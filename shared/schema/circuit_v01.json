@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ohmatic.dev/schemas/circuit_v01.json",
+  "title": "OhmaticCircuitV01",
+  "description": "Ohmatic v0.1 circuit schematic — single source of truth",
+  "type": "object",
+  "required": ["metadata", "components", "nets"],
+  "properties": {
+    "metadata": {
+      "description": "Circuit-level metadata. `version` must be `\"0.1\"`; additional properties allowed.",
+      "type": "object",
+      "required": ["title", "description", "version", "tags"],
+      "properties": {
+        "title": {
+          "description": "Human-readable name for this circuit, e.g. \"555 Timer Astable Oscillator\".",
+          "type": "string"
+        },
+        "description": {
+          "description": "Plain-English description of what this circuit does.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Schema version. Must be the string literal \"0.1\".",
+          "type": "string",
+          "const": "0.1"
+        },
+        "tags": {
+          "description": "Freeform tags for search and categorisation, e.g. [\"timer\", \"oscillator\"]. At least one tag required.",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "components": {
+      "description": "Ordered list of components placed on the schematic. At least one component required.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "value", "part", "x", "y", "pins"],
+        "properties": {
+          "id": {
+            "description": "Unique component identifier. Pattern: `^[A-Z_][A-Za-z0-9_]*$` (e.g. R1, C_bypass, VCC1).",
+            "type": "string",
+            "pattern": "^[A-Z_][A-Za-z0-9_]*$"
+          },
+          "type": {
+            "description": "Component class; one of the enumerated values.",
+            "type": "string",
+            "enum": [
+              "resistor", "capacitor", "led", "diode",
+              "transistor_npn", "transistor_pnp",
+              "mosfet_n", "mosfet_p",
+              "ic_timer", "ic_opamp", "ic_regulator", "ic_logic", "ic_mcu", "ic_driver",
+              "power_vcc", "power_gnd",
+              "connector", "crystal", "inductor", "button", "speaker", "sensor"
+            ]
+          },
+          "value": {
+            "description": "Component value as a human-readable string, e.g. \"10kΩ\", \"100nF\", \"555\".",
+            "type": "string"
+          },
+          "part": {
+            "description": "Footprint or package identifier, e.g. \"0603\", \"DIP-8\", \"SOT-23\".",
+            "type": "string"
+          },
+          "x": {
+            "description": "X position of the component on the schematic canvas. Number; no bounds enforced (verifier normalises to 0–300).",
+            "type": "number"
+          },
+          "y": {
+            "description": "Y position of the component on the schematic canvas. Number; no bounds enforced (verifier normalises to 0–300).",
+            "type": "number"
+          },
+          "pins": {
+            "description": "Map of pin names to net labels (e.g. {\"1\": \"VCC\", \"base\": \"NODE_A\"}). At least one entry required.",
+            "type": "object",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "nets": {
+      "description": "Electrical nets connecting component pins. At least one net required.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "pins"],
+        "properties": {
+          "name": {
+            "description": "Net name, e.g. \"VCC\", \"GND\", \"NODE_A\". Must be unique within the circuit.",
+            "type": "string"
+          },
+          "pins": {
+            "description": "Component-pin references in `ComponentId.pin_name` format (e.g. [\"R1.1\", \"VCC1.1\"]). At least 2 required.",
+            "type": "array",
+            "minItems": 2,
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": true
+}

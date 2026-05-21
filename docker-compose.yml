@@ -1,0 +1,37 @@
+version: "3.9"
+services:
+  gateway:
+    image: python:3.11-slim
+    command: python /app/server.py
+    volumes:
+      - ./gateway/stub:/app
+    ports:
+      - "8080:8080"
+    environment:
+      USE_MOCK: "true"
+
+  inference:
+    image: python:3.11-slim
+    command: python /app/server.py
+    volumes:
+      - ./inference/stub:/app
+    ports:
+      - "8001:8001"
+    environment:
+      USE_MOCK: "true"
+
+  verifier:
+    image: python:3.11-slim
+    command: python /app/server.py
+    volumes:
+      - ./verifier/stub:/app
+    ports:
+      - "8002:8002"
+
+  enricher:
+    image: python:3.11-slim
+    command: python /app/server.py
+    volumes:
+      - ./enricher/stub:/app
+    ports:
+      - "8003:8003"

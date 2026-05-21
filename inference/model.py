@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""
+Local inference with llama-cpp-python.
+Wraps model with grammar constraints and schema validation.
+"""
+import json
+import re
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+try:
+    from llama_cpp import Llama, LlamaGrammar
+except ImportError:
+    Llama = None
+    LlamaGrammar = None
+
+
+class CircuitModel:
+    """Local circuit generation model using llama-cpp-python."""
+
+    # GBNF grammar for JSON schema validation
+    JSON_GRAMMAR = r"""
+    root   : object
+    value  : object | array | string | number | ("true" | "false" | "null") ws
+    object : "{" ws object_inner "}" ws
+    object_inner : "" | string ":" ws value ("," ws string ":" ws value)*
+    array  : "[" ws array_inner "]" ws
+    array_inner : "" | value ("," ws value)*
+    string : "\"" (
+        [^"\\] |
+        "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+      )* "\"" ws
+    number : ("-"? ([0-9] | [1-9] [0-9]*)) ("." [0-9]+)? ([eE] [-+]? [0-9]+)? ws
+    ws : ([ \t\n] ws)?
+    """
+
+    def __init__(self, model_path: Path, n_gpu_layers: int = -1, n_ctx: int = 2048) -> None:
+        """
+        Initialize model.
+
+        Args:
+            model_path: Path to GGUF model file
+            n_gpu_layers: Number of layers to offload to GPU (-1 = auto)
+            n_ctx: Context window size
+        """
+        if not Llama:
+            raise RuntimeError("llama-cpp-python not installed. Install with: pip install llama-cpp-python")
+
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model not found: {model_path}")
+
+        self.model_path = model_path
+        self.llm = Llama(
+            model_path=str(model_path),
+            n_gpu_layers=n_gpu_layers,
+            n_ctx=n_ctx,
+            verbose=False,
+        )
+
+        # Create JSON grammar
+        try:
+            self.grammar = LlamaGrammar.from_string(self.JSON_GRAMMAR)
+        except Exception:
+            self.grammar = None
+            print("Warning: Could not create JSON grammar, will validate output post-hoc")
+
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        top_p: float = 0.95,
+        use_grammar: bool = True,
+    ) -> str:
+        """
+        Generate circuit JSON from prompt.
+
+        Args:
+            prompt: Text prompt describing the circuit
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0=deterministic, 1=creative)
+            top_p: Top-p sampling parameter
+            use_grammar: Whether to enforce JSON grammar
+
+        Returns:
+            Generated JSON string
+        """
+        grammar = self.grammar if (use_grammar and self.grammar) else None
+
+        response = self.llm(
+            prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            grammar=grammar,
+            echo=False,
+        )
+
+        return response["choices"][0]["text"]
+
+    def generate_circuit(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a circuit and parse JSON.
+
+        Args:
+            prompt: Text description of circuit to generate
+            temperature: Sampling temperature
+
+        Returns:
+            Parsed circuit dict or None if parsing fails
+        """
+        # Build system-prompted input
+        full_prompt = f"""You are a circuit design expert. Generate a valid circuit schematic as JSON.
+
+Rules:
+- Return ONLY valid JSON, no explanations
+- Follow schema v0.1
+- Every pin must be in exactly one net
+- Include VCC and GND nets
+- Use realistic component values
+
+Circuit request: {prompt}
+
+Output JSON circuit:
+{{"""
+
+        try:
+            output = self.generate(full_prompt, temperature=temperature)
+
+            # Try to parse as JSON
+            json_str = "{" + output
+            circuit = json.loads(json_str)
+
+            return circuit
+
+        except json.JSONDecodeError:
+            # Try to extract JSON from response
+            match = re.search(r"\{[\s\S]*\}", output)
+            if match:
+                try:
+                    return json.loads(match.group())
+                except json.JSONDecodeError:
+                    pass
+
+            return None
+
+    def __repr__(self) -> str:
+        return f"CircuitModel(path={self.model_path})"
+
+
+class MockCircuitModel:
+    """Mock model for testing without requiring actual GGUF files."""
+
+    def __init__(self) -> None:
+        pass
+
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        top_p: float = 0.95,
+        use_grammar: bool = True,
+    ) -> str:
+        """Mock generation — returns a complete JSON string."""
+        return json.dumps({
+            "metadata": {
+                "title": "Mock LED Circuit",
+                "description": "Mock test circuit generated by MockCircuitModel",
+                "version": "0.1",
+                "tags": ["test", "mock"],
+            },
+            "components": [
+                {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 10},
+                {"id": "R1", "type": "resistor", "part": "1/4W", "value": "330Ω", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 10},
+                {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "A", "K": "K"}, "x": 90, "y": 10},
+                {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 130, "y": 10},
+            ],
+            "nets": [
+                {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+                {"name": "Net1", "pins": ["R1.2", "LED1.A"]},
+                {"name": "GND", "pins": ["LED1.K", "GND1.1"]},
+            ],
+        })
+
+    def generate_circuit(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+    ) -> Optional[Dict[str, Any]]:
+        """Mock circuit generation."""
+        return json.loads(self.generate(prompt))
+
+    def __repr__(self) -> str:
+        return "MockCircuitModel()"
+
+
+def load_model(
+    model_path: Optional[Path] = None,
+    use_mock: bool = False,
+    **kwargs: Any
+) -> CircuitModel | MockCircuitModel:
+    """
+    Load circuit model. Falls back to mock if model not found or use_mock=True.
+
+    Args:
+        model_path: Path to GGUF model file
+        use_mock: Force use of mock model for testing
+        **kwargs: Additional arguments for CircuitModel
+
+    Returns:
+        CircuitModel or MockCircuitModel instance
+    """
+    if use_mock:
+        return MockCircuitModel()
+
+    if model_path and Path(model_path).exists():
+        return CircuitModel(Path(model_path), **kwargs)
+
+    print("Warning: Model not found, using mock model for testing")
+    return MockCircuitModel()

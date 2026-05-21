@@ -1,0 +1,101 @@
+# Ohmatic Log Schema v0.1
+
+> **Normative** — all four services (gateway, inference, verifier, enricher) MUST emit
+> newline-delimited JSON logs matching this schema. Log aggregators (e.g., Loki, CloudWatch)
+> depend on the field names being stable.
+
+---
+
+## Required Fields
+
+Every log line is a single JSON object. The following five fields are **required** on every
+line emitted by any service.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string (ISO-8601 UTC) | When the event occurred, e.g. `"2026-05-23T14:32:01.004Z"`. Always UTC, always millisecond precision or better. |
+| `request_id` | string (ULID) | Unique ID for the inbound request, propagated end-to-end from the gateway across all downstream calls. Format: 26-char ULID, e.g. `"01HXYZ..."`. |
+| `service` | string enum | One of `"gateway"`, `"inference"`, `"verifier"`, `"enricher"`. |
+| `level` | string enum | One of `"debug"`, `"info"`, `"warn"`, `"error"`. |
+| `message` | string | Human-readable description of the event. Must not be empty. |
+
+---
+
+## Service-Specific Optional Fields
+
+Each service may include additional fields. These are **not** required but should be consistent
+within a service.
+
+### gateway
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `job_id` | string | ULID of the async job created for this request. |
+| `http_method` | string | e.g. `"POST"`, `"GET"`. |
+| `http_path` | string | e.g. `"/v1/generate"`. |
+| `http_status` | integer | HTTP response status code. |
+| `latency_ms` | integer | End-to-end request latency in milliseconds. |
+
+### inference
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `model` | string | Model identifier, e.g. `"ohmatic-v0.1-finetune"`. |
+| `raw_tokens` | integer | Number of tokens generated. |
+| `duration_ms` | integer | Inference wall-clock time in ms. |
+| `temperature` | number | Sampling temperature used. |
+
+### verifier
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `tier` | integer | Tier that triggered (1, 2, or 3). |
+| `warnings_count` | integer | Number of Tier 3 DRC warnings emitted. |
+| `errors_count` | integer | Number of Tier 1/2 errors that caused 422. |
+| `circuit_id` | string | `metadata.title` or a hash for traceability. |
+
+### enricher
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `supplier` | string | BOM supplier queried, e.g. `"local"`, `"octopart"`. |
+| `bom_entries` | integer | Number of BOM lines returned. |
+| `mpn_hit_rate` | number | Fraction of components with `mpn_found: true`. |
+
+---
+
+## Example Log Lines
+
+**gateway** — job accepted:
+```json
+{"timestamp":"2026-05-23T14:32:01.004Z","request_id":"01HWABCDE1234567890ABCDE","service":"gateway","level":"info","message":"Job accepted","job_id":"01HWABCDE9876543210ABCDE","http_method":"POST","http_path":"/v1/generate","http_status":202,"latency_ms":3}
+```
+
+**inference** — generation complete:
+```json
+{"timestamp":"2026-05-23T14:32:03.712Z","request_id":"01HWABCDE1234567890ABCDE","service":"inference","level":"info","message":"Circuit generated","model":"ohmatic-v0.1-finetune","raw_tokens":847,"duration_ms":2708,"temperature":0.4}
+```
+
+**verifier** — Tier 3 warning emitted:
+```json
+{"timestamp":"2026-05-23T14:32:03.901Z","request_id":"01HWABCDE1234567890ABCDE","service":"verifier","level":"warn","message":"Tier 3 DRC warning: missing bypass capacitor near U1","tier":3,"warnings_count":1,"errors_count":0,"circuit_id":"555 Timer Astable Oscillator"}
+```
+
+**enricher** — BOM resolved:
+```json
+{"timestamp":"2026-05-23T14:32:04.210Z","request_id":"01HWABCDE1234567890ABCDE","service":"enricher","level":"info","message":"BOM enrichment complete","supplier":"local","bom_entries":8,"mpn_hit_rate":0.875}
+```
+
+---
+
+## Implementation Notes
+
+- **Rust services** (gateway, verifier, enricher): use [`tracing`](https://docs.rs/tracing) with
+  [`tracing-subscriber`](https://docs.rs/tracing-subscriber) configured for JSON output via
+  `tracing_subscriber::fmt().json()`. Set `RUST_LOG=info` in production.
+
+- **Python service** (inference): use [`structlog`](https://www.structlog.org/) with
+  `structlog.configure(processors=[structlog.processors.JSONRenderer()])`.
+  Inject `request_id` at request entry via `structlog.contextvars.bind_contextvars(request_id=...)`.
+
+- **request_id propagation**: gateway generates the ULID on receipt and forwards it as `X-Request-ID`. Each downstream service binds it to its log context before emitting logs.

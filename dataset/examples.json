@@ -1,0 +1,495 @@
+[
+  {
+    "metadata": {
+      "title": "Simple LED Circuit",
+      "description": "LED with current limiting resistor",
+      "version": "0.1",
+      "tags": ["beginner", "led"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "VCC"}, "x": 10, "y": 10},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "330Ω", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 10},
+      {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "2", "K": "3"}, "x": 90, "y": 10},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "3"}, "x": 130, "y": 10}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "LED1.A"]},
+      {"name": "GND", "pins": ["LED1.K", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "RC Low-Pass Filter",
+      "description": "Passive RC filter circuit",
+      "version": "0.1",
+      "tags": ["filter", "analog"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 20},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 20},
+      {"id": "C1", "type": "capacitor", "part": "0805", "value": "100nF", "pins": {"1": "2", "2": "3"}, "x": 90, "y": 20},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "3"}, "x": 130, "y": 20}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "C1.1"]},
+      {"name": "GND", "pins": ["C1.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Voltage Divider",
+      "description": "Simple two-resistor voltage divider",
+      "version": "0.1",
+      "tags": ["analog", "basic"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 30},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 30},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "2", "2": "3"}, "x": 90, "y": 30},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "3"}, "x": 130, "y": 30}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "R2.1"]},
+      {"name": "GND", "pins": ["R2.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Transistor Amplifier",
+      "description": "Simple NPN transistor amplifier stage",
+      "version": "0.1",
+      "tags": ["amplifier", "transistor"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 40},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "47kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 40},
+      {"id": "Q1", "type": "transistor_npn", "part": "2N2222", "value": "", "pins": {"B": "2", "C": "3", "E": "4"}, "x": 90, "y": 40},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "3", "2": "5"}, "x": 130, "y": 40},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "4"}, "x": 170, "y": 40},
+      {"id": "GND2", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 210, "y": 40}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "Q1.B"]},
+      {"name": "Net2", "pins": ["Q1.C", "R2.1"]},
+      {"name": "GND", "pins": ["Q1.E", "GND1.1", "R2.2", "GND2.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "OpAmp Inverting Amplifier",
+      "description": "Inverting amplifier with gain of -10 using LM358",
+      "version": "0.1",
+      "tags": ["opamp", "amplifier", "analog"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "15V", "pins": {"1": "1"}, "x": 10, "y": 50},
+      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-15V", "pins": {"1": "1"}, "x": 10, "y": 60},
+      {"id": "J1", "type": "connector", "part": "SIG_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 55},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 50},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 50},
+      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 55},
+      {"id": "J2", "type": "connector", "part": "SIG_OUT", "value": "", "pins": {"1": "1"}, "x": 170, "y": 55},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 90, "y": 65}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
+      {"name": "NET_IN", "pins": ["J1.1", "R1.1"]},
+      {"name": "NET_INV", "pins": ["R1.2", "R2.1", "U1.2"]},
+      {"name": "NET_OUT", "pins": ["U1.1", "R2.2", "J2.1"]},
+      {"name": "GND", "pins": ["U1.3", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "555 Timer Astable Oscillator",
+      "description": "Astable NE555 timer with LED output at ~1 Hz",
+      "version": "0.1",
+      "tags": ["timer", "oscillator", "ic"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 70},
+      {"id": "U1", "type": "ic_timer", "part": "NE555", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7", "8": "8"}, "x": 50, "y": 75},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 70},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "68kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 80},
+      {"id": "C1", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 75},
+      {"id": "C2", "type": "capacitor", "part": "0603", "value": "10nF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 85},
+      {"id": "R3", "type": "resistor", "part": "1/4W", "value": "330Ω", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 70},
+      {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "A", "K": "K"}, "x": 210, "y": 70},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 250, "y": 75}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.8", "U1.4", "R1.1"]},
+      {"name": "NET_RA", "pins": ["R1.2", "R2.1", "U1.7"]},
+      {"name": "NET_TIMING", "pins": ["R2.2", "C1.1", "U1.6", "U1.2"]},
+      {"name": "NET_CV", "pins": ["U1.5", "C2.1"]},
+      {"name": "NET_OUT", "pins": ["U1.3", "R3.1"]},
+      {"name": "NET_LED", "pins": ["R3.2", "LED1.A"]},
+      {"name": "GND", "pins": ["U1.1", "C1.2", "C2.2", "LED1.K", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "MOSFET Switch",
+      "description": "N-channel MOSFET as a switch",
+      "version": "0.1",
+      "tags": ["mosfet", "switch", "power"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 90},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 90},
+      {"id": "Q1", "type": "mosfet_n", "part": "IRF540N", "value": "", "pins": {"G": "2", "D": "3", "S": "4"}, "x": 90, "y": 90},
+      {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "3", "K": "5"}, "x": 130, "y": 90},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "4"}, "x": 170, "y": 90},
+      {"id": "GND2", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 170, "y": 95}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "Q1.G"]},
+      {"name": "Net2", "pins": ["Q1.D", "LED1.A"]},
+      {"name": "GND", "pins": ["Q1.S", "GND1.1", "LED1.K", "GND2.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "LDO Voltage Regulator",
+      "description": "Linear regulator circuit with bypass caps",
+      "version": "0.1",
+      "tags": ["regulator", "power", "ic"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 100},
+      {"id": "C1", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 100},
+      {"id": "U1", "type": "ic_regulator", "part": "LM7805", "value": "", "pins": {"1": "2", "2": "3", "3": "4"}, "x": 90, "y": 100},
+      {"id": "C2", "type": "capacitor", "part": "0805", "value": "1µF", "pins": {"1": "4", "2": "5"}, "x": 130, "y": 100},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "2"}, "x": 170, "y": 100},
+      {"id": "GND2", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 170, "y": 105}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "C1.1", "U1.1"]},
+      {"name": "GND", "pins": ["C1.2", "U1.2", "GND1.1"]},
+      {"name": "Net1", "pins": ["U1.3", "C2.1"]},
+      {"name": "GND", "pins": ["C2.2", "GND2.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Push Button Circuit",
+      "description": "Button with pullup resistor",
+      "version": "0.1",
+      "tags": ["button", "input"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 110},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 110},
+      {"id": "SW1", "type": "button", "part": "PUSHBUTTON", "value": "", "pins": {"1": "2", "2": "3"}, "x": 90, "y": 110},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "3"}, "x": 130, "y": 110}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "SW1.1"]},
+      {"name": "GND", "pins": ["SW1.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Crystal Pierce Oscillator",
+      "description": "Pierce oscillator using 74HC04 inverter and 16 MHz crystal",
+      "version": "0.1",
+      "tags": ["oscillator", "crystal", "logic"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 120},
+      {"id": "U1", "type": "ic_logic", "part": "74HC04", "value": "", "pins": {"1": "1", "2": "2", "7": "7", "14": "14"}, "x": 50, "y": 120},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "1MΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 115},
+      {"id": "X1", "type": "crystal", "part": "16MHz", "value": "", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 125},
+      {"id": "C1", "type": "capacitor", "part": "0603", "value": "20pF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 115},
+      {"id": "C2", "type": "capacitor", "part": "0603", "value": "20pF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 125},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 120},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 210, "y": 120}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.14", "C_bypass.1"]},
+      {"name": "NET_OSC_IN", "pins": ["U1.1", "R1.1", "X1.1", "C1.1"]},
+      {"name": "NET_OSC_OUT", "pins": ["U1.2", "R1.2", "X1.2", "C2.1"]},
+      {"name": "GND", "pins": ["U1.7", "C1.2", "C2.2", "C_bypass.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Photodiode Transimpedance Amplifier",
+      "description": "TIA with 100 kΩ feedback resistor for BPW34 photodiode",
+      "version": "0.1",
+      "tags": ["opamp", "sensor", "light", "analog"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 140},
+      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 150},
+      {"id": "PD1", "type": "sensor", "part": "BPW34", "value": "", "pins": {"A": "A", "K": "K"}, "x": 50, "y": 145},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 145},
+      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 130, "y": 145},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 145}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
+      {"name": "NET_INV", "pins": ["PD1.A", "R1.1", "U1.2"]},
+      {"name": "NET_OUT", "pins": ["R1.2", "U1.1"]},
+      {"name": "GND", "pins": ["PD1.K", "U1.3", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Simple Relay Driver",
+      "description": "Transistor-driven relay circuit",
+      "version": "0.1",
+      "tags": ["relay", "transistor", "switch"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 160},
+      {"id": "VCC2", "type": "power_vcc", "part": "RELAY_VCC", "value": "12V", "pins": {"1": "2"}, "x": 10, "y": 170},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "1", "2": "3"}, "x": 50, "y": 160},
+      {"id": "Q1", "type": "transistor_npn", "part": "2N2222", "value": "", "pins": {"B": "3", "C": "4", "E": "5"}, "x": 90, "y": 165},
+      {"id": "D1", "type": "diode", "part": "1N4007", "value": "", "pins": {"A": "4", "K": "2"}, "x": 130, "y": 160},
+      {"id": "RL1", "type": "connector", "part": "RELAY_COIL", "value": "", "pins": {"1": "2", "2": "4"}, "x": 130, "y": 170},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 170, "y": 165}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["R1.2", "Q1.B"]},
+      {"name": "Net2", "pins": ["Q1.C", "D1.A", "RL1.1"]},
+      {"name": "RELAY_VCC", "pins": ["VCC2.1", "D1.K", "RL1.2"]},
+      {"name": "GND", "pins": ["Q1.E", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Single-Supply Audio Amplifier",
+      "description": "Non-inverting AC-coupled audio amplifier with gain of 11",
+      "version": "0.1",
+      "tags": ["audio", "amplifier", "opamp"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 180},
+      {"id": "J_in", "type": "connector", "part": "AUDIO_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 175},
+      {"id": "C_in", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 175},
+      {"id": "R_bias", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 185},
+      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 180},
+      {"id": "R_gain", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 175},
+      {"id": "R_fb", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 185},
+      {"id": "C_out", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 180},
+      {"id": "J_out", "type": "connector", "part": "AUDIO_OUT", "value": "", "pins": {"1": "1"}, "x": 210, "y": 180},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 190}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "NET_AC_IN", "pins": ["J_in.1", "C_in.1"]},
+      {"name": "NET_NON_INV", "pins": ["C_in.2", "R_bias.1", "U1.3"]},
+      {"name": "NET_INV", "pins": ["U1.2", "R_gain.1", "R_fb.1"]},
+      {"name": "NET_AMP_OUT", "pins": ["U1.1", "R_fb.2", "C_out.1"]},
+      {"name": "NET_AUDIO_OUT", "pins": ["C_out.2", "J_out.1"]},
+      {"name": "GND", "pins": ["U1.4", "R_gain.2", "R_bias.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Microcontroller Minimal Circuit",
+      "description": "ATmega328P with 16 MHz crystal, bypass caps, and power",
+      "version": "0.1",
+      "tags": ["mcu", "embedded", "avr"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 200},
+      {"id": "U1", "type": "ic_mcu", "part": "ATmega328P", "value": "", "pins": {"VCC": "VCC", "GND": "GND", "XTAL1": "XTAL1", "XTAL2": "XTAL2"}, "x": 50, "y": 200},
+      {"id": "X1", "type": "crystal", "part": "16MHz", "value": "", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 200},
+      {"id": "C1", "type": "capacitor", "part": "0603", "value": "20pF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 195},
+      {"id": "C2", "type": "capacitor", "part": "0603", "value": "20pF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 205},
+      {"id": "C3", "type": "capacitor", "part": "0805", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 200},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 210, "y": 200}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.VCC", "C3.1"]},
+      {"name": "NET_XTAL1", "pins": ["U1.XTAL1", "C1.1", "X1.1"]},
+      {"name": "NET_XTAL2", "pins": ["U1.XTAL2", "C2.1", "X1.2"]},
+      {"name": "GND", "pins": ["U1.GND", "C1.2", "C2.2", "C3.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "CMOS Logic Inverter Buffer",
+      "description": "74HC04 single-gate inverter with bypass cap and I/O connectors",
+      "version": "0.1",
+      "tags": ["logic", "digital", "cmos"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 210},
+      {"id": "U1", "type": "ic_logic", "part": "74HC04", "value": "", "pins": {"1": "1", "2": "2", "7": "7", "14": "14"}, "x": 50, "y": 210},
+      {"id": "C1", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 210},
+      {"id": "J_in", "type": "connector", "part": "SIG_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 205},
+      {"id": "J_out", "type": "connector", "part": "SIG_OUT", "value": "", "pins": {"1": "1"}, "x": 130, "y": 210},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 130, "y": 215}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.14", "C1.1"]},
+      {"name": "NET_IN", "pins": ["J_in.1", "U1.1"]},
+      {"name": "NET_OUT", "pins": ["U1.2", "J_out.1"]},
+      {"name": "GND", "pins": ["U1.7", "C1.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "H-Bridge Motor Driver",
+      "description": "L298N dual H-bridge for bidirectional DC motor control",
+      "version": "0.1",
+      "tags": ["motor", "driver", "power", "hbridge"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 220},
+      {"id": "VCC2", "type": "power_vcc", "part": "VCC_LOGIC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 230},
+      {"id": "U1", "type": "ic_driver", "part": "L298N", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7", "8": "8"}, "x": 60, "y": 225},
+      {"id": "J_ctrl", "type": "connector", "part": "CTRL", "value": "", "pins": {"1": "1", "2": "2"}, "x": 10, "y": 225},
+      {"id": "MOT1", "type": "connector", "part": "MOTOR", "value": "", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 225},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 225}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.4"]},
+      {"name": "VCC_LOGIC", "pins": ["VCC2.1", "U1.1", "U1.7"]},
+      {"name": "NET_IN1", "pins": ["J_ctrl.1", "U1.2"]},
+      {"name": "NET_IN2", "pins": ["J_ctrl.2", "U1.3"]},
+      {"name": "NET_OUT1", "pins": ["U1.5", "MOT1.1"]},
+      {"name": "NET_OUT2", "pins": ["U1.6", "MOT1.2"]},
+      {"name": "GND", "pins": ["U1.8", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Sensor Interface",
+      "description": "Temperature sensor with conditioning",
+      "version": "0.1",
+      "tags": ["sensor", "analog", "temperature"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 240},
+      {"id": "S1", "type": "sensor", "part": "LM35", "value": "", "pins": {"1": "1", "2": "2", "3": "3"}, "x": 50, "y": 240},
+      {"id": "C1", "type": "capacitor", "part": "0805", "value": "100nF", "pins": {"1": "2", "2": "4"}, "x": 90, "y": 240},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "2", "2": "5"}, "x": 130, "y": 240},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "3"}, "x": 170, "y": 240},
+      {"id": "GND2", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "4"}, "x": 170, "y": 245}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "S1.1", "R1.1"]},
+      {"name": "Net1", "pins": ["S1.2", "C1.1", "R1.2"]},
+      {"name": "GND", "pins": ["S1.3", "C1.2", "GND1.1", "GND2.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Buck Converter",
+      "description": "High-side MOSFET buck converter with freewheeling diode, 24V input",
+      "version": "0.1",
+      "tags": ["power", "smps", "dcdc", "buck"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VIN", "value": "24V", "pins": {"1": "1"}, "x": 10, "y": 250},
+      {"id": "J_pwm", "type": "connector", "part": "PWM_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 240},
+      {"id": "R_gate", "type": "resistor", "part": "1/4W", "value": "10Ω", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 245},
+      {"id": "Q1", "type": "mosfet_n", "part": "IRF540N", "value": "", "pins": {"G": "G", "D": "D", "S": "S"}, "x": 90, "y": 250},
+      {"id": "D1", "type": "diode", "part": "MBR20200CT", "value": "", "pins": {"A": "A", "K": "K"}, "x": 130, "y": 255},
+      {"id": "L1", "type": "inductor", "part": "10µH", "value": "", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 245},
+      {"id": "C1", "type": "capacitor", "part": "1206", "value": "100µF", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 250},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 210, "y": 255}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "Q1.D"]},
+      {"name": "NET_PWM", "pins": ["J_pwm.1", "R_gate.1"]},
+      {"name": "NET_GATE", "pins": ["R_gate.2", "Q1.G"]},
+      {"name": "NET_SW", "pins": ["Q1.S", "D1.K", "L1.1"]},
+      {"name": "VOUT", "pins": ["L1.2", "C1.1"]},
+      {"name": "GND", "pins": ["D1.A", "C1.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Op-Amp Difference Amplifier",
+      "description": "Single op-amp unity-gain difference amplifier",
+      "version": "0.1",
+      "tags": ["opamp", "amplifier", "differential"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "15V", "pins": {"1": "1"}, "x": 10, "y": 260},
+      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-15V", "pins": {"1": "1"}, "x": 10, "y": 270},
+      {"id": "J_in1", "type": "connector", "part": "IN1", "value": "", "pins": {"1": "1"}, "x": 10, "y": 255},
+      {"id": "J_in2", "type": "connector", "part": "IN2", "value": "", "pins": {"1": "1"}, "x": 10, "y": 275},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 260},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 260},
+      {"id": "R3", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 270},
+      {"id": "R4", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 275},
+      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 265},
+      {"id": "J_out", "type": "connector", "part": "OUT", "value": "", "pins": {"1": "1"}, "x": 170, "y": 265},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 130, "y": 275}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
+      {"name": "NET_IN1", "pins": ["J_in1.1", "R1.1"]},
+      {"name": "NET_INV", "pins": ["R1.2", "R2.1", "U1.2"]},
+      {"name": "NET_OUT", "pins": ["U1.1", "R2.2", "J_out.1"]},
+      {"name": "NET_IN2", "pins": ["J_in2.1", "R3.1"]},
+      {"name": "NET_NON_INV", "pins": ["R3.2", "R4.1", "U1.3"]},
+      {"name": "GND", "pins": ["R4.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  },
+  {
+    "metadata": {
+      "title": "Precision Half-Wave Rectifier",
+      "description": "Op-amp precision rectifier eliminating the forward diode drop",
+      "version": "0.1",
+      "tags": ["opamp", "rectifier", "precision", "analog"]
+    },
+    "components": [
+      {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 280},
+      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 290},
+      {"id": "J_in", "type": "connector", "part": "SIG_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 285},
+      {"id": "R_in", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 280},
+      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 285},
+      {"id": "D1", "type": "diode", "part": "1N4148", "value": "", "pins": {"A": "A", "K": "K"}, "x": 130, "y": 280},
+      {"id": "D2", "type": "diode", "part": "1N4148", "value": "", "pins": {"A": "A", "K": "K"}, "x": 130, "y": 290},
+      {"id": "R_out", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 285},
+      {"id": "J_out", "type": "connector", "part": "SIG_OUT", "value": "", "pins": {"1": "1"}, "x": 210, "y": 285},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 210, "y": 290}
+    ],
+    "nets": [
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
+      {"name": "NET_SIG_IN", "pins": ["J_in.1", "R_in.1"]},
+      {"name": "NET_INV", "pins": ["R_in.2", "D1.K", "U1.2"]},
+      {"name": "NET_AMP_OUT", "pins": ["U1.1", "D1.A", "D2.A"]},
+      {"name": "NET_RECT_OUT", "pins": ["D2.K", "R_out.1", "J_out.1"]},
+      {"name": "GND", "pins": ["U1.3", "R_out.2", "GND1.1"]}
+    ],
+    "tier3_reviewed": true
+  }
+]

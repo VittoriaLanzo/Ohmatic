@@ -1,0 +1,19 @@
+# Core inference
+llama-cpp-python>=0.2.0
+
+# Training (Colab / GPU machine only — comment out for CPU-only installs)
+# unsloth>=2024.1
+# bitsandbytes>=0.41.0
+
+# HuggingFace ecosystem
+transformers>=4.36.0
+datasets>=2.14.0
+
+# Web UI
+gradio>=4.0.0
+
+# Data validation
+pydantic>=2.0.0
+
+# Dataset generation (calls Anthropic API via HTTP)
+requests>=2.31.0
