@@ -134,6 +134,30 @@ Ohmatic/
 | Rust service implementations | in progress |
 | Fine-tuned inference model | in progress |
 
+## Contributing
+
+The project is in active development. Before opening a PR, read the service contracts in [`shared/docs/contracts.md`](shared/docs/contracts.md) — they are the single source of truth for every request/response shape across the pipeline. Changes to the schema or contracts need to be reflected in both `dataset/validate.py` and `shared/ohmatic-types/src/circuit.rs`, and error messages must stay identical between the two.
+
+A few things that would be genuinely useful right now:
+
+- **More seed circuits** — add examples to `dataset/examples.json`. They must pass `python dataset/validate.py` cleanly. Interesting topologies (H-bridge, charge pump, crystal oscillator) are more valuable than variations on LED + resistor.
+- **SVG renderer improvements** — `ui/renderer.py` is basic. Better component symbol placement, wire routing, or label legibility are all welcome.
+- **New component types** — add to the `ComponentType` enum in `shared/ohmatic-types/src/circuit.rs` and mirror the string in the JSON schema. Open an issue first to agree on the canonical name.
+- **Rust service implementations** — each service has a `stub/server.py` and a `src/main.rs` placeholder. The Rust implementation should satisfy the same contract as the stub; the integration tests in `schema_roundtrip.rs` are the acceptance bar.
+
+For anything non-trivial, open an issue first. The schema is deliberately conservative at v0.1 — backwards-incompatible changes need a version bump and a migration path.
+
+## Citation
+
+```bibtex
+@software{ohmatic,
+  title   = {Ohmatic: Natural-Language Circuit Schematic Generator},
+  author  = {Lanzo, Vittoria},
+  year    = {2026},
+  url     = {https://github.com/VittoriaLanzo/Ohmatic}
+}
+```
+
 ## License
 
 MIT
