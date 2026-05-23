@@ -1,37 +1,79 @@
-version: "3.9"
 services:
   gateway:
-    image: python:3.11-slim
-    command: python /app/server.py
+    image: python:3.11.9-slim
+    command: python3 /app/server.py
+    working_dir: /app
     volumes:
       - ./gateway/stub:/app
     ports:
       - "8080:8080"
-    environment:
-      USE_MOCK: "true"
+    restart: on-failure
+    networks:
+      - ohmatic
+    # Stage 0: stubs return hardcoded responses; gateway never calls backends.
+    # service_started is intentional here. Stage 1 should change to service_healthy.
+    depends_on:
+      inference:
+        condition: service_started
+      verifier:
+        condition: service_started
+      enricher:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   inference:
-    image: python:3.11-slim
-    command: python /app/server.py
+    image: python:3.11.9-slim
+    command: python3 /app/server.py
+    working_dir: /app
     volumes:
       - ./inference/stub:/app
-    ports:
-      - "8001:8001"
-    environment:
-      USE_MOCK: "true"
+    restart: on-failure
+    networks:
+      - ohmatic
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   verifier:
-    image: python:3.11-slim
-    command: python /app/server.py
+    image: python:3.11.9-slim
+    command: python3 /app/server.py
+    working_dir: /app
     volumes:
       - ./verifier/stub:/app
-    ports:
-      - "8002:8002"
+    restart: on-failure
+    networks:
+      - ohmatic
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   enricher:
-    image: python:3.11-slim
-    command: python /app/server.py
+    image: python:3.11.9-slim
+    command: python3 /app/server.py
+    working_dir: /app
     volumes:
       - ./enricher/stub:/app
-    ports:
-      - "8003:8003"
+    restart: on-failure
+    networks:
+      - ohmatic
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+networks:
+  ohmatic:
+    driver: bridge

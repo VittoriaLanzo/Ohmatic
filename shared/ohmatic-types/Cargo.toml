@@ -11,4 +11,5 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
+# Used in schema_roundtrip.rs for JSON Schema validation tests (validates circuits against circuit_v01.json directly).
 jsonschema = "0.18"

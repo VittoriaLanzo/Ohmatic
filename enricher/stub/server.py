@@ -3,8 +3,12 @@
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+MAX_BODY_BYTES = 1 * 1024 * 1024
+
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30  # abort reads that block longer than 30 s
+
     def log_message(self, format, *args):
         pass  # suppress request logs
 
@@ -17,31 +21,67 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path == "/enrich":
-            content_length = int(self.headers.get("Content-Length", 0))
+        path = self.path.split("?")[0]
+        if path == "/enrich":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length < 0:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length > MAX_BODY_BYTES:
+                self.send_json(413, {"error": "request body too large"})
+                return
             raw = self.rfile.read(content_length)
+            if not raw:
+                self.send_json(400, {"error": "request body is required"})
+                return
             try:
                 payload = json.loads(raw)
-                components = payload.get("circuit", {}).get("components", [])
-                bom = [
-                    {
-                        "id": c.get("id", "?"),
-                        "mpn": None,
-                        "description": f"{c.get('type', 'unknown')} {c.get('value', '')}".strip(),
-                        "price_usd": None,
-                        "url": None,
-                        "mpn_found": False
-                    }
-                    for c in components
-                ]
-            except (json.JSONDecodeError, KeyError, TypeError):
-                bom = []
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "invalid JSON body"})
+                return
+            if not isinstance(payload, dict):
+                self.send_json(400, {"error": "request body must be a JSON object"})
+                return
+            if "circuit" not in payload:
+                self.send_json(400, {"error": "missing 'circuit' field"})
+                return
+            circuit = payload["circuit"]
+            if not isinstance(circuit, dict):
+                self.send_json(400, {"error": "'circuit' must be an object"})
+                return
+            if "components" not in circuit:
+                self.send_json(400, {"error": "malformed 'circuit' field"})
+                return
+            components = circuit["components"]
+            if not isinstance(components, list):
+                self.send_json(400, {"error": "'components' must be a list"})
+                return
+            bom = []
+            for c in components:
+                if not isinstance(c, dict):
+                    continue
+                cid = c.get("id")
+                if not isinstance(cid, str) or not cid:
+                    continue
+                bom.append({
+                    "id": cid,
+                    "mpn": None,
+                    "description": f"{c.get('type', 'unknown')} {c.get('value', '')}".strip(),
+                    "price_usd": None,
+                    "url": None,
+                    "mpn_found": False
+                })
             self.send_json(200, bom)
         else:
             self.send_json(404, {"error": "not_found"})
 
     def do_GET(self):
-        if self.path == "/health":
+        path = self.path.split("?")[0]
+        if path == "/health":
             self.send_json(200, {"status": "ok"})
         else:
             self.send_json(404, {"error": "not_found"})

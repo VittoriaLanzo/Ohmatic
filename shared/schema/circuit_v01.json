@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://ohmatic.dev/schemas/circuit_v01.json",
   "title": "OhmaticCircuitV01",
-  "description": "Ohmatic v0.1 circuit schematic — single source of truth",
+  "description": "Ohmatic v0.1 circuit schematic — single source of truth. additionalProperties at root is true to allow dataset annotations (e.g. tier3_reviewed).",
   "type": "object",
   "required": ["metadata", "components", "nets"],
   "properties": {
@@ -13,11 +13,13 @@
       "properties": {
         "title": {
           "description": "Human-readable name for this circuit, e.g. \"555 Timer Astable Oscillator\".",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "description": {
           "description": "Plain-English description of what this circuit does.",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "version": {
           "description": "Schema version. Must be the string literal \"0.1\".",
@@ -27,8 +29,9 @@
         "tags": {
           "description": "Freeform tags for search and categorisation, e.g. [\"timer\", \"oscillator\"]. At least one tag required.",
           "type": "array",
-          "items": { "type": "string" },
-          "minItems": 1
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
         }
       },
       "additionalProperties": true
@@ -42,9 +45,9 @@
         "required": ["id", "type", "value", "part", "x", "y", "pins"],
         "properties": {
           "id": {
-            "description": "Unique component identifier. Pattern: `^[A-Z_][A-Za-z0-9_]*$` (e.g. R1, C_bypass, VCC1).",
+            "description": "Unique component identifier. Pattern: `^[A-Z][A-Za-z0-9_]*$` (e.g. R1, C_bypass, VCC1). Must start with an uppercase letter.",
             "type": "string",
-            "pattern": "^[A-Z_][A-Za-z0-9_]*$"
+            "pattern": "^[A-Z][A-Za-z0-9_]*$"
           },
           "type": {
             "description": "Component class; one of the enumerated values.",
@@ -75,9 +78,10 @@
             "type": "number"
           },
           "pins": {
-            "description": "Map of pin names to net labels (e.g. {\"1\": \"VCC\", \"base\": \"NODE_A\"}). At least one entry required.",
+            "description": "Map of pin names to internal node labels (e.g. {\"1\": \"VCC\", \"base\": \"NODE_A\"}). Values are local node identifiers cross-referenced by the `nets` array — they are not required to match net names directly. At least one entry required.",
             "type": "object",
-            "minProperties": 1
+            "minProperties": 1,
+            "additionalProperties": {"type": "string"}
           }
         },
         "additionalProperties": false
@@ -93,13 +97,18 @@
         "properties": {
           "name": {
             "description": "Net name, e.g. \"VCC\", \"GND\", \"NODE_A\". Must be unique within the circuit.",
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "pins": {
             "description": "Component-pin references in `ComponentId.pin_name` format (e.g. [\"R1.1\", \"VCC1.1\"]). At least 2 required.",
             "type": "array",
             "minItems": 2,
-            "items": { "type": "string" }
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_]+$"
+            }
           }
         },
         "additionalProperties": false

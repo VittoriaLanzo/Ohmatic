@@ -1,8 +1,5 @@
 [workspace]
 members = [
     "shared/ohmatic-types",
-    "gateway",
-    "verifier",
-    "enricher",
 ]
 resolver = "2"

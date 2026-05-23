@@ -3,29 +3,12 @@
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-FALLBACK_CIRCUIT = {
-    "metadata": {
-        "title": "Stub Verified Circuit",
-        "description": "Fallback for verifier stub",
-        "version": "0.1",
-        "tags": ["stub"]
-    },
-    "components": [
-        {"id": "R1", "type": "resistor", "value": "10kΩ", "part": "0603",
-         "x": 50, "y": 50, "pins": {"1": "1", "2": "2"}},
-        {"id": "VCC1", "type": "power_vcc", "value": "5V", "part": "VCC",
-         "x": 10, "y": 10, "pins": {"1": "1"}},
-        {"id": "GND1", "type": "power_gnd", "value": "", "part": "GND",
-         "x": 90, "y": 90, "pins": {"1": "1"}}
-    ],
-    "nets": [
-        {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
-        {"name": "GND", "pins": ["R1.2", "GND1.1"]}
-    ]
-}
+MAX_BODY_BYTES = 1 * 1024 * 1024
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30  # abort reads that block longer than 30 s
+
     def log_message(self, format, *args):
         pass  # suppress request logs
 
@@ -38,14 +21,48 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path == "/verify":
-            content_length = int(self.headers.get("Content-Length", 0))
+        path = self.path.split("?")[0]
+        if path == "/verify":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length < 0:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length > MAX_BODY_BYTES:
+                self.send_json(413, {"error": "request body too large"})
+                return
             raw = self.rfile.read(content_length)
+            if not raw:
+                self.send_json(400, {"error": "request body is required"})
+                return
             try:
                 payload = json.loads(raw)
-                circuit = payload.get("circuit", FALLBACK_CIRCUIT)
-            except (json.JSONDecodeError, KeyError):
-                circuit = FALLBACK_CIRCUIT
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "invalid JSON body"})
+                return
+            if not isinstance(payload, dict):
+                self.send_json(400, {"error": "request body must be a JSON object"})
+                return
+            if "circuit" not in payload:
+                self.send_json(400, {"error": "missing 'circuit' field"})
+                return
+            circuit = payload["circuit"]
+            if not isinstance(circuit, dict):
+                self.send_json(400, {"error": "'circuit' must be an object"})
+                return
+            # Minimal Tier-1 structural check so the 422 path is exercised by integration tests.
+            # Stage 0: only checks key presence and null values; full Tier 1/2/3 DRC deferred to Stage 1.
+            missing = [k for k in ("metadata", "components", "nets")
+                       if k not in circuit or circuit[k] is None]
+            if missing:
+                self.send_json(422, {
+                    "errors": [f"missing required field: {k}" for k in missing],
+                    "warnings": []
+                })
+                return
             self.send_json(200, {
                 "circuit": circuit,
                 "warnings": [],
@@ -55,7 +72,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "not_found"})
 
     def do_GET(self):
-        if self.path == "/health":
+        path = self.path.split("?")[0]
+        if path == "/health":
             self.send_json(200, {"status": "ok"})
         else:
             self.send_json(404, {"error": "not_found"})

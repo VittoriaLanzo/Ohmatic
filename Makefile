@@ -1,8 +1,9 @@
 # Ohmatic Stage 0 — code generation pipeline
-# Generated files: shared/ohmatic-types/src/circuit.rs and schema.md
+# make docs generates schema.md from the schema; make codegen regenerates circuit.rs (currently bootstrapped by hand).
 # Edit shared/schema/circuit_v01.json, then run make codegen.
-# Requires: cargo install typify-cli (pin: cargo install typify-cli --version 0.4.0 or latest)
+# Requires: cargo install typify-cli --version 0.4.0
 # Requires: Rust >= 1.70 (https://rustup.rs)
+# Requires: Python >= 3.8 (https://python.org) — make docs uses walrus operator
 
 SCHEMA := shared/schema/circuit_v01.json
 CIRCUIT_RS := shared/ohmatic-types/src/circuit.rs
@@ -19,14 +20,15 @@ codegen:
 	@if command -v typify-cli >/dev/null 2>&1; then \
 		typify-cli $(SCHEMA) --output $(CIRCUIT_RS); \
 	else \
-		echo "WARNING: typify-cli not installed. Run: cargo install typify-cli"; \
-		echo "Using bootstrapped circuit.rs — run make codegen after installing typify-cli"; \
+		echo "ERROR: typify-cli not installed. Run: cargo install typify-cli --version 0.4.0"; \
+		exit 1; \
 	fi
 	@echo "Codegen complete."
 
-# Invokes an inline Python snippet to render schema.md from circuit_v01.json.
+# Invokes an inline Python 3.8+ snippet (uses walrus operator) to render schema.md.
 docs:
 	@echo "Generating schema.md from $(SCHEMA)..."
+	@python3 -c "import sys; sys.exit(0) if sys.version_info >= (3,8) else sys.exit('ERROR: Python 3.8+ required for make docs (found ' + sys.version + ')')"
 	@python3 -c "\
 import json, sys; \
 s = json.load(open('$(SCHEMA)')); \
@@ -34,10 +36,10 @@ md = '# Ohmatic Circuit Schema v0.1\n\n> **Generated** — edit \`$(SCHEMA)\` an
 md += '## Overview\n\n' + s['description'] + '\n\n'; \
 md += '## Required Top-Level Fields\n\n'; \
 [md := md + '- **' + k + '**\n' for k in s['required']]; \
-print(md)" > $(SCHEMA_MD) 2>/dev/null || \
-	python3 -c "import json; s=json.load(open('$(SCHEMA)')); print('# Ohmatic Circuit Schema v0.1\n\nGenerated from circuit_v01.json.\n\nSee circuit_v01.json for the full schema.')" > $(SCHEMA_MD)
+print(md)" > $(SCHEMA_MD)
 	@echo "Docs complete: $(SCHEMA_MD)"
 
-# Prints a reminder that circuit.rs and schema.md are generated and must be removed manually.
+# Removes only the generated schema.md. circuit.rs is hand-maintained and is not deleted.
 clean:
-	@echo "Note: circuit.rs and schema.md are generated. Remove manually if needed."
+	@rm -f $(SCHEMA_MD)
+	@echo "Cleaned: $(SCHEMA_MD)"

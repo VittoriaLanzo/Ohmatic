@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Stub server for gateway. Returns hardcoded valid responses. Replace with production implementation in Stage 1. See shared/docs/contracts.md for the contract."""
 import json
+import re
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+MAX_BODY_BYTES = 1 * 1024 * 1024
 
 HARDCODED_CIRCUIT = {
     "metadata": {
@@ -26,6 +29,8 @@ HARDCODED_CIRCUIT = {
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30  # abort reads that block longer than 30 s
+
     def log_message(self, format, *args):
         pass  # suppress request logs
 
@@ -38,7 +43,51 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path == "/v1/generate":
+        path = self.path.split("?")[0]
+        if path == "/v1/generate":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length < 0:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length > MAX_BODY_BYTES:
+                self.send_json(413, {"error": "request body too large"})
+                return
+            raw = self.rfile.read(content_length)
+            if not raw:
+                self.send_json(400, {"error": "request body is required"})
+                return
+            try:
+                body = json.loads(raw)
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "invalid JSON body"})
+                return
+            if not isinstance(body, dict):
+                self.send_json(400, {"error": "request body must be a JSON object"})
+                return
+            prompt = body.get("prompt")
+            if not isinstance(prompt, str) or not prompt.strip():
+                self.send_json(400, {"error": "prompt must not be empty"})
+                return
+            if "options" in body:
+                options_raw = body["options"]
+                if not isinstance(options_raw, dict):
+                    self.send_json(400, {"error": "options must be a JSON object"})
+                    return
+                options = options_raw
+            else:
+                options = {}
+            if "temperature" in options:
+                temperature = options["temperature"]
+                if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+                    self.send_json(400, {"error": "options.temperature must be a number"})
+                    return
+                if not (0.0 <= temperature <= 1.0):
+                    self.send_json(400, {"error": "options.temperature must be in [0, 1]"})
+                    return
             self.send_json(202, {
                 "job_id": "stub-job-01",
                 "poll_url": "/v1/jobs/stub-job-01/status"
@@ -47,7 +96,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "not_found"})
 
     def do_GET(self):
-        if "/v1/jobs/" in self.path and self.path.endswith("/status"):
+        path = self.path.split("?")[0]  # strip query string; BaseHTTPRequestHandler.path includes it
+        m = re.fullmatch(r"/v1/jobs/([^/]+)/status", path)
+        if m:
+            job_id = m.group(1)
+            if job_id != "stub-job-01":
+                self.send_json(404, {"error": "job_not_found"})
+                return
             self.send_json(200, {
                 "status": "done",
                 "stage": None,
@@ -59,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
                 },
                 "error": None
             })
-        elif self.path == "/health":
+        elif path == "/health":
             self.send_json(200, {"status": "ok"})
         else:
             self.send_json(404, {"error": "not_found"})

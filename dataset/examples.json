@@ -178,9 +178,8 @@
     ],
     "nets": [
       {"name": "VCC", "pins": ["VCC1.1", "C1.1", "U1.1"]},
-      {"name": "GND", "pins": ["C1.2", "U1.2", "GND1.1"]},
-      {"name": "Net1", "pins": ["U1.3", "C2.1"]},
-      {"name": "GND", "pins": ["C2.2", "GND2.1"]}
+      {"name": "GND", "pins": ["C1.2", "U1.2", "GND1.1", "C2.2", "GND2.1"]},
+      {"name": "Net1", "pins": ["U1.3", "C2.1"]}
     ],
     "tier3_reviewed": true
   },

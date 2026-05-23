@@ -38,8 +38,8 @@ the client must poll `/v1/jobs/{id}/status` for the result.
 
 ```json
 {
-  "job_id": "01HWABCDE9876543210ABCDE",
-  "poll_url": "/v1/jobs/01HWABCDE9876543210ABCDE/status"
+  "job_id": "01HWABCDE9876543210ABCDE01",
+  "poll_url": "/v1/jobs/01HWABCDE9876543210ABCDE01/status"
 }
 ```
 
@@ -116,6 +116,8 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 }
 ```
 
+The `latency_ms` sub-fields (`inference`, `drc`, `bom`) are **integer milliseconds**.
+
 ### Response 200 — Failed
 
 ```json
@@ -130,6 +132,18 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 }
 ```
 
+#### error.code values
+
+| `error.code` | Cause |
+|---|---|
+| `tier1_validation_failed` | Circuit failed Tier 1 schema/structural check after all retries exhausted. |
+| `tier2_validation_failed` | Circuit failed Tier 2 geometric check after all retries exhausted. |
+| `grammar_timeout` | Inference constrained decoding timed out producing a valid circuit. |
+| `unsupported_schema_version` | `metadata.version` returned by inference is not `"0.1"`. |
+| `inference_unavailable` | Inference service unreachable; gateway returned 503. |
+
+> **Error shape note:** Synchronous gateway errors (400, 503 on `POST /v1/generate`) and internal service errors (`POST /infer` 422) use a flat string form: `{ "error": "message" }`. Async job failures use a structured object: `{ "code": "...", "message": "..." }`. These are two different response surfaces — clients must handle both.
+
 ### Response 404 — Not Found
 
 ```json
@@ -138,7 +152,23 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 
 ---
 
-## 3. POST /infer
+## 3. GET /health
+
+**Service:** all four services (gateway :8080, inference :8001, verifier :8002, enricher :8003)
+
+Liveness probe for Docker health checks and load balancer readiness.
+
+### Response 200 — OK
+
+```json
+{ "status": "ok" }
+```
+
+No authentication required. Returns 200 while the service is alive.
+
+---
+
+## 4. POST /infer
 
 **Service:** inference (internal, port 8001)
 
@@ -180,11 +210,11 @@ Returned when constrained decoding times out before producing a valid circuit.
 
 ---
 
-## 4. POST /verify
+## 5. POST /verify
 
 **Service:** verifier (internal, port 8002)
 
-Validates an `OhmaticCircuitV01` object against the three-tier DRC rule set (see [§6](#6-verifier-tier-model)).
+Validates an `OhmaticCircuitV01` object against the three-tier DRC rule set (see [§7](#7-verifier-tier-model)).
 
 ### Request
 
@@ -207,8 +237,17 @@ are reported as warnings; the gateway surfaces these in `result.drc_warnings`.
 }
 ```
 
-If `errors` is **non-empty**, the gateway treats this as a Tier 1/2 failure and returns 422
-to the client (or retries, up to `options.max_retries`).
+The 200 response always has `errors: []`. The verifier **never** returns HTTP 200 with a
+non-empty `errors` array — a non-empty errors array is always signalled via HTTP 422.
+The gateway reads the HTTP status code: 200 → pass, 422 → Tier 1/2 failure.
+
+### Response 400 — Bad Request
+
+```json
+{ "error": "missing 'circuit' field" }
+```
+
+Returned when the request body is absent, is not valid JSON, or does not contain the `circuit` field.
 
 ### Response 422 — Validation Error (Tier 1 or Tier 2)
 
@@ -221,7 +260,7 @@ to the client (or retries, up to `options.max_retries`).
 
 ---
 
-## 5. POST /enrich
+## 6. POST /enrich
 
 **Service:** enricher (internal, port 8003)
 
@@ -274,14 +313,14 @@ Returns one `BomEntry` per component in the same order as `circuit.components`.
 
 ---
 
-## 6. Verifier Tier Model
+## 7. Verifier Tier Model
 
 The verifier applies rules in three tiers. Tiers are applied sequentially; a Tier 1 failure
 prevents Tier 2 checks from running, and so on.
 
 | Tier | Category | Gateway behaviour | Example rules |
 |------|----------|-------------------|---------------|
-| **Tier 1** | Schema violations | Return 422, increment retry counter | Duplicate component IDs; invalid component type; missing required pin; no VCC component; no GND component |
+| **Tier 1** | Schema violations | Return 422, increment retry counter | Duplicate component IDs; duplicate net names; invalid component type; missing required pin; no VCC component; no GND component |
 | **Tier 2** | Geometric violations | Return 422, increment retry counter | Component bounding-box collision; component placed outside the 0–300 canvas after normalization |
 | **Tier 3** | Electrical correctness | Return 200 with `drc_warnings` populated | LED without series resistor; transistor base with no bias resistor; IC power pin unconnected; missing bypass capacitor near IC |
 
@@ -290,11 +329,15 @@ prevents Tier 2 checks from running, and so on.
 - **Tier 3 → 200 + `drc_warnings`:** the circuit is accepted and the client sees warnings in
   `result.drc_warnings`. No retry is triggered.
 
-Full Tier 3 rule catalog: see `OHMATIC_BACKEND_BUILD_PLAN.md` section 3.1.
+The Tier 3 rule catalog will be specified in Stage 1. The examples above are illustrative.
+
+**Known Stage 0 enum gaps (deferred to Stage 1):**
+- Negative supply rails (e.g. VEE, −15 V) are typed as `power_vcc` — a `power_vee` type will be added in Stage 1.
+- Relay coils are typed as `connector` — a `relay` type will be added in Stage 1 to enable flyback-diode DRC rules.
 
 ---
 
-## 7. Schema Versioning Dispatch
+## 8. Schema Versioning Dispatch
 
 The gateway reads `metadata.version` from the circuit returned by inference to select the
 correct verifier rule set. This allows multiple schema versions to coexist on a single
@@ -303,11 +346,11 @@ running instance.
 | `metadata.version` | Action |
 |--------------------|--------|
 | `"0.1"` | Apply full Tier 1–3 rule set against `shared/schema/circuit_v01.json`. |
-| Any other value | Return 422 with `{ "error": "unsupported_schema_version" }`. |
+| Any other value | Job fails with `error.code = "unsupported_schema_version"` (see §2 failed state). |
 
 **Dispatch example:**
 
-```json
+```text
 POST /v1/generate → inference returns circuit with metadata.version = "0.1"
 → gateway dispatches to verifier with circuit_v01 rule set
 → verifier returns { warnings: [], errors: [] }
@@ -316,10 +359,27 @@ POST /v1/generate → inference returns circuit with metadata.version = "0.1"
 
 **Unknown version rejection example:**
 
-```json
+```text
 POST /v1/generate → inference returns circuit with metadata.version = "99.0"
-→ gateway returns 422: { "error": "unsupported_schema_version" }
+→ gateway sets job to "failed" with error.code = "unsupported_schema_version"
+→ GET /v1/jobs/{id}/status returns: { "status": "failed", "error": { "code": "unsupported_schema_version", "message": "metadata.version \"99.0\" is not supported" } }
 ```
 
 This dispatch design is forward-compatible: adding `circuit_v02.json` and a corresponding
 verifier rule set requires no changes to the gateway dispatch table structure.
+
+> **Schema limitation:** JSON Schema draft-07 cannot enforce uniqueness of `nets[].name` across
+> the array. Net-name uniqueness is enforced by `dataset/validate.py` and by the verifier's Tier 1
+> rule set. Do not rely solely on `jsonschema.validate()` for this constraint.
+
+---
+
+## 9. Extending the Component Type Enum
+
+To add a new component type (e.g. `relay`, `power_vee`):
+
+1. Add the new string to `circuit_v01.json` `components[].type.enum`.
+2. Add the corresponding variant to `ComponentType` in `shared/ohmatic-types/src/circuit.rs`.
+3. Add an example circuit using the new type to `dataset/examples.json`.
+4. Update the Tier 3 DRC rules in `shared/docs/contracts.md` if new electrical rules apply.
+5. Bump `metadata.version` only when introducing breaking schema changes.

@@ -3,6 +3,8 @@
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+MAX_BODY_BYTES = 1 * 1024 * 1024
+
 HARDCODED_CIRCUIT = {
     "metadata": {
         "title": "Stub Inference Circuit",
@@ -26,6 +28,8 @@ HARDCODED_CIRCUIT = {
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30  # abort reads that block longer than 30 s
+
     def log_message(self, format, *args):
         pass  # suppress request logs
 
@@ -38,19 +42,55 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path == "/infer":
-            content_length = int(self.headers.get("Content-Length", 0))
-            _ = self.rfile.read(content_length)  # consume body
+        path = self.path.split("?")[0]
+        if path == "/infer":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length < 0:
+                self.send_json(400, {"error": "invalid Content-Length header"})
+                return
+            if content_length > MAX_BODY_BYTES:
+                self.send_json(413, {"error": "request body too large"})
+                return
+            raw = self.rfile.read(content_length)
+            if not raw:
+                self.send_json(400, {"error": "request body is required"})
+                return
+            try:
+                body = json.loads(raw)
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "invalid JSON body"})
+                return
+            if not isinstance(body, dict):
+                self.send_json(400, {"error": "request body must be a JSON object"})
+                return
+            prompt = body.get("prompt")
+            if not isinstance(prompt, str) or not prompt.strip():
+                self.send_json(400, {"error": "prompt must not be empty"})
+                return
+            if "temperature" in body:
+                temperature = body["temperature"]
+                if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+                    self.send_json(400, {"error": "temperature must be a number"})
+                    return
+                if not (0.0 <= temperature <= 1.0):
+                    self.send_json(400, {"error": "temperature must be in [0, 1]"})
+                    return
+            # Stage 0 synthetic values — not reflective of production latency
             self.send_json(200, {
                 "circuit": HARDCODED_CIRCUIT,
                 "raw_tokens": 512,
-                "duration_ms": 0
+                "duration_ms": 1
             })
         else:
             self.send_json(404, {"error": "not_found"})
 
     def do_GET(self):
-        if self.path == "/health":
+        path = self.path.split("?")[0]
+        if path == "/health":
             self.send_json(200, {"status": "ok"})
         else:
             self.send_json(404, {"error": "not_found"})

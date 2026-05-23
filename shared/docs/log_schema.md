@@ -14,10 +14,12 @@ line emitted by any service.
 | Field | Type | Description |
 |-------|------|-------------|
 | `timestamp` | string (ISO-8601 UTC) | When the event occurred, e.g. `"2026-05-23T14:32:01.004Z"`. Always UTC, always millisecond precision or better. |
-| `request_id` | string (ULID) | Unique ID for the inbound request, propagated end-to-end from the gateway across all downstream calls. Format: 26-char ULID, e.g. `"01HXYZ..."`. |
+| `request_id` | string (ULID) | Unique ID for the inbound request, propagated end-to-end from the gateway across all downstream calls. Format: 26-char ULID, e.g. `"01HWABCDE1234567890ABCDEF0"`. |
 | `service` | string enum | One of `"gateway"`, `"inference"`, `"verifier"`, `"enricher"`. |
 | `level` | string enum | One of `"debug"`, `"info"`, `"warn"`, `"error"`. |
 | `message` | string | Human-readable description of the event. Must not be empty. |
+
+> **Note:** For log lines that are not associated with an inbound request (e.g. service startup, scheduled tasks), `request_id` should be set to a generated ULID scoped to that operation. Health-check probe log lines may omit `request_id`.
 
 ---
 
@@ -68,34 +70,36 @@ within a service.
 
 **gateway** — job accepted:
 ```json
-{"timestamp":"2026-05-23T14:32:01.004Z","request_id":"01HWABCDE1234567890ABCDE","service":"gateway","level":"info","message":"Job accepted","job_id":"01HWABCDE9876543210ABCDE","http_method":"POST","http_path":"/v1/generate","http_status":202,"latency_ms":3}
+{"timestamp":"2026-05-23T14:32:01.004Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"gateway","level":"info","message":"Job accepted","job_id":"01HWABCDE9876543210ABCDEF0","http_method":"POST","http_path":"/v1/generate","http_status":202,"latency_ms":3}
 ```
 
 **inference** — generation complete:
 ```json
-{"timestamp":"2026-05-23T14:32:03.712Z","request_id":"01HWABCDE1234567890ABCDE","service":"inference","level":"info","message":"Circuit generated","model":"ohmatic-v0.1-finetune","raw_tokens":847,"duration_ms":2708,"temperature":0.4}
+{"timestamp":"2026-05-23T14:32:03.712Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"inference","level":"info","message":"Circuit generated","model":"ohmatic-v0.1-finetune","raw_tokens":847,"duration_ms":2708,"temperature":0.4}
 ```
 
 **verifier** — Tier 3 warning emitted:
 ```json
-{"timestamp":"2026-05-23T14:32:03.901Z","request_id":"01HWABCDE1234567890ABCDE","service":"verifier","level":"warn","message":"Tier 3 DRC warning: missing bypass capacitor near U1","tier":3,"warnings_count":1,"errors_count":0,"circuit_id":"555 Timer Astable Oscillator"}
+{"timestamp":"2026-05-23T14:32:03.901Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"verifier","level":"warn","message":"Tier 3 DRC warning: missing bypass capacitor near U1","tier":3,"warnings_count":1,"errors_count":0,"circuit_id":"555 Timer Astable Oscillator"}
 ```
 
 **enricher** — BOM resolved:
 ```json
-{"timestamp":"2026-05-23T14:32:04.210Z","request_id":"01HWABCDE1234567890ABCDE","service":"enricher","level":"info","message":"BOM enrichment complete","supplier":"local","bom_entries":8,"mpn_hit_rate":0.875}
+{"timestamp":"2026-05-23T14:32:04.210Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"enricher","level":"info","message":"BOM enrichment complete","supplier":"local","bom_entries":8,"mpn_hit_rate":0.875}
 ```
 
 ---
 
-## Implementation Notes
+## Implementation Notes (Stage 1 Production Target)
 
-- **Rust services** (gateway, verifier, enricher): use [`tracing`](https://docs.rs/tracing) with
-  [`tracing-subscriber`](https://docs.rs/tracing-subscriber) configured for JSON output via
-  `tracing_subscriber::fmt().json()`. Set `RUST_LOG=info` in production.
+> **Stage 0 note:** The Stage 0 stubs emit minimal stdout only. The logging contract below applies to the Stage 1 production implementation.
+
+- **Rust services** (gateway, verifier, enricher — Stage 1 target; Stage 0 uses Python stubs): use
+  [`tracing`](https://docs.rs/tracing) with [`tracing-subscriber`](https://docs.rs/tracing-subscriber)
+  configured for JSON output via `tracing_subscriber::fmt().json().init();`. Set `RUST_LOG=info` in production.
 
 - **Python service** (inference): use [`structlog`](https://www.structlog.org/) with
   `structlog.configure(processors=[structlog.processors.JSONRenderer()])`.
   Inject `request_id` at request entry via `structlog.contextvars.bind_contextvars(request_id=...)`.
 
-- **request_id propagation**: gateway generates the ULID on receipt and forwards it as `X-Request-ID`. Each downstream service binds it to its log context before emitting logs.
+- **request_id propagation**: gateway generates the ULID on receipt and forwards it as the `X-Request-ID` HTTP header (normative; all internal calls MUST include this header). Each downstream service reads `X-Request-ID` from the incoming request and binds it to its log context.
