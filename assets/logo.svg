@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<svg id="logo" viewBox="0 0 380 100" width="460" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#f4f3ed"></rect>
+
+    <!-- baseline circuit trace -->
+    <line x1="14" y1="80" x2="366" y2="80" stroke="#16a34a" stroke-width="0.5" opacity="0.3"></line>
+
+    <!-- Ω — Ohm symbol -->
+    <path d="M14 80 L22 80 L22 74 A32 32 0 1 1 62 74 L62 80 L70 80" stroke="#1a1a14" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+
+    <!-- h — smooth arch + via node at apex -->
+    <line x1="80" y1="16" x2="80" y2="80" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <path d="M80 44 C80 28,118 28,118 80" stroke="#1a1a14" stroke-width="3" fill="none" stroke-linecap="round"></path>
+    <circle cx="99" cy="34" r="4.5" fill="#16a34a"></circle>
+
+    <!-- m — triangle wave (M-shaped waveform symbol) -->
+    <path d="M128 80 L146 20 L164 80 L182 20 L200 80" stroke="#1a1a14" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+    <circle cx="146" cy="20" r="4" fill="#16a34a"></circle>
+    <circle cx="182" cy="20" r="4" fill="#16a34a"></circle>
+
+    <!-- a — triangle / node at apex -->
+    <line x1="210" y1="80" x2="231" y2="16" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <line x1="252" y1="80" x2="231" y2="16" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <line x1="218" y1="56" x2="244" y2="56" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <circle cx="231" cy="16" r="4.5" fill="#16a34a"></circle>
+
+    <!-- t — junction node at crossbar -->
+    <line x1="277" y1="28" x2="277" y2="80" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <line x1="263" y1="44" x2="291" y2="44" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <circle cx="277" cy="44" r="4" fill="#16a34a"></circle>
+
+    <!-- i — plain lowercase i -->
+    <circle cx="309" cy="14" r="3.5" fill="#16a34a"></circle>
+    <line x1="309" y1="20" x2="309" y2="80" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+    <line x1="303" y1="80" x2="315" y2="80" stroke="#1a1a14" stroke-width="3" stroke-linecap="round"></line>
+
+    <!-- c — mirrored arc (opens to the left) -->
+    <path d="M325 40 L337 40 A30 30 0 0 1 337 76 L325 76" stroke="#1a1a14" stroke-width="3" fill="none" stroke-linecap="round"></path>
+
+  </svg>
