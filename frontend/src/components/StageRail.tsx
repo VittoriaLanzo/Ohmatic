@@ -1,4 +1,5 @@
 import { CheckCircle2, CircleDashed, Cpu, PackageCheck, ShieldCheck, Zap } from "lucide-react";
+import type { CSSProperties } from "react";
 import type { JobStage } from "../types/api";
 
 type StageRailProps = {
@@ -18,16 +19,24 @@ export function StageRail({ stage, phase }: StageRailProps) {
   // PIPELINE UI ENTRY: maps backend job `stage` values from GET /v1/jobs/{id}/status
   // to the visible progress rail. Add new backend stages here if the gateway contract grows.
   const activeIndex = getActiveIndex(stage, phase);
+  const railStyle = { "--active-index": activeIndex } as CSSProperties;
 
   return (
-    <ol className="stage-rail" aria-label="Generation pipeline">
+    <ol className={`stage-rail is-${phase}`} style={railStyle} aria-label="Generation pipeline">
+      <span className="stage-bus" aria-hidden="true" />
+      <span className="stage-bus-charge" aria-hidden="true" />
+      <span className="stage-bus-packet" aria-hidden="true" />
       {stages.map((item, index) => {
         const Icon = item.icon;
         const state = index < activeIndex ? "complete" : index === activeIndex ? "active" : "waiting";
         return (
-          <li className={`stage-step is-${state}`} key={item.id}>
+          <li
+            className={`stage-step is-${state} stage-${item.id}`}
+            key={item.id}
+            style={{ "--stage-order": index } as CSSProperties}
+          >
             <span className="stage-icon" aria-hidden="true">
-              {state === "active" && phase !== "done" ? <Zap size={15} /> : <Icon size={15} />}
+              {state === "active" && phase !== "done" && phase !== "idle" ? <Zap size={15} /> : <Icon size={15} />}
             </span>
             <span>{item.label}</span>
           </li>

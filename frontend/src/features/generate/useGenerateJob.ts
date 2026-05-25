@@ -130,6 +130,22 @@ async function pollUntilTerminal(
       return;
     }
 
+    if (status.status === "failed") {
+      setState((current) => ({
+        ...current,
+        phase: "error",
+        status,
+        stage: current.stage,
+        result: null,
+        error: {
+          code: status.error.code,
+          message: status.error.message,
+          source: "job"
+        }
+      }));
+      return;
+    }
+
     setState((current) => ({
       ...current,
       phase: "polling",

@@ -22,6 +22,8 @@ const defaultOptions: Required<GenerateOptions> = {
   max_components: 30
 };
 
+type CompletionMotion = "idle" | "burst" | "returning" | "settled";
+
 export default function App() {
   const job = useGenerateJob();
   const [prompt, setPrompt] = useState(examples[0]);
@@ -29,6 +31,7 @@ export default function App() {
   const [maxComponents, setMaxComponents] = useState(defaultOptions.max_components);
   const [supplier, setSupplier] = useState<Supplier>(defaultOptions.supplier);
   const [health, setHealth] = useState<"checking" | "ok" | "offline">("checking");
+  const [completionMotion, setCompletionMotion] = useState<CompletionMotion>("idle");
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +44,26 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (job.phase !== "done") {
+      setCompletionMotion("idle");
+      return;
+    }
+
+    setCompletionMotion("burst");
+    const returnTimer = window.setTimeout(() => {
+      setCompletionMotion("returning");
+    }, 260);
+    const settleTimer = window.setTimeout(() => {
+      setCompletionMotion("settled");
+    }, 1900);
+
+    return () => {
+      window.clearTimeout(returnTimer);
+      window.clearTimeout(settleTimer);
+    };
+  }, [job.phase, job.jobId]);
 
   async function jobCheckHealth() {
     try {
@@ -67,12 +90,29 @@ export default function App() {
   }
 
   const statusText = statusLabel(job.phase, job.stage);
+  const isReturningToStart = job.phase === "done" && completionMotion === "returning";
+  const isSettledDone = job.phase === "done" && completionMotion === "settled";
+  const visualPhase = isReturningToStart || isSettledDone ? "idle" : job.phase;
+  const visualStage = isReturningToStart || isSettledDone ? null : job.stage;
+  const motionPhase = visualPhase === "polling" && visualStage ? visualStage : visualPhase;
+  const stageKey = visualStage ?? visualPhase;
+  const logoReturning = job.phase === "done" && completionMotion !== "settled";
+  const logoPhase = logoReturning ? "idle" : visualPhase;
+  const logoStage = logoReturning ? null : visualStage;
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell motion-${motionPhase}`} data-motion-phase={motionPhase} data-stage={stageKey}>
       <a className="skip-link" href="#prompt">
         Skip to prompt
       </a>
+      <div className="pcb-backplane" aria-hidden="true">
+        <span className="pcb-backplane__grid" />
+        <span className="pcb-backplane__lane pcb-backplane__lane--primary" />
+        <span className="pcb-backplane__lane pcb-backplane__lane--secondary" />
+        <span className="pcb-backplane__node pcb-backplane__node--a" />
+        <span className="pcb-backplane__node pcb-backplane__node--b" />
+        <span className="pcb-backplane__node pcb-backplane__node--c" />
+      </div>
       <header className="app-header">
         <h1 className="sr-only">Ohmatic</h1>
         <nav className="top-nav" aria-label="Primary">
@@ -89,7 +129,7 @@ export default function App() {
       <section className="hero-workbench" aria-label="Circuit generation workspace">
         <p className="version-badge">Version 1.0</p>
         <div className="hero-logo">
-          <OhmaticLogo stage={job.stage} active={job.isBusy} />
+          <OhmaticLogo stage={logoStage} phase={logoPhase} active={job.isBusy} returning={logoReturning} />
         </div>
 
         <div className="hero-copy">
@@ -100,7 +140,7 @@ export default function App() {
 
       </section>
 
-      <form className="prompt-panel command-dock" onSubmit={handleSubmit}>
+      <form className={`prompt-panel command-dock ${job.isBusy ? "is-transmitting" : ""}`} onSubmit={handleSubmit}>
         <div className="command-heading">
           <div>
             <span className="console-label">Gateway command</span>
@@ -195,7 +235,7 @@ export default function App() {
             </output>
           </div>
 
-          <StageRail stage={job.stage} phase={job.phase} />
+          <StageRail stage={visualStage} phase={visualPhase} />
 
           {job.error && (
             <div className="error-box" role="alert">
@@ -208,7 +248,7 @@ export default function App() {
           )}
 
           <div className="schematic-frame">
-            <SchematicSvg circuit={job.result?.circuit ?? null} />
+            <SchematicSvg circuit={job.result?.circuit ?? null} phase={visualPhase} />
           </div>
 
           <dl className="metadata-grid">
@@ -239,7 +279,7 @@ export default function App() {
           </dl>
         </section>
 
-        <ResultPanels result={job.result} />
+        <ResultPanels result={job.result} phase={visualPhase} />
       </section>
     </main>
   );

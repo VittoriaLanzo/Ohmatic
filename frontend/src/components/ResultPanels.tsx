@@ -1,15 +1,17 @@
 import { AlertTriangle, Copy, FileJson, PackageSearch } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { formatCurrency, formatMs } from "../lib/format";
 import type { GenerateResult } from "../types/api";
 
 type ResultPanelsProps = {
   result: GenerateResult | null;
+  phase: "idle" | "submitting" | "polling" | "done" | "error";
 };
 
 type TabId = "warnings" | "bom" | "json";
 
-export function ResultPanels({ result }: ResultPanelsProps) {
+export function ResultPanels({ result, phase }: ResultPanelsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("warnings");
   // JSON VISUALIZATION TODO:
   // The Contract tab currently pretty-prints result.circuit as read-only JSON.
@@ -42,7 +44,7 @@ export function ResultPanels({ result }: ResultPanelsProps) {
   }, [result]);
 
   return (
-    <section className="inspector-panel" aria-labelledby="inspector-heading">
+    <section className={`inspector-panel is-${phase}`} aria-labelledby="inspector-heading">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Artifact package</p>
@@ -120,8 +122,8 @@ export function ResultPanels({ result }: ResultPanelsProps) {
                 </tr>
               </thead>
               <tbody>
-                {displayedParts.map((entry) => (
-                  <tr key={entry.id}>
+                {displayedParts.map((entry, index) => (
+                  <tr key={entry.id} style={{ "--row-order": index } as CSSProperties}>
                     <th scope="row">{entry.id}</th>
                     <td>{entry.mpn}</td>
                     <td>{entry.description}</td>
@@ -139,6 +141,7 @@ export function ResultPanels({ result }: ResultPanelsProps) {
 
       {activeTab === "json" && (
         <div className="tab-panel json-panel" role="tabpanel">
+          <span className="json-scanline" aria-hidden="true" />
           <button
             className="icon-button"
             type="button"

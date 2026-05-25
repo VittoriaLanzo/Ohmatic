@@ -1,16 +1,19 @@
+import type { CSSProperties } from "react";
 import type { OhmaticCircuitV01 } from "../types/circuit";
 
 type SchematicSvgProps = {
   circuit: OhmaticCircuitV01 | null;
+  phase: "idle" | "submitting" | "polling" | "done" | "error";
 };
 
-export function SchematicSvg({ circuit }: SchematicSvgProps) {
+export function SchematicSvg({ circuit, phase }: SchematicSvgProps) {
   // CIRCUIT ARTIFACT ENTRY: renders result.circuit returned by the gateway job.
   // Backend agents linking output should preserve metadata/components/nets, coordinates, and pin refs.
   if (!circuit) {
     return (
-      <div className="empty-schematic" role="status">
+      <div className={`empty-schematic is-${phase}`} role="status">
         <span className="empty-schematic__trace" aria-hidden="true" />
+        <span className="empty-schematic__packet" aria-hidden="true" />
         <p>Schematic will appear here.</p>
       </div>
     );
@@ -19,7 +22,12 @@ export function SchematicSvg({ circuit }: SchematicSvgProps) {
   const positions = normalizePositions(circuit);
 
   return (
-    <svg className="schematic-svg" viewBox="0 0 360 210" role="img" aria-labelledby="schematic-title schematic-desc">
+    <svg
+      className={`schematic-svg is-${phase}`}
+      viewBox="0 0 360 210"
+      role="img"
+      aria-labelledby="schematic-title schematic-desc"
+    >
       <title id="schematic-title">{circuit.metadata.title}</title>
       <desc id="schematic-desc">{circuit.metadata.description}</desc>
       <defs>
@@ -43,8 +51,15 @@ export function SchematicSvg({ circuit }: SchematicSvgProps) {
               <polyline
                 points={points.map((point) => `${point.x},${point.y}`).join(" ")}
                 className={`net-line net-line-${index % 5}`}
+                pathLength="1"
+                style={{ "--draw-order": index } as CSSProperties}
               />
-              <text x={points[0].x + 8} y={points[0].y - 8} className="net-label">
+              <text
+                x={points[0].x + 8}
+                y={points[0].y - 8}
+                className="net-label"
+                style={{ "--draw-order": index } as CSSProperties}
+              >
                 {net.name}
               </text>
             </g>
@@ -53,10 +68,15 @@ export function SchematicSvg({ circuit }: SchematicSvgProps) {
       </g>
 
       <g className="schematic-components">
-        {circuit.components.map((component) => {
+        {circuit.components.map((component, index) => {
           const point = positions.get(component.id) ?? { x: 0, y: 0 };
           return (
-            <g key={component.id} transform={`translate(${point.x} ${point.y})`} className="schematic-component">
+            <g
+              key={component.id}
+              transform={`translate(${point.x} ${point.y})`}
+              className="schematic-component"
+              style={{ "--draw-order": index } as CSSProperties}
+            >
               <ComponentSymbol type={component.type} />
               <circle cx="-29" cy="0" r="2.8" />
               <circle cx="29" cy="0" r="2.8" />
