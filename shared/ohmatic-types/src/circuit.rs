@@ -1,8 +1,10 @@
-// Structs bootstrapped by hand from shared/schema/circuit_v01.json.
-// Run: make codegen (requires typify-cli --version 0.4.0) to regenerate ONLY the struct/enum
-// definitions above the `fn is_valid_component_id` line.
-// DO NOT regenerate: is_valid_component_id, is_valid_pin_ref, and impl OhmaticCircuitV01
-// are hand-written and must be preserved.
+// Hand-authored circuit data model — derived from shared/schema/circuit_v01.json
+// but NOT machine-generated. ComponentType is a transparent string newtype
+// (not an enum) so that new types can be added via component_registry.toml alone.
+//
+// DO NOT run typify-cli codegen against this file — it would overwrite the
+// ComponentType newtype with an enum and break the data-driven registry design.
+// To add a new component type: see verifier/config/component_registry.toml.
 
 use serde::{Deserialize, Serialize};
 
@@ -34,31 +36,160 @@ pub struct Component {
     pub pins: std::collections::HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ComponentType {
-    Resistor,
-    Capacitor,
-    Led,
-    Diode,
-    TransistorNpn,
-    TransistorPnp,
-    MosfetN,
-    MosfetP,
-    IcTimer,
-    IcOpamp,
-    IcRegulator,
-    IcLogic,
-    IcMcu,
-    IcDriver,
-    PowerVcc,
-    PowerGnd,
-    Connector,
-    Crystal,
-    Inductor,
-    Button,
-    Speaker,
-    Sensor,
+/// A component type identifier — any lowercase snake_case string.
+///
+/// Ohmatic is data-driven: the authoritative list of supported types lives in
+/// `verifier/config/component_registry.toml`.  To register a new component:
+///   1. Add an entry to `component_registry.toml` (bbox, ref_prefix, description).
+///   2. Optionally add a named constant to `ohmatic_types::component_types` for
+///      use in the rules engine — no other Rust change is required.
+///
+/// Unknown types (strings not present in the registry) pass serde but are
+/// rejected by the verifier as a T1-PARSE error.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(transparent)]
+pub struct ComponentType(pub String);
+
+impl ComponentType {
+    /// Construct from any string (no validity check — registry is the authority).
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+
+    /// Borrow the inner string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ComponentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl From<&str> for ComponentType {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for ComponentType {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+/// Named string constants for all well-known component types.
+///
+/// Import with `use ohmatic_types::component_types as ct;` then use `ct::LED`,
+/// `ct::RESISTOR`, etc. in pattern matching and array slices.
+///
+/// Adding a new type does NOT require adding a constant here — it only requires
+/// a registry entry.  Constants are provided as a convenience for the rules
+/// engine and are informational only.
+pub mod component_types {
+    // ── Passives ─────────────────────────────────────────────────────────────
+    pub const RESISTOR: &str = "resistor";
+    pub const CAPACITOR: &str = "capacitor";
+    pub const INDUCTOR: &str = "inductor";
+    pub const POTENTIOMETER: &str = "potentiometer";
+    pub const THERMISTOR: &str = "thermistor";
+    pub const VARISTOR: &str = "varistor";
+
+    // ── Diodes ───────────────────────────────────────────────────────────────
+    pub const DIODE: &str = "diode";
+    pub const LED: &str = "led";
+    pub const LED_RGB: &str = "led_rgb";
+    pub const ZENER_DIODE: &str = "zener_diode";
+    pub const SCHOTTKY_DIODE: &str = "schottky_diode";
+    pub const TVS_DIODE: &str = "tvs_diode";
+    pub const PHOTODIODE: &str = "photodiode";
+
+    // ── Bipolar transistors ───────────────────────────────────────────────────
+    pub const TRANSISTOR_NPN: &str = "transistor_npn";
+    pub const TRANSISTOR_PNP: &str = "transistor_pnp";
+
+    // ── Field-effect & power transistors ─────────────────────────────────────
+    pub const MOSFET_N: &str = "mosfet_n";
+    pub const MOSFET_P: &str = "mosfet_p";
+    pub const IGBT: &str = "igbt";
+    pub const PHOTOTRANSISTOR: &str = "phototransistor";
+
+    // ── Thyristors & AC power devices ────────────────────────────────────────
+    pub const THYRISTOR_SCR: &str = "thyristor_scr";
+    pub const TRIAC: &str = "triac";
+
+    // ── Optoelectronics ───────────────────────────────────────────────────────
+    pub const OPTOCOUPLER: &str = "optocoupler";
+
+    // ── Protection & switching ────────────────────────────────────────────────
+    pub const FUSE: &str = "fuse";
+    pub const RELAY: &str = "relay";
+    pub const RELAY_SOLID_STATE: &str = "relay_solid_state";
+
+    // ── Magnetics ─────────────────────────────────────────────────────────────
+    pub const TRANSFORMER: &str = "transformer";
+    pub const FERRITE_BEAD: &str = "ferrite_bead";
+
+    // ── Displays ──────────────────────────────────────────────────────────────
+    pub const SEVEN_SEGMENT: &str = "seven_segment";
+    pub const LCD: &str = "lcd";
+
+    // ── ICs — analog ──────────────────────────────────────────────────────────
+    pub const IC_TIMER: &str = "ic_timer";
+    pub const IC_OPAMP: &str = "ic_opamp";
+    pub const IC_COMPARATOR: &str = "ic_comparator";
+    pub const IC_REGULATOR: &str = "ic_regulator";
+    pub const IC_INSTRUMENTATION_AMP: &str = "ic_instrumentation_amp";
+    pub const IC_VOLTAGE_REF: &str = "ic_voltage_ref";
+    pub const IC_ADC: &str = "ic_adc";
+    pub const IC_DAC: &str = "ic_dac";
+    pub const IC_PLL: &str = "ic_pll";
+
+    // ── ICs — digital / mixed-signal ──────────────────────────────────────────
+    pub const IC_LOGIC: &str = "ic_logic";
+    pub const IC_MCU: &str = "ic_mcu";
+    pub const IC_DRIVER: &str = "ic_driver";
+    pub const IC_MEMORY: &str = "ic_memory";
+    pub const IC_FPGA: &str = "ic_fpga";
+    pub const IC_LEVEL_SHIFTER: &str = "ic_level_shifter";
+    pub const IC_INTERFACE: &str = "ic_interface";
+    pub const IC_FILTER: &str = "ic_filter";
+    pub const IC_AUDIO_AMP: &str = "ic_audio_amp";
+    pub const IC_BATTERY_MANAGEMENT: &str = "ic_battery_management";
+    pub const IC_POWER_CONVERTER: &str = "ic_power_converter";
+    pub const IC_RTC: &str = "ic_rtc";
+    pub const IC_RF: &str = "ic_rf";
+
+    // ── Power symbols ─────────────────────────────────────────────────────────
+    pub const POWER_VCC: &str = "power_vcc";
+    pub const POWER_GND: &str = "power_gnd";
+    pub const POWER_VEE: &str = "power_vee";
+    pub const POWER_3V3: &str = "power_3v3";
+    pub const POWER_5V: &str = "power_5v";
+    pub const POWER_12V: &str = "power_12v";
+
+    // ── Power sources ─────────────────────────────────────────────────────────
+    pub const BATTERY: &str = "battery";
+
+    // ── Electromechanical / interface ─────────────────────────────────────────
+    pub const CONNECTOR: &str = "connector";
+    pub const BUTTON: &str = "button";
+    pub const SWITCH: &str = "switch";
+    pub const MOTOR_DC: &str = "motor_dc";
+    pub const MOTOR_STEPPER: &str = "motor_stepper";
+    pub const SERVO: &str = "servo";
+
+    // ── RF / wireless ─────────────────────────────────────────────────────────
+    pub const ANTENNA: &str = "antenna";
+
+    // ── Sensors / transducers / output devices ────────────────────────────────
+    pub const CRYSTAL: &str = "crystal";
+    pub const SPEAKER: &str = "speaker";
+    pub const SENSOR: &str = "sensor";
+    pub const MICROPHONE: &str = "microphone";
+    pub const DIODE_BRIDGE: &str = "diode_bridge";
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -145,8 +276,12 @@ impl OhmaticCircuitV01 {
                 if is_dup {
                     errors.push(format!("Duplicate component id: {}", comp.id));
                 } else {
-                    if comp.component_type == ComponentType::PowerVcc { has_vcc = true; }
-                    if comp.component_type == ComponentType::PowerGnd { has_gnd = true; }
+                    if comp.component_type.as_str() == component_types::POWER_VCC {
+                        has_vcc = true;
+                    }
+                    if comp.component_type.as_str() == component_types::POWER_GND {
+                        has_gnd = true;
+                    }
                     if comp.pins.is_empty() {
                         errors.push(format!("component '{}' pins must not be empty", comp.id));
                     } else if id_counts[comp.id.as_str()] == 1 {

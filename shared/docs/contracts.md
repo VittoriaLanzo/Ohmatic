@@ -164,7 +164,7 @@ Liveness probe for Docker health checks and load balancer readiness.
 { "status": "ok" }
 ```
 
-No authentication required. Returns 200 while the service is alive.
+No authentication required.
 
 ---
 
@@ -237,9 +237,7 @@ are reported as warnings; the gateway surfaces these in `result.drc_warnings`.
 }
 ```
 
-The 200 response always has `errors: []`. The verifier **never** returns HTTP 200 with a
-non-empty `errors` array — a non-empty errors array is always signalled via HTTP 422.
-The gateway reads the HTTP status code: 200 → pass, 422 → Tier 1/2 failure.
+`errors` is always `[]` on a 200. A non-empty errors array is always signalled via HTTP 422. Gateway reads: 200 → pass, 422 → Tier 1/2 failure.
 
 ### Response 400 — Bad Request
 
@@ -247,16 +245,29 @@ The gateway reads the HTTP status code: 200 → pass, 422 → Tier 1/2 failure.
 { "error": "missing 'circuit' field" }
 ```
 
-Returned when the request body is absent, is not valid JSON, or does not contain the `circuit` field.
+Request body absent, not valid JSON, or missing the `circuit` field.
+
+### Response 422 — Parse Error (circuit field present but undeserializable)
+
+`circuit` is present but cannot be deserialised into `OhmaticCircuitV01` (unknown type string, missing field, type mismatch). Fires before `validate()`; rule ID `T1-PARSE` (see §7).
+
+```json
+{
+  "errors": ["[T1-PARSE] failed to deserialise circuit: unknown variant `unknown_widget` for enum ComponentType"],
+  "warnings": []
+}
+```
 
 ### Response 422 — Validation Error (Tier 1 or Tier 2)
 
 ```json
 {
-  "errors": ["Component IDs are not unique: R1 appears twice"],
+  "errors": ["[T1-04] Duplicate component id: R1"],
   "warnings": []
 }
 ```
+
+`validate()` found structural violations. Each entry in `errors` has format `"[rule_id] message"`. `warnings` is always `[]` on 422.
 
 ---
 
@@ -321,11 +332,13 @@ prevents Tier 2 checks from running, and so on.
 | Tier | Category | Gateway behaviour | Example rules |
 |------|----------|-------------------|---------------|
 | **Tier 1** | Schema violations | Return 422, increment retry counter | Duplicate component IDs; duplicate net names; invalid component type; missing required pin; no VCC component; no GND component |
-| **Tier 2** | Geometric violations | Return 422, increment retry counter | Component bounding-box collision; component placed outside the 0–300 canvas after normalization |
+| **Tier 2** | Geometric violations | Normalize coordinates and push-apart collisions (max 20 iterations). Return 200 if all collisions resolved. If any collision remains unresolvable, return 200 + `DRC_WARNING` (gateway does not retry Tier 2). | Component bounding-box collision; component placed outside the 0–300 canvas after normalization |
 | **Tier 3** | Electrical correctness | Return 200 with `drc_warnings` populated | LED without series resistor; transistor base with no bias resistor; IC power pin unconnected; missing bypass capacitor near IC |
 
-- **Tier 1 and Tier 2 → 422:** the gateway may retry inference up to `options.max_retries` times
+- **Tier 1 → 422:** the gateway may retry inference up to `options.max_retries` times
   before returning a `"failed"` job status to the client.
+- **Tier 2 → always 200:** the verifier corrects what it can. Unresolvable collisions produce a
+  `DRC_WARNING` but the circuit is still accepted. The gateway never retries on Tier 2 warnings.
 - **Tier 3 → 200 + `drc_warnings`:** the circuit is accepted and the client sees warnings in
   `result.drc_warnings`. No retry is triggered.
 
@@ -365,8 +378,7 @@ POST /v1/generate → inference returns circuit with metadata.version = "99.0"
 → GET /v1/jobs/{id}/status returns: { "status": "failed", "error": { "code": "unsupported_schema_version", "message": "metadata.version \"99.0\" is not supported" } }
 ```
 
-This dispatch design is forward-compatible: adding `circuit_v02.json` and a corresponding
-verifier rule set requires no changes to the gateway dispatch table structure.
+Forward-compatible: adding `circuit_v02.json` with a new rule set requires no gateway changes.
 
 > **Schema limitation:** JSON Schema draft-07 cannot enforce uniqueness of `nets[].name` across
 > the array. Net-name uniqueness is enforced by `dataset/validate.py` and by the verifier's Tier 1
