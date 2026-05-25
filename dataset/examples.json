@@ -240,7 +240,7 @@
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 140},
       {"id": "VEE1", "type": "power_vee", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 150},
-      {"id": "PD1", "type": "sensor", "part": "BPW34", "value": "", "pins": {"A": "A", "K": "K"}, "x": 50, "y": 145},
+      {"id": "PD1", "type": "photodiode", "part": "BPW34", "value": "", "pins": {"A": "A", "K": "K"}, "x": 50, "y": 145},
       {"id": "R1", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 145},
       {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 130, "y": 145},
       {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 138},

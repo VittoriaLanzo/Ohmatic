@@ -365,8 +365,15 @@ async fn t2_02_unresolvable_collision_200() {
     let r: Value = resp.json();
     // Response must have circuit, warnings, errors fields
     assert!(r.get("circuit").is_some(), "response missing 'circuit' field");
-    assert!(r.get("warnings").is_some(), "response missing 'warnings' field");
+    let warnings = r["warnings"].as_array().unwrap();
     assert!(r.get("errors").is_some(), "response missing 'errors' field");
+    // All 4 components are at the same position — at least one pair must remain
+    // colliding after the sequential pair-correction pass, producing a [T2-02] warning.
+    assert!(
+        warnings.iter().any(|w| w.as_str().unwrap_or("").starts_with("[T2-02]")),
+        "expected at least one [T2-02] warning for packed 4-way collision, got: {:?}",
+        warnings
+    );
 }
 
 // ---------------------------------------------------------------------------

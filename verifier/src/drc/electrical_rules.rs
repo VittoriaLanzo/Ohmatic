@@ -33,11 +33,17 @@ const IC_TYPES_WITH_VCC: &[&str] = &[
 
 // Component types exempt from the T3-07 BFS isolation check.
 // These components are legitimately the outermost nodes of a circuit (connectors, power symbols,
-// mechanical/electromechanical parts) and need not be reachable from a power net to be valid.
+// mechanical/electromechanical parts, transducers) and need not be reachable from a power net
+// to be valid. When adding a new component type, check whether it is a terminal/boundary device;
+// if so, add it here to prevent spurious isolation warnings.
 const T3_07_EXEMPT: &[&str] = &[
     ct::POWER_VCC, ct::POWER_GND, ct::CONNECTOR,
     ct::BUTTON, ct::CRYSTAL, ct::SPEAKER,
     ct::SENSOR, ct::INDUCTOR,
+    ct::BATTERY,      // self-contained power source
+    ct::ANTENNA,      // RF boundary — may appear isolated in RF sub-circuits
+    ct::MICROPHONE,   // transducer — input signal source
+    ct::MOTOR_DC, ct::MOTOR_STEPPER, ct::SERVO, // load devices driven from other nets
 ];
 
 pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
@@ -96,9 +102,12 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
     }
 
     // T3-02: LED without current limiting resistor on anode net.
+    // Applies to both `led` and `led_rgb` (each channel pin acts as an anode).
     // Exception: if a transistor (NPN/PNP) or MOSFET (N/P) has a pin on the anode net,
     // that active device is acting as the current controller — rule does not fire.
-    for comp in circuit.components.iter().filter(|c| c.component_type.as_str() == ct::LED) {
+    for comp in circuit.components.iter()
+        .filter(|c| c.component_type.as_str() == ct::LED || c.component_type.as_str() == ct::LED_RGB)
+    {
         if !comp.pins.contains_key("A") { continue; }
         let anode_ref = format!("{}.A", comp.id);
         let anode_net = circuit.nets.iter().find(|n| n.pins.contains(&anode_ref));

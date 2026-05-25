@@ -125,6 +125,9 @@ mod tests {
     }
 
     fn minimal_circuit(components: Vec<Component>) -> OhmaticCircuitV01 {
+        // Nets reference R1.1 on VCC and R2.1 on GND so no pin appears in two nets
+        // (which would be a T1-SHORT violation). run_tier2 ignores net topology but
+        // the fixture should represent a T1-valid circuit.
         OhmaticCircuitV01 {
             metadata: CircuitMetadata {
                 title: "Test".to_string(),
@@ -140,7 +143,7 @@ mod tests {
                 },
                 Net {
                     name: "GND".to_string(),
-                    pins: vec!["GND1.1".to_string(), "R1.1".to_string()],
+                    pins: vec!["GND1.1".to_string(), "R2.1".to_string()],
                 },
             ],
         }

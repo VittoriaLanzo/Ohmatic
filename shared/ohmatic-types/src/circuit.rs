@@ -212,7 +212,10 @@ fn is_valid_pin_ref(pin_ref: &str) -> bool {
         Some((comp_id, pin_name)) => {
             !pin_name.is_empty()
                 && is_valid_component_id(comp_id)
-                && pin_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                // Pin names may include '+' and '-' for differential/signed pins
+                // (e.g. U1.IN+, U1.IN-, U1.V+) — must stay in sync with the
+                // JSON schema pattern: ^[A-Za-z0-9_+\-]+$
+                && pin_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '+' || c == '-')
         }
         None => false,
     }
