@@ -12,6 +12,9 @@ dataset/prepared/
 node_modules/
 frontend/dist/
 frontend/vite-dev*.log
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 ## OS
 .DS_Store
