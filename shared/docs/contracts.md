@@ -85,7 +85,7 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 }
 ```
 
-`stage` is one of `"inference"`, `"drc"`, `"bom"`.
+`stage` is one of `"inference"`, `"drc"`, `"bom"`, or `null` (pending / done / failed states).
 
 ### Response 200 — Done
 
@@ -164,7 +164,7 @@ Liveness probe for Docker health checks and load balancer readiness.
 { "status": "ok" }
 ```
 
-No authentication required. Returns 200 while the service is alive.
+No authentication required.
 
 ---
 
@@ -237,9 +237,7 @@ are reported as warnings; the gateway surfaces these in `result.drc_warnings`.
 }
 ```
 
-The 200 response always has `errors: []`. The verifier **never** returns HTTP 200 with a
-non-empty `errors` array — a non-empty errors array is always signalled via HTTP 422.
-The gateway reads the HTTP status code: 200 → pass, 422 → Tier 1/2 failure.
+`errors` is always `[]` on a 200. A non-empty errors array is always signalled via HTTP 422. Gateway reads: 200 → pass, 422 → Tier 1/2 failure.
 
 ### Response 400 — Bad Request
 
@@ -247,16 +245,40 @@ The gateway reads the HTTP status code: 200 → pass, 422 → Tier 1/2 failure.
 { "error": "missing 'circuit' field" }
 ```
 
-Returned when the request body is absent, is not valid JSON, or does not contain the `circuit` field.
+Request body absent, not valid JSON, or missing the `circuit` field.
+
+### Response 422 — Parse Error (circuit field present but undeserializable)
+
+Two sub-cases, distinguished by rule ID prefix:
+
+**T1-PARSE-SERDE**: `circuit` JSON structure is valid but cannot be coerced into `OhmaticCircuitV01` (missing required field, wrong type, deny_unknown_fields violation on a Component or Net). Not retry-able — the model produced malformed JSON.
+
+```json
+{
+  "errors": ["[T1-PARSE-SERDE] failed to deserialise circuit: missing field `nets`"],
+  "warnings": []
+}
+```
+
+**T1-PARSE-REGISTRY**: `circuit` deserialises successfully but a component carries a `type` string absent from the component registry. Retry-able — the model hallucinated an unknown component type.
+
+```json
+{
+  "errors": ["[T1-PARSE-REGISTRY] unknown component type 'unknown_widget' on component 'U1'"],
+  "warnings": []
+}
+```
 
 ### Response 422 — Validation Error (Tier 1 or Tier 2)
 
 ```json
 {
-  "errors": ["Component IDs are not unique: R1 appears twice"],
+  "errors": ["[T1-04] Duplicate component id: R1"],
   "warnings": []
 }
 ```
+
+`validate()` found structural violations. Each entry in `errors` has format `"[rule_id] message"`. `warnings` is always `[]` on 422.
 
 ---
 
@@ -321,19 +343,19 @@ prevents Tier 2 checks from running, and so on.
 | Tier | Category | Gateway behaviour | Example rules |
 |------|----------|-------------------|---------------|
 | **Tier 1** | Schema violations | Return 422, increment retry counter | Duplicate component IDs; duplicate net names; invalid component type; missing required pin; no VCC component; no GND component |
-| **Tier 2** | Geometric violations | Return 422, increment retry counter | Component bounding-box collision; component placed outside the 0–300 canvas after normalization |
-| **Tier 3** | Electrical correctness | Return 200 with `drc_warnings` populated | LED without series resistor; transistor base with no bias resistor; IC power pin unconnected; missing bypass capacitor near IC |
+| **Tier 2** | Geometric violations | Normalize coordinates and push-apart collisions (max 20 iterations). Always returns 200. Unresolvable collisions appear as `[T2-02]` entries in the `warnings` array; the gateway does not retry Tier 2. | Component bounding-box collision; component placed outside the 0–300 canvas after normalization |
+| **Tier 3** | Electrical correctness | Return 200 with `drc_warnings` populated | LED without series resistor; IC power pin unconnected; missing bypass capacitor near IC; floating MOSFET gate; reverse-polarity capacitor |
 
-- **Tier 1 and Tier 2 → 422:** the gateway may retry inference up to `options.max_retries` times
+- **Tier 1 → 422:** the gateway may retry inference up to `options.max_retries` times
   before returning a `"failed"` job status to the client.
+- **Tier 2 → always 200:** the verifier corrects what it can. Unresolvable collisions produce a
+  `DRC_WARNING` but the circuit is still accepted. The gateway never retries on Tier 2 warnings.
 - **Tier 3 → 200 + `drc_warnings`:** the circuit is accepted and the client sees warnings in
   `result.drc_warnings`. No retry is triggered.
 
 The Tier 3 rule catalog will be specified in Stage 1. The examples above are illustrative.
 
-**Known Stage 0 enum gaps (deferred to Stage 1):**
-- Negative supply rails (e.g. VEE, −15 V) are typed as `power_vcc` — a `power_vee` type will be added in Stage 1.
-- Relay coils are typed as `connector` — a `relay` type will be added in Stage 1 to enable flyback-diode DRC rules.
+**Implemented types (Stage 0):** `power_vee`, `relay`, and all other types listed in the schema enum are accepted by the verifier. The schema enum and `verifier/config/component_registry.toml` are kept in sync; the registry is the authoritative source at runtime.
 
 ---
 
@@ -365,8 +387,7 @@ POST /v1/generate → inference returns circuit with metadata.version = "99.0"
 → GET /v1/jobs/{id}/status returns: { "status": "failed", "error": { "code": "unsupported_schema_version", "message": "metadata.version \"99.0\" is not supported" } }
 ```
 
-This dispatch design is forward-compatible: adding `circuit_v02.json` and a corresponding
-verifier rule set requires no changes to the gateway dispatch table structure.
+Forward-compatible: adding `circuit_v02.json` with a new rule set requires no gateway changes.
 
 > **Schema limitation:** JSON Schema draft-07 cannot enforce uniqueness of `nets[].name` across
 > the array. Net-name uniqueness is enforced by `dataset/validate.py` and by the verifier's Tier 1
@@ -376,10 +397,15 @@ verifier rule set requires no changes to the gateway dispatch table structure.
 
 ## 9. Extending the Component Type Enum
 
-To add a new component type (e.g. `relay`, `power_vee`):
+`ComponentType` is a **transparent string newtype** — it is not a Rust enum. To add a new component type (e.g. `relay_solid_state`):
 
-1. Add the new string to `circuit_v01.json` `components[].type.enum`.
-2. Add the corresponding variant to `ComponentType` in `shared/ohmatic-types/src/circuit.rs`.
-3. Add an example circuit using the new type to `dataset/examples.json`.
-4. Update the Tier 3 DRC rules in `shared/docs/contracts.md` if new electrical rules apply.
-5. Bump `metadata.version` only when introducing breaking schema changes.
+1. Add the new string to `circuit_v01.json` `components[].type.enum` (keeps the schema in sync with the registry).
+2. Add an entry to `verifier/config/component_registry.toml` (`bbox`, `ref_prefix`, `description` fields).
+3. Optionally add a `pub const` to the `component_types` module in `shared/ohmatic-types/src/circuit.rs` for use in rule code — no other Rust change is required.
+4. Add an example circuit using the new type to `dataset/examples.json`.
+5. Update the Tier 3 DRC rules in `shared/docs/contracts.md` if new electrical rules apply.
+6. Bump `metadata.version` only when introducing breaking schema changes (adding a field to components, changing a required field type). Adding a new type to the enum is additive and non-breaking — no version bump required.
+
+> **`/health` versioning note:** The `/health` endpoint on all four services is intentionally unversioned (no `/v1/` prefix). It is a liveness probe, not an API resource. All other endpoints are versioned under `/v1/`.
+
+> **`additionalProperties` policy:** The JSON schema allows extra fields at the circuit root (`additionalProperties: true`) to support dataset annotation fields (e.g. `tier3_reviewed`). The `metadata` object is also open to allow tooling extensions. Only `Component` and `Net` objects are strict (`additionalProperties: false`). Do not rely on schema validation alone to reject unknown fields at the root or metadata level.

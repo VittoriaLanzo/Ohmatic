@@ -13,7 +13,7 @@ line emitted by any service.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `timestamp` | string (ISO-8601 UTC) | When the event occurred, e.g. `"2026-05-23T14:32:01.004Z"`. Always UTC, always millisecond precision or better. |
+| `timestamp` | string (ISO-8601 UTC) | When the event occurred (example: `2026-05-23T14:32:01.004Z`). Always UTC, always millisecond precision or better. |
 | `request_id` | string (ULID) | Unique ID for the inbound request, propagated end-to-end from the gateway across all downstream calls. Format: 26-char ULID, e.g. `"01HWABCDE1234567890ABCDEF0"`. |
 | `service` | string enum | One of `"gateway"`, `"inference"`, `"verifier"`, `"enricher"`. |
 | `level` | string enum | One of `"debug"`, `"info"`, `"warn"`, `"error"`. |

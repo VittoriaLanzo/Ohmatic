@@ -1,3 +1,4 @@
+## Python
 venv/
 __pycache__/
 *.pyc
@@ -6,5 +7,34 @@ __pycache__/
 .env
 .dataset_cache/
 dataset/prepared/
+
+## Node
 node_modules/
+frontend/dist/
+frontend/vite-dev*.log
+
+## OS
 .DS_Store
+Thumbs.db
+
+## Rust — binary workspace: commit Cargo.lock, ignore build output
+target/
+
+## IDE / Editor
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+## WakaTime / Hackatime
+.wakatime-project
+
+## Claude Code agent state (machine-local, not portable)
+.claude/
+
+## Machine-local Cargo config (absolute linker paths etc.)
+## If you need to commit .cargo/config.toml, do so explicitly with documentation.
+.cargo/

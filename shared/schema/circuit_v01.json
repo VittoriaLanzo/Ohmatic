@@ -45,20 +45,36 @@
         "required": ["id", "type", "value", "part", "x", "y", "pins"],
         "properties": {
           "id": {
-            "description": "Unique component identifier. Pattern: `^[A-Z][A-Za-z0-9_]*$` (e.g. R1, C_bypass, VCC1). Must start with an uppercase letter.",
+            "description": "Unique component identifier. Pattern: `^[A-Z][A-Za-z0-9_]*$` (e.g. R1, C_bypass, VCC1). Must start with an uppercase letter. Maximum 64 characters.",
             "type": "string",
-            "pattern": "^[A-Z][A-Za-z0-9_]*$"
+            "pattern": "^[A-Z][A-Za-z0-9_]*$",
+            "maxLength": 64
           },
           "type": {
-            "description": "Component class; one of the enumerated values.",
+            "description": "Component class. Must match a key in verifier/config/component_registry.toml — that file is the authoritative type registry. The enum below is kept in sync with the registry; the verifier enforces registry membership at runtime.",
             "type": "string",
             "enum": [
-              "resistor", "capacitor", "led", "diode",
+              "resistor", "capacitor", "inductor", "potentiometer", "thermistor", "varistor",
+              "diode", "led", "led_rgb", "zener_diode", "schottky_diode", "tvs_diode",
+              "photodiode", "diode_bridge",
               "transistor_npn", "transistor_pnp",
-              "mosfet_n", "mosfet_p",
-              "ic_timer", "ic_opamp", "ic_regulator", "ic_logic", "ic_mcu", "ic_driver",
-              "power_vcc", "power_gnd",
-              "connector", "crystal", "inductor", "button", "speaker", "sensor"
+              "mosfet_n", "mosfet_p", "igbt", "phototransistor",
+              "thyristor_scr", "triac",
+              "optocoupler",
+              "fuse", "relay", "relay_solid_state",
+              "transformer", "ferrite_bead",
+              "seven_segment", "lcd",
+              "ic_timer", "ic_opamp", "ic_comparator", "ic_regulator",
+              "ic_instrumentation_amp", "ic_voltage_ref", "ic_adc", "ic_dac", "ic_pll",
+              "ic_logic", "ic_mcu", "ic_driver", "ic_memory", "ic_fpga",
+              "ic_level_shifter", "ic_interface", "ic_filter", "ic_audio_amp",
+              "ic_battery_management", "ic_power_converter", "ic_rtc", "ic_rf",
+              "power_vcc", "power_gnd", "power_vee", "power_3v3", "power_5v", "power_12v",
+              "battery",
+              "connector", "button", "switch",
+              "motor_dc", "motor_stepper", "servo",
+              "antenna",
+              "crystal", "speaker", "sensor", "microphone"
             ]
           },
           "value": {
@@ -101,13 +117,13 @@
             "minLength": 1
           },
           "pins": {
-            "description": "Component-pin references in `ComponentId.pin_name` format (e.g. [\"R1.1\", \"VCC1.1\"]). At least 2 required.",
+            "description": "Component-pin references in `ComponentId.pin_name` format (e.g. [\"R1.1\", \"VCC1.1\", \"U1.IN+\"]). At least 2 required. Pin names may contain alphanumerics, underscores, `+`, and `-` to support canonical names like `IN+`, `IN-`, `A+`, `B-`.",
             "type": "array",
             "minItems": 2,
             "uniqueItems": true,
             "items": {
               "type": "string",
-              "pattern": "^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_]+$"
+              "pattern": "^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_+\\-]+$"
             }
           }
         },

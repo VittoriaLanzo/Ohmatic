@@ -20,7 +20,7 @@ fn minimal_valid_circuit() -> OhmaticCircuitV01 {
         components: vec![
             Component {
                 id: "R1".to_string(),
-                component_type: ComponentType::Resistor,
+                component_type: ComponentType::new("resistor"),
                 value: "10kΩ".to_string(),
                 part: "0603".to_string(),
                 x: 50.0,
@@ -29,7 +29,7 @@ fn minimal_valid_circuit() -> OhmaticCircuitV01 {
             },
             Component {
                 id: "VCC1".to_string(),
-                component_type: ComponentType::PowerVcc,
+                component_type: ComponentType::new("power_vcc"),
                 value: "5V".to_string(),
                 part: "VCC".to_string(),
                 x: 10.0,
@@ -42,7 +42,7 @@ fn minimal_valid_circuit() -> OhmaticCircuitV01 {
             },
             Component {
                 id: "GND1".to_string(),
-                component_type: ComponentType::PowerGnd,
+                component_type: ComponentType::new("power_gnd"),
                 value: "".to_string(),
                 part: "GND".to_string(),
                 x: 90.0,
@@ -102,25 +102,39 @@ fn test_net_has_at_least_two_pins() {
 }
 
 #[test]
-fn test_component_type_enum_all_variants_deserializable() {
+fn test_component_type_all_known_names_roundtrip() {
+    // ComponentType is now a transparent string newtype — any string deserialises.
+    // Verify that all well-known type names survive a serde round-trip unchanged.
     let types = [
         "resistor", "capacitor", "led", "diode", "transistor_npn", "transistor_pnp",
         "mosfet_n", "mosfet_p", "ic_timer", "ic_opamp", "ic_regulator", "ic_logic",
         "ic_mcu", "ic_driver", "power_vcc", "power_gnd", "connector", "crystal",
         "inductor", "button", "speaker", "sensor",
+        // second-wave types
+        "battery", "ferrite_bead", "switch", "relay_solid_state", "microphone",
+        "antenna", "diode_bridge", "ic_battery_management", "ic_power_converter",
+        "ic_rtc", "ic_rf", "ic_interface", "ic_filter", "ic_level_shifter",
+        "ic_audio_amp", "ic_fpga",
     ];
     for t in &types {
         let json = format!("\"{}\"", t);
-        let result: Result<ComponentType, _> = serde_json::from_str(&json);
-        assert!(result.is_ok(), "ComponentType '{}' failed to deserialize", t);
+        let ct: ComponentType = serde_json::from_str(&json)
+            .unwrap_or_else(|e| panic!("ComponentType '{}' failed to deserialize: {}", t, e));
+        assert_eq!(ct.as_str(), *t, "ComponentType '{}' round-trip changed value", t);
+        let re_json = serde_json::to_string(&ct).unwrap();
+        assert_eq!(re_json, json, "ComponentType '{}' re-serialised incorrectly", t);
     }
 }
 
 #[test]
-fn test_unknown_component_type_rejected() {
+fn test_unknown_component_type_deserializes_as_string() {
+    // ComponentType is a transparent string wrapper — any string is accepted at the
+    // serde level.  Unknown types are rejected at the verifier (T1-PARSE) level by
+    // checking against the component registry, NOT at deserialisation time.
     let json = "\"unknown_widget\"";
-    let result: Result<ComponentType, _> = serde_json::from_str(json);
-    assert!(result.is_err(), "unknown_widget should be rejected by ComponentType enum");
+    let ct: ComponentType = serde_json::from_str(json)
+        .expect("ComponentType now accepts any string; registry check happens in the verifier");
+    assert_eq!(ct.as_str(), "unknown_widget");
 }
 
 #[test]
@@ -132,7 +146,7 @@ fn test_underscore_id_in_component() {
     // C_bypass is a valid component ID in the seed circuits
     let component = Component {
         id: "C_bypass".to_string(),
-        component_type: ComponentType::Capacitor,
+        component_type: ComponentType::new("capacitor"),
         value: "100nF".to_string(),
         part: "0402".to_string(),
         x: 170.0,
@@ -151,7 +165,7 @@ fn test_coordinate_out_of_300_range_is_valid() {
     pins.insert("1".to_string(), "1".to_string());
     let component = Component {
         id: "R1".to_string(),
-        component_type: ComponentType::Resistor,
+        component_type: ComponentType::new("resistor"),
         value: "1kΩ".to_string(),
         part: "0603".to_string(),
         x: 1000.0,
@@ -254,11 +268,14 @@ fn test_schema_rejects_missing_required_field() {
 }
 
 /// AC3 — A full circuit whose component has an unrecognised type string must
-/// fail to deserialize (covers the enum-completeness path via a full circuit).
-/// Fails pre-fix: OhmaticCircuitV01 type absent.
+/// be rejected at the schema-validation layer (circuit_v01.json enum).
+/// ComponentType is now a transparent string newtype — serde accepts any string;
+/// rejection happens via JSON Schema and the verifier registry check (T1-PARSE).
 #[test]
 fn test_schema_rejects_unknown_component_type_json() {
-    let bad_circuit = r#"{
+    use jsonschema::JSONSchema;
+
+    let bad_circuit_value: serde_json::Value = serde_json::from_str(r#"{
         "metadata": {
             "title": "Bad Type",
             "description": "unknown component type",
@@ -279,11 +296,20 @@ fn test_schema_rejects_unknown_component_type_json() {
         "nets": [
             {"name": "GND", "pins": ["X1.1", "GND1.1"]}
         ]
-    }"#;
-    let result: Result<OhmaticCircuitV01, _> = serde_json::from_str(bad_circuit);
+    }"#).unwrap();
+
+    // Serde now accepts any string for ComponentType — rejection is at schema/registry level.
+    let serde_result: Result<OhmaticCircuitV01, _> =
+        serde_json::from_value(bad_circuit_value.clone());
+    assert!(serde_result.is_ok(), "ComponentType(String) accepts any string at serde level");
+
+    // JSON Schema (circuit_v01.json) enumerates valid types and MUST reject unknown ones.
+    let schema_str = include_str!("../../../shared/schema/circuit_v01.json");
+    let schema_value: serde_json::Value = serde_json::from_str(schema_str).unwrap();
+    let compiled = JSONSchema::compile(&schema_value).expect("schema compile failed");
     assert!(
-        result.is_err(),
-        "circuit with 'unknown_widget' component type should be rejected by serde"
+        !compiled.is_valid(&bad_circuit_value),
+        "circuit with 'unknown_widget' component type must be rejected by the JSON schema"
     );
 }
 
@@ -657,7 +683,7 @@ fn test_leading_underscore_id_rejected_by_schema() {
     pins.insert("2".to_string(), "GND".to_string());
     let component = Component {
         id: "C_bypass".to_string(),
-        component_type: ComponentType::Capacitor,
+        component_type: ComponentType::new("capacitor"),
         value: "100nF".to_string(),
         part: "0402".to_string(),
         x: 10.0,

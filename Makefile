@@ -11,19 +11,17 @@ SCHEMA_MD := schema.md
 
 .PHONY: all codegen docs clean
 
-# Default target: runs codegen then docs in sequence.
-all: codegen docs
+# Default target: docs only. codegen is NOT in the default target — circuit.rs is hand-authored.
+all: docs
 
-# Invokes typify-cli to generate shared/ohmatic-types/src/circuit.rs from the JSON schema.
+# !! DANGER: do NOT run this target. circuit.rs is hand-authored (transparent ComponentType
+# newtype + component_types constants). Running typify-cli overwrites it with a hard enum,
+# destroying the data-driven registry design. See shared/ohmatic-types/src/circuit.rs header.
+# This target is retained for historical reference only.
 codegen:
-	@echo "Generating Rust types from $(SCHEMA)..."
-	@if command -v typify-cli >/dev/null 2>&1; then \
-		typify-cli $(SCHEMA) --output $(CIRCUIT_RS); \
-	else \
-		echo "ERROR: typify-cli not installed. Run: cargo install typify-cli --version 0.4.0"; \
-		exit 1; \
-	fi
-	@echo "Codegen complete."
+	@echo "ERROR: codegen is disabled. circuit.rs is hand-authored — see its header comment."
+	@echo "To add a new component type, edit verifier/config/component_registry.toml instead."
+	@exit 1
 
 # Invokes an inline Python 3.8+ snippet (uses walrus operator) to render schema.md.
 docs:

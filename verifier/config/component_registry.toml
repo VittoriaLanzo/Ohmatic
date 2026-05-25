@@ -1,0 +1,395 @@
+# Component Registry — Ohmatic Stage 1+
+#
+# Single source of truth for component type metadata.
+# Each section name matches the serde snake_case output of ComponentType.
+# Fields:
+#   bbox        = [width, height]  canvas units, used by Tier 2 AABB collision
+#   ref_prefix  = "R"              reference designator prefix (IEEE 315 convention)
+#   description = "..."            one-line human description
+#
+# To add a new type: see §9 of shared/docs/contracts.md.
+
+[defaults]
+bbox = [12, 12]
+
+# ── Passives ──────────────────────────────────────────────────────────────────
+
+[resistor]
+bbox        = [8, 4]
+ref_prefix  = "R"
+description = "Fixed-value resistor; pins 1, 2 (passive, no polarity)"
+
+[capacitor]
+bbox        = [8, 4]
+ref_prefix  = "C"
+description = "Capacitor (ceramic, electrolytic, film, tantalum)"
+
+[inductor]
+bbox        = [10, 6]
+ref_prefix  = "L"
+description = "Inductor or coil (series element); pins 1, 2"
+
+[potentiometer]
+bbox        = [10, 8]
+ref_prefix  = "RV"
+description = "3-terminal variable resistor; pins A, W (wiper), B"
+
+[thermistor]
+bbox        = [8, 4]
+ref_prefix  = "RT"
+description = "Temperature-sensitive resistor (NTC or PTC)"
+
+[varistor]
+bbox        = [8, 4]
+ref_prefix  = "RV"
+description = "Voltage-dependent resistor (MOV); overvoltage clamp"
+
+# ── Diodes ────────────────────────────────────────────────────────────────────
+
+[diode]
+bbox        = [8, 4]
+ref_prefix  = "D"
+description = "General-purpose rectifier diode; pins A, K"
+
+[led]
+bbox        = [8, 4]
+ref_prefix  = "D"
+description = "Light-emitting diode; pins A, K"
+
+[led_rgb]
+bbox        = [10, 8]
+ref_prefix  = "D"
+description = "RGB LED (common anode or common cathode); pins R, G, B, COM"
+
+[zener_diode]
+bbox        = [8, 4]
+ref_prefix  = "D"
+description = "Zener diode; voltage reference / clamp (reverse-biased); pins A, K"
+
+[schottky_diode]
+bbox        = [8, 4]
+ref_prefix  = "D"
+description = "Schottky diode; low forward-voltage drop; pins A, K"
+
+[tvs_diode]
+bbox        = [8, 4]
+ref_prefix  = "D"
+description = "Transient voltage suppressor (unidirectional or bidirectional); pins A, K"
+
+[photodiode]
+bbox        = [8, 4]
+ref_prefix  = "D"
+description = "Light-sensitive diode; pins A, K"
+
+# ── Bipolar transistors ───────────────────────────────────────────────────────
+
+[transistor_npn]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "NPN bipolar junction transistor; pins B, C, E"
+
+[transistor_pnp]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "PNP bipolar junction transistor; pins B, C, E"
+
+# ── Field-effect & power transistors ─────────────────────────────────────────
+
+[mosfet_n]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "N-channel MOSFET; pins G, D, S"
+
+[mosfet_p]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "P-channel MOSFET; pins G, D, S"
+
+[igbt]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "Insulated-gate bipolar transistor; pins G, C, E"
+
+[phototransistor]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "Light-sensitive transistor; no physical base pin; pins C, E"
+
+# ── Thyristors & AC power devices ─────────────────────────────────────────────
+
+[thyristor_scr]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "Silicon controlled rectifier (SCR); latching switch; pins A, K, G"
+
+[triac]
+bbox        = [10, 8]
+ref_prefix  = "Q"
+description = "Bidirectional thyristor for AC power control; pins MT1, MT2, G"
+
+# ── Optoelectronics ───────────────────────────────────────────────────────────
+
+[optocoupler]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Galvanic isolator via LED+phototransistor; pins A, K (input), C, E (output)"
+
+# ── Protection & switching ────────────────────────────────────────────────────
+
+[fuse]
+bbox        = [10, 4]
+ref_prefix  = "F"
+description = "Overcurrent protection element; pins 1, 2"
+
+[relay]
+bbox        = [16, 12]
+ref_prefix  = "K"
+description = "Electromechanical switch; coil A1/A2, contacts NO/NC/COM"
+
+[relay_solid_state]
+bbox        = [16, 12]
+ref_prefix  = "K"
+description = "Solid-state relay (SSR); optical isolation; pins IN+, IN-, OUT+, OUT-"
+
+# ── Magnetics ─────────────────────────────────────────────────────────────────
+
+[transformer]
+bbox        = [20, 16]
+ref_prefix  = "T"
+description = "Isolated magnetic coupling; pins P1, P2 (primary), S1, S2 (secondary)"
+
+[ferrite_bead]
+bbox        = [8, 4]
+ref_prefix  = "FB"
+description = "EMI suppression ferrite bead (series element); pins 1, 2"
+
+# ── Displays ──────────────────────────────────────────────────────────────────
+
+[seven_segment]
+bbox        = [16, 20]
+ref_prefix  = "DS"
+description = "7-segment numeric display; pins A–G, DP, COM"
+
+[lcd]
+bbox        = [24, 20]
+ref_prefix  = "DS"
+description = "LCD display module; VCC, GND + data/control bus"
+
+# ── ICs — analog ──────────────────────────────────────────────────────────────
+
+[ic_timer]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Timer IC (e.g. NE555); astable/monostable modes"
+
+[ic_opamp]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Operational amplifier; pins IN+, IN-, OUT, VCC, VEE/GND"
+
+[ic_comparator]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Voltage comparator (often open-drain output); pins IN+, IN-, OUT, VCC, GND"
+
+[ic_regulator]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Linear voltage regulator (LDO or standard); pins VIN, VOUT, GND, ADJ?"
+
+[ic_instrumentation_amp]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Instrumentation amplifier; high CMRR; pins IN+, IN-, OUT, REF, VCC, VEE, RG"
+
+[ic_voltage_ref]
+bbox        = [12, 8]
+ref_prefix  = "U"
+description = "Precision voltage reference; pins IN, OUT, GND"
+
+[ic_adc]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Analog-to-digital converter; pins VIN, VREF, VCC, GND + data bus"
+
+[ic_dac]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Digital-to-analog converter; pins VOUT, VREF, VCC, GND + data bus"
+
+[ic_pll]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Phase-locked loop; pins VCO_IN, CLK_IN, CLK_OUT, VCC, GND"
+
+# ── ICs — digital / mixed-signal ──────────────────────────────────────────────
+
+[ic_logic]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Digital logic IC (gate, flip-flop, decoder, shift register); requires VCC and GND pins"
+
+[ic_mcu]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Microcontroller unit; requires VCC, GND, and a bypass capacitor (T3-04)"
+
+[ic_driver]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Driver IC (motor driver, gate driver, LED driver, H-bridge)"
+
+[ic_memory]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Memory IC (EEPROM, Flash, SRAM); pins VCC, GND, CS + data/address bus"
+
+[ic_fpga]
+bbox        = [28, 24]
+ref_prefix  = "U"
+description = "FPGA or CPLD; configurable logic fabric; VCC, GND + I/O banks"
+
+[ic_level_shifter]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Voltage level translator; shifts logic signals between voltage domains; VCC_A, VCC_B, GND + data"
+
+[ic_interface]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Interface bridge IC (UART, SPI, I2C, USB, CAN, RS-485); VCC, GND + bus pins"
+
+[ic_filter]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Active or switched-capacitor filter IC (low-pass, band-pass, notch)"
+
+[ic_audio_amp]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Audio power amplifier IC; pins IN+, IN-, OUT, VCC, GND, BYPASS"
+
+[ic_battery_management]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Battery charger or fuel-gauge IC; pins VIN, VBAT, GND, SDA, SCL, STAT"
+
+[ic_power_converter]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "DC-DC converter IC (buck, boost, SEPIC, flyback controller); VIN, VOUT, GND, FB, EN"
+
+[ic_rtc]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Real-time clock IC; pins VCC, GND, SDA, SCL, INT, BAT"
+
+[ic_rf]
+bbox        = [24, 20]
+ref_prefix  = "U"
+description = "RF transceiver, receiver, or transmitter IC; pins VCC, GND, RF, SDA/SPI, IRQ"
+
+# ── Power symbols ─────────────────────────────────────────────────────────────
+
+[power_vcc]
+bbox        = [8, 8]
+ref_prefix  = "PWR"
+description = "Positive supply rail (generic VCC); Stage 1 rules inspect only the net named 'VCC'"
+
+[power_gnd]
+bbox        = [8, 8]
+ref_prefix  = "PWR"
+description = "Ground reference (0V); the net named GND is the BFS isolation root for T3-07"
+
+[power_vee]
+bbox        = [8, 8]
+ref_prefix  = "PWR"
+description = "Negative supply rail (e.g. −15V for bipolar op-amps)"
+
+[power_3v3]
+bbox        = [8, 8]
+ref_prefix  = "PWR"
+description = "Named 3.3V supply rail"
+
+[power_5v]
+bbox        = [8, 8]
+ref_prefix  = "PWR"
+description = "Named 5V supply rail"
+
+[power_12v]
+bbox        = [8, 8]
+ref_prefix  = "PWR"
+description = "Named 12V supply rail"
+
+# ── Power sources ─────────────────────────────────────────────────────────────
+
+[battery]
+bbox        = [12, 8]
+ref_prefix  = "BT"
+description = "Electrochemical cell or battery pack; pins +, -"
+
+# ── Electromechanical / interface ─────────────────────────────────────────────
+
+[connector]
+bbox        = [12, 8]
+ref_prefix  = "J"
+description = "Connector / header / terminal block"
+
+[button]
+bbox        = [10, 8]
+ref_prefix  = "SW"
+description = "Momentary push-button switch"
+
+[switch]
+bbox        = [10, 8]
+ref_prefix  = "SW"
+description = "General-purpose switch (SPST, SPDT, DPDT); pins 1, 2 (and COM, 3 for SPDT)"
+
+[motor_dc]
+bbox        = [16, 12]
+ref_prefix  = "M"
+description = "DC brush motor; pins 1, 2"
+
+[motor_stepper]
+bbox        = [16, 12]
+ref_prefix  = "M"
+description = "Stepper motor (bipolar 4-wire); pins A+, A-, B+, B-"
+
+[servo]
+bbox        = [16, 12]
+ref_prefix  = "M"
+description = "RC servo with PWM control; pins VCC, GND, SIG"
+
+# ── RF / wireless ─────────────────────────────────────────────────────────────
+
+[antenna]
+bbox        = [12, 16]
+ref_prefix  = "ANT"
+description = "RF antenna (wire, PCB trace, patch, whip); pins RF (and GND on shielded types)"
+
+# ── Sensors / transducers / output devices ────────────────────────────────────
+
+[crystal]
+bbox        = [12, 8]
+ref_prefix  = "Y"
+description = "Quartz crystal or ceramic resonator; pins 1, 2 (and GND on 3-pin resonators)"
+
+[speaker]
+bbox        = [12, 10]
+ref_prefix  = "SP"
+description = "Speaker or buzzer; pins 1, 2"
+
+[sensor]
+bbox        = [12, 10]
+ref_prefix  = "U"
+description = "Generic sensor (temperature, humidity, pressure, IMU, etc.)"
+
+[microphone]
+bbox        = [10, 10]
+ref_prefix  = "MK"
+description = "Microphone or audio input transducer; pins OUT, GND (and VCC for MEMS/condenser)"
+
+[diode_bridge]
+bbox        = [16, 16]
+ref_prefix  = "BR"
+description = "4-diode full-wave bridge rectifier module; pins AC1, AC2, + (DC+), - (DC-)"
