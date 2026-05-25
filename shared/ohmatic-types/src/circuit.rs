@@ -240,13 +240,14 @@ impl OhmaticCircuitV01 {
             errors.push("metadata.tags must have at least one item".to_string());
         } else {
             let mut seen_tags: HashSet<&str> = HashSet::new();
-            let mut dup_tag_reported = false;
             for tag in &self.metadata.tags {
                 if tag.is_empty() {
                     errors.push("metadata.tags items must be non-empty strings".to_string());
-                } else if !seen_tags.insert(tag.as_str()) && !dup_tag_reported {
-                    errors.push("metadata.tags must not contain duplicate values".to_string());
-                    dup_tag_reported = true;
+                } else if !seen_tags.insert(tag.as_str()) {
+                    errors.push(format!(
+                        "metadata.tags must not contain duplicate values: '{}'",
+                        tag
+                    ));
                 }
             }
         }
@@ -266,7 +267,12 @@ impl OhmaticCircuitV01 {
             let mut has_vcc = false;
             let mut has_gnd = false;
             for comp in &self.components {
-                if !is_valid_component_id(&comp.id) {
+                if comp.id.len() > 64 {
+                    errors.push(format!(
+                        "component '{}...' id too long (max 64 chars)",
+                        &comp.id[..32.min(comp.id.len())]
+                    ));
+                } else if !is_valid_component_id(&comp.id) {
                     errors.push(format!(
                         "component '{}' id violates pattern ^[A-Z][A-Za-z0-9_]*$",
                         comp.id
@@ -284,7 +290,21 @@ impl OhmaticCircuitV01 {
                     }
                     if comp.pins.is_empty() {
                         errors.push(format!("component '{}' pins must not be empty", comp.id));
-                    } else if id_counts[comp.id.as_str()] == 1 {
+                    } else {
+                        for (pin_name, net_label) in &comp.pins {
+                            if net_label.is_empty() {
+                                errors.push(format!(
+                                    "component '{}' pin '{}' has an empty net label",
+                                    comp.id, pin_name
+                                ));
+                            }
+                        }
+                    }
+                    // Always populate comp_pins with the first occurrence's pins.
+                    // Duplicates are already flagged by T1-04; suppressing comp_pins for them
+                    // causes spurious T1-07 "unknown component" errors for every net that
+                    // references the duplicated component.
+                    if !comp_pins.contains_key(comp.id.as_str()) {
                         comp_pins.insert(
                             comp.id.as_str(),
                             comp.pins.keys().map(String::as_str).collect(),

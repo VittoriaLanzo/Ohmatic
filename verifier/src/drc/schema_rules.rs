@@ -35,6 +35,11 @@ fn assign_t1_rule_id(err: &str) -> &'static str {
     } else if err.starts_with("components must not be empty") {
         "T1-03"
     } else if err.starts_with("component '") || err.starts_with("Duplicate component id") {
+        // "component '{}' id violates pattern"
+        // "component '{}' pin '{}' has an empty net label"
+        // "component '{}' pins must not be empty"
+        // "component '{}...' id too long (max 64 chars)"
+        // "Duplicate component id: {}"
         "T1-04"
     } else if err.starts_with("Missing required") {
         "T1-05"
@@ -44,7 +49,13 @@ fn assign_t1_rule_id(err: &str) -> &'static str {
         || (err.starts_with("net '") && err.contains("must have at least 2 pins"))
     {
         "T1-06"
+    } else if err.starts_with("pin ref") && err.contains("more than one net") {
+        // "pin ref X appears in more than one net (electrical short)" — distinct from
+        // unknown-component/unknown-pin errors (T1-07) even though both are connectivity issues.
+        "T1-SHORT"
     } else {
+        // T1-07 covers: unknown component, unknown pin, component pin not connected to any net,
+        // net '{}' invalid pin ref, net '{}' contains duplicate pin ref.
         "T1-07"
     }
 }

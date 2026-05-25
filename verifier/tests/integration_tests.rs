@@ -109,8 +109,8 @@ async fn t1_parse_unknown_component_type_422() {
     let errors = r["errors"].as_array().unwrap();
     assert!(!errors.is_empty());
     assert!(
-        errors[0].as_str().unwrap().starts_with("[T1-PARSE]"),
-        "expected [T1-PARSE], got: {}",
+        errors[0].as_str().unwrap().starts_with("[T1-PARSE-REGISTRY]"),
+        "expected [T1-PARSE-REGISTRY], got: {}",
         errors[0]
     );
 }
@@ -212,7 +212,9 @@ async fn t1_05_no_vcc_422() {
 #[tokio::test]
 async fn t1_06_net_one_pin_422() {
     let server = make_server();
-    // VCC net with only 1 pin reference.
+    // The ISOLATED_PIN net has only 1 pin reference — T1-06 must fire.
+    // VCC1 and GND1 are connected through a two-resistor chain so T1 passes
+    // for all other rules. R2 has an isolated single-pin net that triggers T1-06.
     let body = json!({
         "circuit": {
             "metadata": {
@@ -225,14 +227,16 @@ async fn t1_06_net_one_pin_422() {
                 {"id": "VCC1", "type": "power_vcc", "value": "5V", "part": "VCC",
                  "x": 0.0, "y": 0.0, "pins": {"1": "vcc"}},
                 {"id": "GND1", "type": "power_gnd", "value": "", "part": "GND",
-                 "x": 10.0, "y": 0.0, "pins": {"1": "gnd"}},
+                 "x": 20.0, "y": 0.0, "pins": {"1": "gnd"}},
                 {"id": "R1", "type": "resistor", "value": "10k", "part": "RES",
-                 "x": 5.0, "y": 0.0, "pins": {"1": "a", "2": "b"}}
+                 "x": 10.0, "y": 0.0, "pins": {"1": "vcc", "2": "gnd"}},
+                {"id": "R2", "type": "resistor", "value": "1k", "part": "RES",
+                 "x": 30.0, "y": 0.0, "pins": {"1": "lone"}}
             ],
             "nets": [
-                {"name": "VCC", "pins": ["VCC1.1"]},
-                {"name": "MID", "pins": ["R1.1", "R1.2"]},
-                {"name": "GND", "pins": ["GND1.1", "R1.2"]}
+                {"name": "VCC",  "pins": ["VCC1.1", "R1.1"]},
+                {"name": "GND",  "pins": ["GND1.1", "R1.2"]},
+                {"name": "LONE", "pins": ["R2.1"]}
             ]
         }
     });
@@ -694,7 +698,7 @@ async fn t3_08_button_no_pullup_200_with_warning() {
 }
 
 // ---------------------------------------------------------------------------
-// Edge cases — empty body and missing 'circuit' field → 400
+// Edge cases — empty body, missing/null 'circuit' field → 400
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -705,4 +709,71 @@ async fn missing_circuit_field_400() {
     assert_eq!(resp.status_code(), 400);
     let r: Value = resp.json();
     assert_eq!(r["error"], json!("missing 'circuit' field"));
+}
+
+#[tokio::test]
+async fn null_circuit_field_400() {
+    // circuit: null must be treated as missing (400), not as a parse failure (422).
+    let server = make_server();
+    let body = json!({"circuit": null});
+    let resp = server.post("/verify").json(&body).await;
+    assert_eq!(resp.status_code(), 400);
+    let r: Value = resp.json();
+    assert_eq!(r["error"], json!("missing 'circuit' field"));
+}
+
+#[tokio::test]
+async fn t1_01_version_02_422() {
+    // version "0.2" is not supported — must return 422 with T1-01 error.
+    let server = make_server();
+    let mut circuit = minimal_valid_circuit();
+    circuit["metadata"]["version"] = json!("0.2");
+    let body = json!({"circuit": circuit});
+    let resp = server.post("/verify").json(&body).await;
+    assert_eq!(resp.status_code(), 422);
+    let r: Value = resp.json();
+    let errors = r["errors"].as_array().unwrap();
+    assert!(
+        errors.iter().any(|e| e.as_str().unwrap_or("").starts_with("[T1-01]")),
+        "expected a [T1-01] error for version 0.2, got: {:?}",
+        errors
+    );
+}
+
+#[tokio::test]
+async fn t1_short_pin_in_multiple_nets_422() {
+    // A pin that appears in two nets is an electrical short → T1-SHORT, 422.
+    let server = make_server();
+    let body = json!({
+        "circuit": {
+            "metadata": {
+                "title": "Short Test",
+                "description": "Pin in two nets",
+                "version": "0.1",
+                "tags": ["test"]
+            },
+            "components": [
+                {"id": "VCC1", "type": "power_vcc", "value": "5V", "part": "VCC",
+                 "x": 0.0, "y": 0.0, "pins": {"1": "vcc"}},
+                {"id": "GND1", "type": "power_gnd", "value": "", "part": "GND",
+                 "x": 20.0, "y": 0.0, "pins": {"1": "gnd"}},
+                {"id": "R1", "type": "resistor", "value": "10k", "part": "RES",
+                 "x": 10.0, "y": 0.0, "pins": {"1": "vcc", "2": "gnd"}}
+            ],
+            "nets": [
+                {"name": "VCC",  "pins": ["VCC1.1", "R1.1"]},
+                {"name": "GND",  "pins": ["GND1.1", "R1.2"]},
+                {"name": "ALSO", "pins": ["R1.1", "GND1.1"]}
+            ]
+        }
+    });
+    let resp = server.post("/verify").json(&body).await;
+    assert_eq!(resp.status_code(), 422);
+    let r: Value = resp.json();
+    let errors = r["errors"].as_array().unwrap();
+    assert!(
+        errors.iter().any(|e| e.as_str().unwrap_or("").starts_with("[T1-SHORT]")),
+        "expected a [T1-SHORT] error for pin in multiple nets, got: {:?}",
+        errors
+    );
 }

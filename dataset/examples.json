@@ -62,23 +62,22 @@
   {
     "metadata": {
       "title": "Transistor Amplifier",
-      "description": "Simple NPN transistor amplifier stage",
+      "description": "Simple NPN common-emitter amplifier stage. R1 (47kΩ) base bias; R2 (1kΩ) collector load to VCC.",
       "version": "0.1",
       "tags": ["amplifier", "transistor"]
     },
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 40},
-      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "47kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 40},
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "47kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 35},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "1", "2": "3"}, "x": 50, "y": 45},
       {"id": "Q1", "type": "transistor_npn", "part": "2N2222", "value": "", "pins": {"B": "2", "C": "3", "E": "4"}, "x": 90, "y": 40},
-      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "3", "2": "5"}, "x": 130, "y": 40},
-      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "4"}, "x": 170, "y": 40},
-      {"id": "GND2", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 210, "y": 40}
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "4"}, "x": 130, "y": 40}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1", "R2.1"]},
       {"name": "Net1", "pins": ["R1.2", "Q1.B"]},
-      {"name": "Net2", "pins": ["Q1.C", "R2.1"]},
-      {"name": "GND", "pins": ["Q1.E", "GND1.1", "R2.2", "GND2.1"]}
+      {"name": "Net2", "pins": ["R2.2", "Q1.C"]},
+      {"name": "GND", "pins": ["Q1.E", "GND1.1"]}
     ],
     "tier3_reviewed": true
   },
@@ -91,21 +90,22 @@
     },
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "15V", "pins": {"1": "1"}, "x": 10, "y": 50},
-      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-15V", "pins": {"1": "1"}, "x": 10, "y": 60},
+      {"id": "VEE1", "type": "power_vee", "part": "VEE", "value": "-15V", "pins": {"1": "1"}, "x": 10, "y": 60},
       {"id": "J1", "type": "connector", "part": "SIG_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 55},
       {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 50},
       {"id": "R2", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 50},
       {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 55},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 48},
       {"id": "J2", "type": "connector", "part": "SIG_OUT", "value": "", "pins": {"1": "1"}, "x": 170, "y": 55},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 90, "y": 65}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7", "C_bypass.1"]},
       {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
       {"name": "NET_IN", "pins": ["J1.1", "R1.1"]},
       {"name": "NET_INV", "pins": ["R1.2", "R2.1", "U1.2"]},
       {"name": "NET_OUT", "pins": ["U1.1", "R2.2", "J2.1"]},
-      {"name": "GND", "pins": ["U1.3", "GND1.1"]}
+      {"name": "GND", "pins": ["U1.3", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   },
@@ -123,41 +123,43 @@
       {"id": "R2", "type": "resistor", "part": "1/4W", "value": "68kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 80},
       {"id": "C1", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 75},
       {"id": "C2", "type": "capacitor", "part": "0603", "value": "10nF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 85},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 10, "y": 65},
       {"id": "R3", "type": "resistor", "part": "1/4W", "value": "330Ω", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 70},
       {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "A", "K": "K"}, "x": 210, "y": 70},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 250, "y": 75}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.8", "U1.4", "R1.1"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.8", "U1.4", "R1.1", "C_bypass.1"]},
       {"name": "NET_RA", "pins": ["R1.2", "R2.1", "U1.7"]},
       {"name": "NET_TIMING", "pins": ["R2.2", "C1.1", "U1.6", "U1.2"]},
       {"name": "NET_CV", "pins": ["U1.5", "C2.1"]},
       {"name": "NET_OUT", "pins": ["U1.3", "R3.1"]},
       {"name": "NET_LED", "pins": ["R3.2", "LED1.A"]},
-      {"name": "GND", "pins": ["U1.1", "C1.2", "C2.2", "LED1.K", "GND1.1"]}
+      {"name": "GND", "pins": ["U1.1", "C1.2", "C2.2", "LED1.K", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   },
   {
     "metadata": {
       "title": "MOSFET Switch",
-      "description": "N-channel MOSFET as a switch",
+      "description": "N-channel MOSFET low-side switch — LED load with current-limiting resistor, gate driven through pull-up",
       "version": "0.1",
       "tags": ["mosfet", "switch", "power"]
     },
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 90},
-      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 90},
-      {"id": "Q1", "type": "mosfet_n", "part": "IRF540N", "value": "", "pins": {"G": "2", "D": "3", "S": "4"}, "x": 90, "y": 90},
-      {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "3", "K": "5"}, "x": 130, "y": 90},
-      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "4"}, "x": 170, "y": 90},
-      {"id": "GND2", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 170, "y": 95}
+      {"id": "R1", "type": "resistor", "part": "1/4W", "value": "470Ω", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 85},
+      {"id": "R2", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "3"}, "x": 50, "y": 95},
+      {"id": "LED1", "type": "led", "part": "RED", "value": "", "pins": {"A": "2", "K": "4"}, "x": 90, "y": 85},
+      {"id": "Q1", "type": "mosfet_n", "part": "IRF540N", "value": "", "pins": {"G": "3", "D": "4", "S": "5"}, "x": 130, "y": 90},
+      {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "5"}, "x": 170, "y": 90}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "R1.1"]},
-      {"name": "Net1", "pins": ["R1.2", "Q1.G"]},
-      {"name": "Net2", "pins": ["Q1.D", "LED1.A"]},
-      {"name": "GND", "pins": ["Q1.S", "GND1.1", "LED1.K", "GND2.1"]}
+      {"name": "VCC", "pins": ["VCC1.1", "R1.1", "R2.1"]},
+      {"name": "Net1", "pins": ["R1.2", "LED1.A"]},
+      {"name": "Net2", "pins": ["LED1.K", "Q1.D"]},
+      {"name": "Net3", "pins": ["R2.2", "Q1.G"]},
+      {"name": "GND", "pins": ["Q1.S", "GND1.1"]}
     ],
     "tier3_reviewed": true
   },
@@ -237,18 +239,19 @@
     },
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 140},
-      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 150},
+      {"id": "VEE1", "type": "power_vee", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 150},
       {"id": "PD1", "type": "sensor", "part": "BPW34", "value": "", "pins": {"A": "A", "K": "K"}, "x": 50, "y": 145},
       {"id": "R1", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 145},
       {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 130, "y": 145},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 138},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 145}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7", "C_bypass.1"]},
       {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
       {"name": "NET_INV", "pins": ["PD1.A", "R1.1", "U1.2"]},
       {"name": "NET_OUT", "pins": ["R1.2", "U1.1"]},
-      {"name": "GND", "pins": ["PD1.K", "U1.3", "GND1.1"]}
+      {"name": "GND", "pins": ["PD1.K", "U1.3", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   },
@@ -290,6 +293,7 @@
       {"id": "C_in", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 175},
       {"id": "R_bias", "type": "resistor", "part": "1/4W", "value": "100kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 185},
       {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 180},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 173},
       {"id": "R_gain", "type": "resistor", "part": "1/4W", "value": "1kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 175},
       {"id": "R_fb", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 185},
       {"id": "C_out", "type": "capacitor", "part": "0805", "value": "10µF", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 180},
@@ -297,13 +301,13 @@
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 190}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7", "C_bypass.1"]},
       {"name": "NET_AC_IN", "pins": ["J_in.1", "C_in.1"]},
       {"name": "NET_NON_INV", "pins": ["C_in.2", "R_bias.1", "U1.3"]},
       {"name": "NET_INV", "pins": ["U1.2", "R_gain.1", "R_fb.1"]},
       {"name": "NET_AMP_OUT", "pins": ["U1.1", "R_fb.2", "C_out.1"]},
       {"name": "NET_AUDIO_OUT", "pins": ["C_out.2", "J_out.1"]},
-      {"name": "GND", "pins": ["U1.4", "R_gain.2", "R_bias.2", "GND1.1"]}
+      {"name": "GND", "pins": ["U1.4", "R_gain.2", "R_bias.2", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   },
@@ -365,18 +369,19 @@
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 220},
       {"id": "VCC2", "type": "power_vcc", "part": "VCC_LOGIC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 230},
       {"id": "U1", "type": "ic_driver", "part": "L298N", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7", "8": "8"}, "x": 60, "y": 225},
+      {"id": "C_bypass", "type": "capacitor", "part": "0805", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 60, "y": 215},
       {"id": "J_ctrl", "type": "connector", "part": "CTRL", "value": "", "pins": {"1": "1", "2": "2"}, "x": 10, "y": 225},
       {"id": "MOT1", "type": "connector", "part": "MOTOR", "value": "", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 225},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 225}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.4"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.4", "C_bypass.1"]},
       {"name": "VCC_LOGIC", "pins": ["VCC2.1", "U1.1", "U1.7"]},
       {"name": "NET_IN1", "pins": ["J_ctrl.1", "U1.2"]},
       {"name": "NET_IN2", "pins": ["J_ctrl.2", "U1.3"]},
       {"name": "NET_OUT1", "pins": ["U1.5", "MOT1.1"]},
       {"name": "NET_OUT2", "pins": ["U1.6", "MOT1.2"]},
-      {"name": "GND", "pins": ["U1.8", "GND1.1"]}
+      {"name": "GND", "pins": ["U1.8", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   },
@@ -405,25 +410,25 @@
   {
     "metadata": {
       "title": "Buck Converter",
-      "description": "High-side MOSFET buck converter with freewheeling diode, 24V input",
+      "description": "P-channel MOSFET high-side buck converter with freewheeling diode, 12V input. P-MOSFET requires no bootstrap gate driver — gate pulled low to turn on.",
       "version": "0.1",
       "tags": ["power", "smps", "dcdc", "buck"]
     },
     "components": [
-      {"id": "VCC1", "type": "power_vcc", "part": "VIN", "value": "24V", "pins": {"1": "1"}, "x": 10, "y": 250},
+      {"id": "VCC1", "type": "power_vcc", "part": "VIN", "value": "12V", "pins": {"1": "1"}, "x": 10, "y": 250},
       {"id": "J_pwm", "type": "connector", "part": "PWM_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 240},
       {"id": "R_gate", "type": "resistor", "part": "1/4W", "value": "10Ω", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 245},
-      {"id": "Q1", "type": "mosfet_n", "part": "IRF540N", "value": "", "pins": {"G": "G", "D": "D", "S": "S"}, "x": 90, "y": 250},
+      {"id": "Q1", "type": "mosfet_p", "part": "IRF9540N", "value": "", "pins": {"G": "G", "D": "D", "S": "S"}, "x": 90, "y": 250},
       {"id": "D1", "type": "diode", "part": "MBR20200CT", "value": "", "pins": {"A": "A", "K": "K"}, "x": 130, "y": 255},
       {"id": "L1", "type": "inductor", "part": "10µH", "value": "", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 245},
       {"id": "C1", "type": "capacitor", "part": "1206", "value": "100µF", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 250},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 210, "y": 255}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "Q1.D"]},
+      {"name": "VCC", "pins": ["VCC1.1", "Q1.S"]},
       {"name": "NET_PWM", "pins": ["J_pwm.1", "R_gate.1"]},
       {"name": "NET_GATE", "pins": ["R_gate.2", "Q1.G"]},
-      {"name": "NET_SW", "pins": ["Q1.S", "D1.K", "L1.1"]},
+      {"name": "NET_SW", "pins": ["Q1.D", "D1.K", "L1.1"]},
       {"name": "VOUT", "pins": ["L1.2", "C1.1"]},
       {"name": "GND", "pins": ["D1.A", "C1.2", "GND1.1"]}
     ],
@@ -438,7 +443,7 @@
     },
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "15V", "pins": {"1": "1"}, "x": 10, "y": 260},
-      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-15V", "pins": {"1": "1"}, "x": 10, "y": 270},
+      {"id": "VEE1", "type": "power_vee", "part": "VEE", "value": "-15V", "pins": {"1": "1"}, "x": 10, "y": 270},
       {"id": "J_in1", "type": "connector", "part": "IN1", "value": "", "pins": {"1": "1"}, "x": 10, "y": 255},
       {"id": "J_in2", "type": "connector", "part": "IN2", "value": "", "pins": {"1": "1"}, "x": 10, "y": 275},
       {"id": "R1", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 260},
@@ -446,18 +451,19 @@
       {"id": "R3", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 270},
       {"id": "R4", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 275},
       {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 265},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 258},
       {"id": "J_out", "type": "connector", "part": "OUT", "value": "", "pins": {"1": "1"}, "x": 170, "y": 265},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 130, "y": 275}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7", "C_bypass.1"]},
       {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
       {"name": "NET_IN1", "pins": ["J_in1.1", "R1.1"]},
       {"name": "NET_INV", "pins": ["R1.2", "R2.1", "U1.2"]},
       {"name": "NET_OUT", "pins": ["U1.1", "R2.2", "J_out.1"]},
       {"name": "NET_IN2", "pins": ["J_in2.1", "R3.1"]},
       {"name": "NET_NON_INV", "pins": ["R3.2", "R4.1", "U1.3"]},
-      {"name": "GND", "pins": ["R4.2", "GND1.1"]}
+      {"name": "GND", "pins": ["R4.2", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   },
@@ -470,10 +476,11 @@
     },
     "components": [
       {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 280},
-      {"id": "VEE1", "type": "power_vcc", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 290},
+      {"id": "VEE1", "type": "power_vee", "part": "VEE", "value": "-5V", "pins": {"1": "1"}, "x": 10, "y": 290},
       {"id": "J_in", "type": "connector", "part": "SIG_IN", "value": "", "pins": {"1": "1"}, "x": 10, "y": 285},
       {"id": "R_in", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 280},
       {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 285},
+      {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 278},
       {"id": "D1", "type": "diode", "part": "1N4148", "value": "", "pins": {"A": "A", "K": "K"}, "x": 130, "y": 280},
       {"id": "D2", "type": "diode", "part": "1N4148", "value": "", "pins": {"A": "A", "K": "K"}, "x": 130, "y": 290},
       {"id": "R_out", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 170, "y": 285},
@@ -481,13 +488,13 @@
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 210, "y": 290}
     ],
     "nets": [
-      {"name": "VCC", "pins": ["VCC1.1", "U1.7"]},
+      {"name": "VCC", "pins": ["VCC1.1", "U1.7", "C_bypass.1"]},
       {"name": "VEE", "pins": ["VEE1.1", "U1.4"]},
       {"name": "NET_SIG_IN", "pins": ["J_in.1", "R_in.1"]},
       {"name": "NET_INV", "pins": ["R_in.2", "D1.K", "U1.2"]},
       {"name": "NET_AMP_OUT", "pins": ["U1.1", "D1.A", "D2.A"]},
       {"name": "NET_RECT_OUT", "pins": ["D2.K", "R_out.1", "J_out.1"]},
-      {"name": "GND", "pins": ["U1.3", "R_out.2", "GND1.1"]}
+      {"name": "GND", "pins": ["U1.3", "R_out.2", "GND1.1", "C_bypass.2"]}
     ],
     "tier3_reviewed": true
   }

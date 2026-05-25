@@ -42,13 +42,14 @@ async fn verify_handler(
     State(state): State<AppState>,
     req: Request,
 ) -> (StatusCode, Json<Value>) {
-    // Extract raw bytes from the request body
-    let body_bytes = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
+    // Extract raw bytes from the request body — cap at 1 MiB to prevent memory exhaustion DoS.
+    const MAX_BODY_BYTES: usize = 1_048_576; // 1 MiB
+    let body_bytes = match axum::body::to_bytes(req.into_body(), MAX_BODY_BYTES).await {
         Ok(b) => b,
         Err(_) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({"error": "missing 'circuit' field"})),
+                Json(json!({"error": "request body too large (max 1 MiB)"})),
             );
         }
     };
@@ -70,9 +71,16 @@ async fn verify_handler(
         }
     };
 
-    // Step 2: extract "circuit" field
+    // Step 2: extract "circuit" field — must be present and non-null.
     let circuit_value = match body_value.get("circuit") {
-        Some(v) => v.clone(),
+        Some(v) if !v.is_null() => v.clone(),
+        Some(_) => {
+            // circuit field is null → treat same as missing
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "missing 'circuit' field"})),
+            );
+        }
         None => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -81,24 +89,29 @@ async fn verify_handler(
         }
     };
 
-    // Step 3: deserialise into OhmaticCircuitV01
+    // Step 3: deserialise into OhmaticCircuitV01.
+    // T1-PARSE-SERDE: JSON structure is valid but cannot be coerced into OhmaticCircuitV01
+    // (missing required field, wrong type, deny_unknown_fields violation on Component/Net).
     let circuit: OhmaticCircuitV01 = match serde_json::from_value(circuit_value) {
         Ok(c) => c,
         Err(e) => {
             return (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 Json(json!({
-                    "errors": [format!("[T1-PARSE] failed to deserialise circuit: {}", e)],
+                    "errors": [format!("[T1-PARSE-SERDE] failed to deserialise circuit: {}", e)],
                     "warnings": []
                 })),
             );
         }
     };
 
-    // Step 3b: validate all component types against the registry — unknown types → T1-PARSE
+    // Step 3b: validate all component types against the registry.
+    // T1-PARSE-REGISTRY: type string is valid JSON but not in the known component registry.
+    // Distinct from T1-PARSE-SERDE so the gateway can distinguish "model hallucinated a type"
+    // (retry-able) from "JSON was malformed" (not retry-able).
     let unknown_type_errors: Vec<String> = circuit.components.iter()
         .filter(|c| !state.bboxes.components.contains_key(c.component_type.as_str()))
-        .map(|c| format!("[T1-PARSE] unknown component type '{}' on component '{}'",
+        .map(|c| format!("[T1-PARSE-REGISTRY] unknown component type '{}' on component '{}'",
                          c.component_type, c.id))
         .collect();
     if !unknown_type_errors.is_empty() {

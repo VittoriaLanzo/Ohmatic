@@ -16,7 +16,8 @@ pub fn component_aabb(c: &Component, bboxes: &BboxConfig) -> (f64, f64, f64, f64
     (c.x, c.y, c.x + w, c.y + h)
 }
 
-/// Returns true iff two AABBs overlap (touching edges count as overlap).
+/// Returns true iff two AABBs overlap (touching edges are NOT counted as overlap —
+/// adjacent components sharing an edge are valid and must not trigger push-apart).
 pub fn aabbs_overlap(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
     !(a.2 <= b.0 || b.2 <= a.0 || a.3 <= b.1 || b.3 <= a.1)
 }

@@ -16,7 +16,7 @@ pub fn normalise_coordinates(
     components: &mut Vec<Component>,
     _bboxes: &BboxConfig,
 ) -> Vec<DrcError> {
-    if components.len() <= 1 {
+    if components.is_empty() {
         return vec![];
     }
 
@@ -31,6 +31,7 @@ pub fn normalise_coordinates(
     }
 
     // Shift so min is 0, then scale to fit CANVAS_MAX preserving aspect ratio.
+    // For a single component (or all components at the same point), range is 0 — scale = 1.
     let range_x = max_x - min_x;
     let range_y = max_y - min_y;
     let max_range = range_x.max(range_y);
@@ -42,8 +43,8 @@ pub fn normalise_coordinates(
     };
 
     for comp in components.iter_mut() {
-        comp.x = (comp.x - min_x) * scale;
-        comp.y = (comp.y - min_y) * scale;
+        comp.x = ((comp.x - min_x) * scale).min(CANVAS_MAX);
+        comp.y = ((comp.y - min_y) * scale).min(CANVAS_MAX);
     }
 
     vec![DrcError::new(

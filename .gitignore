@@ -10,6 +10,8 @@ dataset/prepared/
 
 ## Node
 node_modules/
+frontend/dist/
+frontend/vite-dev*.log
 
 ## OS
 .DS_Store

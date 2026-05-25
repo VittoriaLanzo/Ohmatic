@@ -108,13 +108,25 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
                 .any(|r| net.pins.iter().any(|p| p.starts_with(&format!("{}.", r.id))));
             if has_resistor { continue; }
 
-            // Active device on anode net acts as current limiter — exempt.
-            let active_device_types: &[&str] = &[
-                ct::TRANSISTOR_NPN, ct::TRANSISTOR_PNP, ct::MOSFET_N, ct::MOSFET_P,
-            ];
-            let has_active_device = circuit.components.iter()
-                .any(|c| active_device_types.contains(&c.component_type.as_str())
-                    && net.pins.iter().any(|p| p.starts_with(&format!("{}.", c.id))));
+            // Active device exemption: a transistor/MOSFET controlling current to the LED
+            // anode net makes the resistor redundant — BUT only when the controlling terminal
+            // (drain for MOSFET, collector for BJT) is on the anode net.
+            // Gate/base pins on the anode net do NOT provide current limiting.
+            let has_active_device = circuit.components.iter().any(|c| {
+                match c.component_type.as_str() {
+                    t if t == ct::MOSFET_N || t == ct::MOSFET_P => {
+                        // MOSFET drain (D) on the anode net = valid current controller.
+                        let drain_ref = format!("{}.D", c.id);
+                        net.pins.contains(&drain_ref)
+                    }
+                    t if t == ct::TRANSISTOR_NPN || t == ct::TRANSISTOR_PNP => {
+                        // BJT collector (C) on the anode net = valid current controller.
+                        let coll_ref = format!("{}.C", c.id);
+                        net.pins.contains(&coll_ref)
+                    }
+                    _ => false,
+                }
+            });
             if has_active_device { continue; }
 
             warnings.push(DrcError::new("T3-02",
@@ -150,7 +162,7 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
             .any(|c| vcc_net.pins.iter().any(|p| p.starts_with(&format!("{}.", c.id))));
 
         for comp in circuit.components.iter()
-            .filter(|c| matches!(c.component_type.as_str(), ct::IC_MCU | ct::IC_OPAMP))
+            .filter(|c| IC_TYPES_WITH_VCC.contains(&c.component_type.as_str()))
         {
             let ic_on_vcc = vcc_net.pins.iter().any(|p| p.starts_with(&format!("{}.", comp.id)));
             if ic_on_vcc && !cap_on_vcc {
@@ -527,7 +539,11 @@ mod tests {
         assert!(run_tier3(&c).iter().any(|e| e.rule_id == "T3-08"));
     }
 
-    // --- Seed circuits — no Violation-level findings ---
+    // --- Seed circuits — no Violation-level findings, no Warning-level findings ---
+    //
+    // Seed circuits must be electrically clean: no DRC violations AND no warnings.
+    // Keeping warnings visible here prevents regressions where bad circuits silently
+    // accumulate in the training set.
 
     #[test]
     fn seed_circuits_no_violations() {
@@ -547,6 +563,14 @@ mod tests {
                 "circuit {} '{}' has Violation-level T3 findings: {:?}",
                 idx, circuit.metadata.title,
                 violations.iter().map(|f| f.to_wire()).collect::<Vec<_>>());
+            // Warning-level findings are also surfaced — seed circuits must be fully clean.
+            let warnings: Vec<_> = findings.iter()
+                .filter(|f| f.level == DrcLevel::Warning)
+                .collect();
+            assert!(warnings.is_empty(),
+                "circuit {} '{}' has Warning-level T3 findings (seed circuits must be fully clean): {:?}",
+                idx, circuit.metadata.title,
+                warnings.iter().map(|f| f.to_wire()).collect::<Vec<_>>());
         }
     }
 } // end mod tests
