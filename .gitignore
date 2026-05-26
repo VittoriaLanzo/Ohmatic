@@ -35,6 +35,9 @@ target/
 ## Claude Code agent state (machine-local, not portable)
 .claude/
 
+## Local feature worktrees
+.worktrees/
+
 ## Machine-local Cargo config (absolute linker paths etc.)
 ## If you need to commit .cargo/config.toml, do so explicitly with documentation.
 .cargo/
