@@ -5,28 +5,122 @@ Validate circuit schematics against schema v0.1.
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
 
-VALID_COMPONENT_TYPES = {
-    "resistor", "capacitor", "led", "diode", "transistor_npn", "transistor_pnp",
-    "mosfet_n", "mosfet_p", "ic_timer", "ic_opamp", "ic_regulator", "ic_logic",
-    "ic_mcu", "ic_driver", "power_vcc", "power_gnd", "connector", "crystal",
-    "inductor", "button", "speaker", "sensor"
+DEFAULT_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "verifier/config/component_registry.toml"
+FORBIDDEN_FIELDS = {
+    "bom",
+    "supplier",
+    "price_usd",
+    "stock",
+    "url",
+    "affiliate",
+    "mpn",
+    "manufacturer",
+    "octopart",
+    "poll_url",
 }
-
+FORBIDDEN_FIELD_STEMS = {
+    "affiliate",
+    "api",
+    "bom",
+    "key",
+    "manufacturer",
+    "mpn",
+    "octopart",
+    "price",
+    "secret",
+    "stock",
+    "supplier",
+    "token",
+    "url",
+}
+PIN_REF_RE = re.compile(r'^[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_+\-]+$')
 ALLOWED_COMPONENT_FIELDS = {"id", "type", "value", "part", "x", "y", "pins"}
 ALLOWED_NET_FIELDS = {"name", "pins"}
 MAX_COMPONENTS = 10_000
 MAX_NETS = 10_000
 
 
+def load_registry_component_types(path: Path) -> Set[str]:
+    """Load component type names from the TOML registry."""
+    with open(path, "rb") as f:
+        registry = tomllib.load(f)
+    return {key for key in registry if key != "defaults"}
+
+
+def load_schema_component_types(path: Path) -> Set[str]:
+    """Load component type enum values from the JSON schema."""
+    with open(path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+    component_type = schema["properties"]["components"]["items"]["properties"]["type"]
+    return set(component_type["enum"])
+
+
+def check_registry_schema_drift(registry_path: Path, schema_path: Path) -> List[str]:
+    """Return registry/schema component type mismatches."""
+    registry = load_registry_component_types(registry_path)
+    schema = load_schema_component_types(schema_path)
+    errors: List[str] = []
+    missing_from_schema = sorted(registry - schema)
+    missing_from_registry = sorted(schema - registry)
+    if missing_from_schema:
+        errors.append(f"registry types missing from schema enum: {missing_from_schema}")
+    if missing_from_registry:
+        errors.append(f"schema enum types missing from registry: {missing_from_registry}")
+    return errors
+
+
+def check_registry_parts_metadata(path: Path) -> List[str]:
+    """Check local parts_list metadata exists and contains no supplier-style fields."""
+    with open(path, "rb") as f:
+        registry = tomllib.load(f)
+
+    errors: List[str] = []
+    for component_type, metadata in registry.items():
+        if component_type == "defaults":
+            continue
+        if not isinstance(metadata.get("parts_list_part"), str) or not metadata.get("parts_list_part"):
+            errors.append(f"{component_type} missing parts_list_part")
+        if not isinstance(metadata.get("is_physical"), bool):
+            errors.append(f"{component_type} missing boolean is_physical")
+
+        forbidden = sorted(key for key in metadata if is_forbidden_field(key))
+        if forbidden:
+            errors.append(f"{component_type} has forbidden fields: {forbidden}")
+
+    return errors
+
+
+def is_forbidden_field(key: str) -> bool:
+    """Return True for supplier/BOM-style field names, including derived forms."""
+    normalized = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key).lower()
+    normalized = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+    if normalized in FORBIDDEN_FIELDS:
+        return True
+    tokens = {token for token in normalized.split("_") if token}
+    if tokens & FORBIDDEN_FIELD_STEMS:
+        return True
+    return any(stem in normalized for stem in {"octopart"})
+
+
 class SchemaValidator:
     """Validates circuit JSON against schema v0.1."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        valid_component_types: Set[str] | None = None,
+        registry_path: Path | None = None,
+    ) -> None:
         self.errors: List[str] = []
+        self.valid_component_types = (
+            valid_component_types
+            if valid_component_types is not None
+            else load_registry_component_types(registry_path or DEFAULT_REGISTRY_PATH)
+        )
 
     def validate_circuit(self, circuit: Dict[str, Any]) -> bool:
         """Validate a complete circuit. Returns True if valid.
@@ -39,6 +133,8 @@ class SchemaValidator:
         if not isinstance(circuit, dict):
             self.errors.append(f"circuit must be a JSON object, got {type(circuit).__name__}")
             return False
+
+        self._validate_forbidden_fields(circuit)
 
         # --- metadata ---
         if "metadata" not in circuit:
@@ -156,7 +252,7 @@ class SchemaValidator:
 
             # Validate type (only when the field is present to avoid double-reporting)
             comp_type = comp.get("type")
-            if "type" in comp and comp_type not in VALID_COMPONENT_TYPES:
+            if "type" in comp and comp_type not in self.valid_component_types:
                 self.errors.append(f"component '{comp_id}' invalid type: {comp_type}")
 
             # Validate value and part are strings
@@ -264,9 +360,7 @@ class SchemaValidator:
             # Validate pin references
             seen_in_net: Set[str] = set()
             for pin_ref in pins:
-                if not isinstance(pin_ref, str) or not re.match(
-                    r'^[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_]+$', pin_ref
-                ):
+                if not isinstance(pin_ref, str) or not PIN_REF_RE.match(pin_ref):
                     self.errors.append(f"net '{net_name}' invalid pin ref: {pin_ref}")
                     continue
 
@@ -312,6 +406,20 @@ class SchemaValidator:
                 if pin_ref not in used_pins:
                     self.errors.append(f"component pin {pin_ref} not connected to any net")
 
+    def _validate_forbidden_fields(self, value: Any, path: str = "$") -> None:
+        """Reject Step 2-local forbidden supplier/BOM fields anywhere in the circuit."""
+        if isinstance(value, dict):
+            if path.endswith(".pins"):
+                return
+            for key, child in value.items():
+                child_path = f"{path}.{key}"
+                if is_forbidden_field(key):
+                    self.errors.append(f"forbidden field at {child_path}: {key}")
+                self._validate_forbidden_fields(child, child_path)
+        elif isinstance(value, list):
+            for i, child in enumerate(value):
+                self._validate_forbidden_fields(child, f"{path}[{i}]")
+
     def get_errors(self) -> List[str]:
         """Return list of validation errors."""
         return self.errors
@@ -321,6 +429,13 @@ def load_examples(file_path: Path) -> List[Dict[str, Any]]:
     """Load examples from JSON file."""
     with open(file_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def validate_circuit(circuit: Dict[str, Any], registry_path: Path | None = None) -> List[str]:
+    """Validate one circuit and return all validation errors."""
+    validator = SchemaValidator(registry_path=registry_path)
+    validator.validate_circuit(circuit)
+    return validator.get_errors()
 
 
 def validate_file(file_path: Path) -> Tuple[int, int]:
