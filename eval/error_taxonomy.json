@@ -1,0 +1,114 @@
+{
+  "version": "diagnostic_taxonomy_v2",
+  "codes": {
+    "FORBIDDEN_SUPPLIER_FIELD": {
+      "severity": "error",
+      "related_rule": "STEP2-FORBID-SUPPLIER"
+    },
+    "CONNECTIVITY_COMPONENT_NOT_REACHABLE_FROM_POWER": {
+      "severity": "warning",
+      "related_rule": "T3-07"
+    },
+    "INTERACTION_BJT_BASE_MISSING_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-13"
+    },
+    "INTERACTION_BUTTON_MISSING_PULL_RESISTOR": {
+      "severity": "warning",
+      "related_rule": "T3-08"
+    },
+    "INTERACTION_FLOATING_MOSFET_GATE": {
+      "severity": "error",
+      "related_rule": "T3-03"
+    },
+    "INTERACTION_IGBT_GATE_MISSING_DRIVER": {
+      "severity": "error",
+      "related_rule": "T3-14"
+    },
+    "INTERACTION_LED_MISSING_CURRENT_LIMIT": {
+      "severity": "error",
+      "related_rule": "T3-02"
+    },
+    "INTERACTION_MOTOR_DC_MISSING_FLYBACK_DIODE": {
+      "severity": "error",
+      "related_rule": "T3-18"
+    },
+    "INTERACTION_OPTOCOUPLER_INPUT_MISSING_CURRENT_LIMIT": {
+      "severity": "error",
+      "related_rule": "T3-20"
+    },
+    "INTERACTION_RELAY_COIL_MISSING_FLYBACK_DIODE": {
+      "severity": "error",
+      "related_rule": "T3-17"
+    },
+    "INTERACTION_SCR_GATE_MISSING_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-15"
+    },
+    "INTERACTION_SPEAKER_DIRECT_MCU_DRIVE": {
+      "severity": "error",
+      "related_rule": "T3-19"
+    },
+    "INTERACTION_TRIAC_GATE_MISSING_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-16"
+    },
+    "INTERACTION_ZENER_CATHODE_MISSING_SERIES_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-23"
+    },
+    "PIN_UNKNOWN_FOR_COMPONENT": {
+      "severity": "error",
+      "related_rule": "T1-07"
+    },
+    "POLARITY_DIODE_REVERSED": {
+      "severity": "error",
+      "related_rule": "T3-22"
+    },
+    "POLARITY_REVERSED_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-05"
+    },
+    "POLARITY_ZENER_ANODE_ON_HIGH_RAIL": {
+      "severity": "error",
+      "related_rule": "T3-21"
+    },
+    "POWER_CONVERTER_MISSING_OUTPUT_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-12"
+    },
+    "POWER_CRYSTAL_MISSING_LOAD_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-11"
+    },
+    "POWER_IC_MISSING_BYPASS_CAPACITOR": {
+      "severity": "warning",
+      "related_rule": "T3-04"
+    },
+    "POWER_IC_MISSING_LITERAL_VCC_NET": {
+      "severity": "warning",
+      "related_rule": "T3-06"
+    },
+    "POWER_REGULATOR_MISSING_INPUT_CAPACITOR": {
+      "severity": "warning",
+      "related_rule": "T3-10"
+    },
+    "POWER_REGULATOR_MISSING_OUTPUT_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-09"
+    },
+    "POWER_SHORT_VCC_GND": {
+      "severity": "error",
+      "related_rule": "T3-01"
+    },
+    "REGISTRY_UNKNOWN_COMPONENT_TYPE": {
+      "severity": "error",
+      "related_rule": "T1-PARSE-REGISTRY"
+    },
+    "SCHEMA_VALIDATION_ERROR": {
+      "severity": "error",
+      "related_rule": "T1"
+    }
+  },
+  "component_type_policy": "all registry component types are covered by registry-aware schema diagnostics plus component-card context"
+}
