@@ -68,9 +68,16 @@ _RULE_MODULES: list[Callable] = [
 ]
 
 
+def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
+    """Return (components, nets) from either flat or STAGE_1_TOPOLOGY format."""
+    if "STAGE_1_TOPOLOGY" in circuit:
+        topo = circuit["STAGE_1_TOPOLOGY"]
+        return topo.get("components", []), topo.get("nets", [])
+    return circuit.get("components", []), circuit.get("nets", [])
+
+
 def electrical_diagnostics(circuit: dict[str, Any], make_item: DiagnosticFactory) -> list[dict[str, Any]]:
-    components = circuit.get("components")
-    nets = circuit.get("nets")
+    components, nets = _extract_topology(circuit)
     if not isinstance(components, list) or not isinstance(nets, list):
         return []
     ctx = _Context(components, nets, make_item)
