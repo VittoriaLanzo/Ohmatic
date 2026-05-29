@@ -18,31 +18,43 @@ bbox = [12, 12]
 bbox        = [8, 4]
 ref_prefix  = "R"
 description = "Fixed-value resistor; pins 1, 2 (passive, no polarity)"
+parts_list_part = "resistor"
+is_physical     = true
 
 [capacitor]
 bbox        = [8, 4]
 ref_prefix  = "C"
 description = "Capacitor (ceramic, electrolytic, film, tantalum)"
+parts_list_part = "capacitor"
+is_physical     = true
 
 [inductor]
 bbox        = [10, 6]
 ref_prefix  = "L"
 description = "Inductor or coil (series element); pins 1, 2"
+parts_list_part = "inductor"
+is_physical     = true
 
 [potentiometer]
 bbox        = [10, 8]
 ref_prefix  = "RV"
 description = "3-terminal variable resistor; pins A, W (wiper), B"
+parts_list_part = "potentiometer"
+is_physical     = true
 
 [thermistor]
 bbox        = [8, 4]
 ref_prefix  = "RT"
 description = "Temperature-sensitive resistor (NTC or PTC)"
+parts_list_part = "thermistor"
+is_physical     = true
 
 [varistor]
 bbox        = [8, 4]
 ref_prefix  = "RV"
 description = "Voltage-dependent resistor (MOV); overvoltage clamp"
+parts_list_part = "varistor"
+is_physical     = true
 
 # ── Diodes ────────────────────────────────────────────────────────────────────
 
@@ -50,36 +62,50 @@ description = "Voltage-dependent resistor (MOV); overvoltage clamp"
 bbox        = [8, 4]
 ref_prefix  = "D"
 description = "General-purpose rectifier diode; pins A, K"
+parts_list_part = "diode"
+is_physical     = true
 
 [led]
 bbox        = [8, 4]
 ref_prefix  = "D"
 description = "Light-emitting diode; pins A, K"
+parts_list_part = "led"
+is_physical     = true
 
 [led_rgb]
 bbox        = [10, 8]
 ref_prefix  = "D"
 description = "RGB LED (common anode or common cathode); pins R, G, B, COM"
+parts_list_part = "led_rgb"
+is_physical     = true
 
 [zener_diode]
 bbox        = [8, 4]
 ref_prefix  = "D"
 description = "Zener diode; voltage reference / clamp (reverse-biased); pins A, K"
+parts_list_part = "zener_diode"
+is_physical     = true
 
 [schottky_diode]
 bbox        = [8, 4]
 ref_prefix  = "D"
 description = "Schottky diode; low forward-voltage drop; pins A, K"
+parts_list_part = "schottky_diode"
+is_physical     = true
 
 [tvs_diode]
 bbox        = [8, 4]
 ref_prefix  = "D"
 description = "Transient voltage suppressor (unidirectional or bidirectional); pins A, K"
+parts_list_part = "tvs_diode"
+is_physical     = true
 
 [photodiode]
 bbox        = [8, 4]
 ref_prefix  = "D"
 description = "Light-sensitive diode; pins A, K"
+parts_list_part = "photodiode"
+is_physical     = true
 
 # ── Bipolar transistors ───────────────────────────────────────────────────────
 
@@ -87,11 +113,15 @@ description = "Light-sensitive diode; pins A, K"
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "NPN bipolar junction transistor; pins B, C, E"
+parts_list_part = "transistor_npn"
+is_physical     = true
 
 [transistor_pnp]
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "PNP bipolar junction transistor; pins B, C, E"
+parts_list_part = "transistor_pnp"
+is_physical     = true
 
 # ── Field-effect & power transistors ─────────────────────────────────────────
 
@@ -99,21 +129,29 @@ description = "PNP bipolar junction transistor; pins B, C, E"
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "N-channel MOSFET; pins G, D, S"
+parts_list_part = "mosfet_n"
+is_physical     = true
 
 [mosfet_p]
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "P-channel MOSFET; pins G, D, S"
+parts_list_part = "mosfet_p"
+is_physical     = true
 
 [igbt]
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "Insulated-gate bipolar transistor; pins G, C, E"
+parts_list_part = "igbt"
+is_physical     = true
 
 [phototransistor]
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "Light-sensitive transistor; no physical base pin; pins C, E"
+parts_list_part = "phototransistor"
+is_physical     = true
 
 # ── Thyristors & AC power devices ─────────────────────────────────────────────
 
@@ -121,11 +159,15 @@ description = "Light-sensitive transistor; no physical base pin; pins C, E"
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "Silicon controlled rectifier (SCR); latching switch; pins A, K, G"
+parts_list_part = "thyristor_scr"
+is_physical     = true
 
 [triac]
 bbox        = [10, 8]
 ref_prefix  = "Q"
 description = "Bidirectional thyristor for AC power control; pins MT1, MT2, G"
+parts_list_part = "triac"
+is_physical     = true
 
 # ── Optoelectronics ───────────────────────────────────────────────────────────
 
@@ -133,6 +175,8 @@ description = "Bidirectional thyristor for AC power control; pins MT1, MT2, G"
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Galvanic isolator via LED+phototransistor; pins A, K (input), C, E (output)"
+parts_list_part = "optocoupler"
+is_physical     = true
 
 # ── Protection & switching ────────────────────────────────────────────────────
 
@@ -140,16 +184,22 @@ description = "Galvanic isolator via LED+phototransistor; pins A, K (input), C, 
 bbox        = [10, 4]
 ref_prefix  = "F"
 description = "Overcurrent protection element; pins 1, 2"
+parts_list_part = "fuse"
+is_physical     = true
 
 [relay]
 bbox        = [16, 12]
 ref_prefix  = "K"
 description = "Electromechanical switch; coil A1/A2, contacts NO/NC/COM"
+parts_list_part = "relay"
+is_physical     = true
 
 [relay_solid_state]
 bbox        = [16, 12]
 ref_prefix  = "K"
 description = "Solid-state relay (SSR); optical isolation; pins IN+, IN-, OUT+, OUT-"
+parts_list_part = "relay_solid_state"
+is_physical     = true
 
 # ── Magnetics ─────────────────────────────────────────────────────────────────
 
@@ -157,11 +207,15 @@ description = "Solid-state relay (SSR); optical isolation; pins IN+, IN-, OUT+, 
 bbox        = [20, 16]
 ref_prefix  = "T"
 description = "Isolated magnetic coupling; pins P1, P2 (primary), S1, S2 (secondary)"
+parts_list_part = "transformer"
+is_physical     = true
 
 [ferrite_bead]
 bbox        = [8, 4]
 ref_prefix  = "FB"
 description = "EMI suppression ferrite bead (series element); pins 1, 2"
+parts_list_part = "ferrite_bead"
+is_physical     = true
 
 # ── Displays ──────────────────────────────────────────────────────────────────
 
@@ -169,11 +223,15 @@ description = "EMI suppression ferrite bead (series element); pins 1, 2"
 bbox        = [16, 20]
 ref_prefix  = "DS"
 description = "7-segment numeric display; pins A–G, DP, COM"
+parts_list_part = "seven_segment"
+is_physical     = true
 
 [lcd]
 bbox        = [24, 20]
 ref_prefix  = "DS"
 description = "LCD display module; VCC, GND + data/control bus"
+parts_list_part = "lcd"
+is_physical     = true
 
 # ── ICs — analog ──────────────────────────────────────────────────────────────
 
@@ -181,46 +239,64 @@ description = "LCD display module; VCC, GND + data/control bus"
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Timer IC (e.g. NE555); astable/monostable modes"
+parts_list_part = "ic_timer"
+is_physical     = true
 
 [ic_opamp]
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Operational amplifier; pins IN+, IN-, OUT, VCC, VEE/GND"
+parts_list_part = "ic_opamp"
+is_physical     = true
 
 [ic_comparator]
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Voltage comparator (often open-drain output); pins IN+, IN-, OUT, VCC, GND"
+parts_list_part = "ic_comparator"
+is_physical     = true
 
 [ic_regulator]
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Linear voltage regulator (LDO or standard); pins VIN, VOUT, GND, ADJ?"
+parts_list_part = "ic_regulator"
+is_physical     = true
 
 [ic_instrumentation_amp]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Instrumentation amplifier; high CMRR; pins IN+, IN-, OUT, REF, VCC, VEE, RG"
+parts_list_part = "ic_instrumentation_amp"
+is_physical     = true
 
 [ic_voltage_ref]
 bbox        = [12, 8]
 ref_prefix  = "U"
 description = "Precision voltage reference; pins IN, OUT, GND"
+parts_list_part = "ic_voltage_ref"
+is_physical     = true
 
 [ic_adc]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Analog-to-digital converter; pins VIN, VREF, VCC, GND + data bus"
+parts_list_part = "ic_adc"
+is_physical     = true
 
 [ic_dac]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Digital-to-analog converter; pins VOUT, VREF, VCC, GND + data bus"
+parts_list_part = "ic_dac"
+is_physical     = true
 
 [ic_pll]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Phase-locked loop; pins VCO_IN, CLK_IN, CLK_OUT, VCC, GND"
+parts_list_part = "ic_pll"
+is_physical     = true
 
 # ── ICs — digital / mixed-signal ──────────────────────────────────────────────
 
@@ -228,66 +304,92 @@ description = "Phase-locked loop; pins VCO_IN, CLK_IN, CLK_OUT, VCC, GND"
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Digital logic IC (gate, flip-flop, decoder, shift register); requires VCC and GND pins"
+parts_list_part = "ic_logic"
+is_physical     = true
 
 [ic_mcu]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Microcontroller unit; requires VCC, GND, and a bypass capacitor (T3-04)"
+parts_list_part = "ic_mcu"
+is_physical     = true
 
 [ic_driver]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Driver IC (motor driver, gate driver, LED driver, H-bridge)"
+parts_list_part = "ic_driver"
+is_physical     = true
 
 [ic_memory]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Memory IC (EEPROM, Flash, SRAM); pins VCC, GND, CS + data/address bus"
+parts_list_part = "ic_memory"
+is_physical     = true
 
 [ic_fpga]
 bbox        = [28, 24]
 ref_prefix  = "U"
 description = "FPGA or CPLD; configurable logic fabric; VCC, GND + I/O banks"
+parts_list_part = "ic_fpga"
+is_physical     = true
 
 [ic_level_shifter]
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Voltage level translator; shifts logic signals between voltage domains; VCC_A, VCC_B, GND + data"
+parts_list_part = "ic_level_shifter"
+is_physical     = true
 
 [ic_interface]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Interface bridge IC (UART, SPI, I2C, USB, CAN, RS-485); VCC, GND + bus pins"
+parts_list_part = "ic_interface"
+is_physical     = true
 
 [ic_filter]
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Active or switched-capacitor filter IC (low-pass, band-pass, notch)"
+parts_list_part = "ic_filter"
+is_physical     = true
 
 [ic_audio_amp]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Audio power amplifier IC; pins IN+, IN-, OUT, VCC, GND, BYPASS"
+parts_list_part = "ic_audio_amp"
+is_physical     = true
 
 [ic_battery_management]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "Battery charger or fuel-gauge IC; pins VIN, VBAT, GND, SDA, SCL, STAT"
+parts_list_part = "ic_battery_management"
+is_physical     = true
 
 [ic_power_converter]
 bbox        = [20, 16]
 ref_prefix  = "U"
 description = "DC-DC converter IC (buck, boost, SEPIC, flyback controller); VIN, VOUT, GND, FB, EN"
+parts_list_part = "ic_power_converter"
+is_physical     = true
 
 [ic_rtc]
 bbox        = [16, 12]
 ref_prefix  = "U"
 description = "Real-time clock IC; pins VCC, GND, SDA, SCL, INT, BAT"
+parts_list_part = "ic_rtc"
+is_physical     = true
 
 [ic_rf]
 bbox        = [24, 20]
 ref_prefix  = "U"
 description = "RF transceiver, receiver, or transmitter IC; pins VCC, GND, RF, SDA/SPI, IRQ"
+parts_list_part = "ic_rf"
+is_physical     = true
 
 # ── Power symbols ─────────────────────────────────────────────────────────────
 
@@ -295,31 +397,43 @@ description = "RF transceiver, receiver, or transmitter IC; pins VCC, GND, RF, S
 bbox        = [8, 8]
 ref_prefix  = "PWR"
 description = "Positive supply rail (generic VCC); Stage 1 rules inspect only the net named 'VCC'"
+parts_list_part = "power_vcc"
+is_physical     = false
 
 [power_gnd]
 bbox        = [8, 8]
 ref_prefix  = "PWR"
 description = "Ground reference (0V); the net named GND is the BFS isolation root for T3-07"
+parts_list_part = "power_gnd"
+is_physical     = false
 
 [power_vee]
 bbox        = [8, 8]
 ref_prefix  = "PWR"
 description = "Negative supply rail (e.g. −15V for bipolar op-amps)"
+parts_list_part = "power_vee"
+is_physical     = false
 
 [power_3v3]
 bbox        = [8, 8]
 ref_prefix  = "PWR"
 description = "Named 3.3V supply rail"
+parts_list_part = "power_3v3"
+is_physical     = false
 
 [power_5v]
 bbox        = [8, 8]
 ref_prefix  = "PWR"
 description = "Named 5V supply rail"
+parts_list_part = "power_5v"
+is_physical     = false
 
 [power_12v]
 bbox        = [8, 8]
 ref_prefix  = "PWR"
 description = "Named 12V supply rail"
+parts_list_part = "power_12v"
+is_physical     = false
 
 # ── Power sources ─────────────────────────────────────────────────────────────
 
@@ -327,6 +441,8 @@ description = "Named 12V supply rail"
 bbox        = [12, 8]
 ref_prefix  = "BT"
 description = "Electrochemical cell or battery pack; pins +, -"
+parts_list_part = "battery"
+is_physical     = true
 
 # ── Electromechanical / interface ─────────────────────────────────────────────
 
@@ -334,31 +450,43 @@ description = "Electrochemical cell or battery pack; pins +, -"
 bbox        = [12, 8]
 ref_prefix  = "J"
 description = "Connector / header / terminal block"
+parts_list_part = "connector"
+is_physical     = true
 
 [button]
 bbox        = [10, 8]
 ref_prefix  = "SW"
 description = "Momentary push-button switch"
+parts_list_part = "button"
+is_physical     = true
 
 [switch]
 bbox        = [10, 8]
 ref_prefix  = "SW"
 description = "General-purpose switch (SPST, SPDT, DPDT); pins 1, 2 (and COM, 3 for SPDT)"
+parts_list_part = "switch"
+is_physical     = true
 
 [motor_dc]
 bbox        = [16, 12]
 ref_prefix  = "M"
 description = "DC brush motor; pins 1, 2"
+parts_list_part = "motor_dc"
+is_physical     = true
 
 [motor_stepper]
 bbox        = [16, 12]
 ref_prefix  = "M"
 description = "Stepper motor (bipolar 4-wire); pins A+, A-, B+, B-"
+parts_list_part = "motor_stepper"
+is_physical     = true
 
 [servo]
 bbox        = [16, 12]
 ref_prefix  = "M"
 description = "RC servo with PWM control; pins VCC, GND, SIG"
+parts_list_part = "servo"
+is_physical     = true
 
 # ── RF / wireless ─────────────────────────────────────────────────────────────
 
@@ -366,6 +494,8 @@ description = "RC servo with PWM control; pins VCC, GND, SIG"
 bbox        = [12, 16]
 ref_prefix  = "ANT"
 description = "RF antenna (wire, PCB trace, patch, whip); pins RF (and GND on shielded types)"
+parts_list_part = "antenna"
+is_physical     = true
 
 # ── Sensors / transducers / output devices ────────────────────────────────────
 
@@ -373,23 +503,33 @@ description = "RF antenna (wire, PCB trace, patch, whip); pins RF (and GND on sh
 bbox        = [12, 8]
 ref_prefix  = "Y"
 description = "Quartz crystal or ceramic resonator; pins 1, 2 (and GND on 3-pin resonators)"
+parts_list_part = "crystal"
+is_physical     = true
 
 [speaker]
 bbox        = [12, 10]
 ref_prefix  = "SP"
 description = "Speaker or buzzer; pins 1, 2"
+parts_list_part = "speaker"
+is_physical     = true
 
 [sensor]
 bbox        = [12, 10]
 ref_prefix  = "U"
 description = "Generic sensor (temperature, humidity, pressure, IMU, etc.)"
+parts_list_part = "sensor"
+is_physical     = true
 
 [microphone]
 bbox        = [10, 10]
 ref_prefix  = "MK"
 description = "Microphone or audio input transducer; pins OUT, GND (and VCC for MEMS/condenser)"
+parts_list_part = "microphone"
+is_physical     = true
 
 [diode_bridge]
 bbox        = [16, 16]
 ref_prefix  = "BR"
 description = "4-diode full-wave bridge rectifier module; pins AC1, AC2, + (DC+), - (DC-)"
+parts_list_part = "diode_bridge"
+is_physical     = true

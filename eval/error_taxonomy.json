@@ -1,0 +1,178 @@
+{
+  "version": "diagnostic_taxonomy_v3",
+  "codes": {
+    "FORBIDDEN_SUPPLIER_FIELD": {
+      "severity": "error",
+      "related_rule": "STEP2-FORBID-SUPPLIER"
+    },
+    "CONNECTIVITY_COMPONENT_NOT_REACHABLE_FROM_POWER": {
+      "severity": "warning",
+      "related_rule": "T3-07"
+    },
+    "INTERACTION_BJT_BASE_MISSING_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-13"
+    },
+    "INTERACTION_BUTTON_MISSING_PULL_RESISTOR": {
+      "severity": "warning",
+      "related_rule": "T3-08"
+    },
+    "INTERACTION_COMPARATOR_OPEN_DRAIN_MISSING_PULL": {
+      "severity": "error",
+      "related_rule": "T3-26"
+    },
+    "INTERACTION_DAC_OUTPUT_MISSING_FILTER_CAPACITOR": {
+      "severity": "warning",
+      "related_rule": "T3-39"
+    },
+    "INTERACTION_DIODE_BRIDGE_AC_FROM_DC_RAIL": {
+      "severity": "error",
+      "related_rule": "T3-35"
+    },
+    "INTERACTION_FLOATING_MOSFET_GATE": {
+      "severity": "error",
+      "related_rule": "T3-03"
+    },
+    "INTERACTION_IGBT_GATE_MISSING_DRIVER": {
+      "severity": "error",
+      "related_rule": "T3-14"
+    },
+    "INTERACTION_LED_MISSING_CURRENT_LIMIT": {
+      "severity": "error",
+      "related_rule": "T3-02"
+    },
+    "INTERACTION_LEVEL_SHIFTER_SAME_VOLTAGE_RAILS": {
+      "severity": "error",
+      "related_rule": "T3-40"
+    },
+    "INTERACTION_MICROPHONE_MISSING_DECOUPLING": {
+      "severity": "warning",
+      "related_rule": "T3-38"
+    },
+    "INTERACTION_MOTOR_DC_MISSING_FLYBACK_DIODE": {
+      "severity": "error",
+      "related_rule": "T3-18"
+    },
+    "INTERACTION_MOTOR_STEPPER_DIRECT_MCU_DRIVE": {
+      "severity": "error",
+      "related_rule": "T3-24"
+    },
+    "INTERACTION_OPTOCOUPLER_INPUT_MISSING_CURRENT_LIMIT": {
+      "severity": "error",
+      "related_rule": "T3-20"
+    },
+    "INTERACTION_RELAY_COIL_MISSING_FLYBACK_DIODE": {
+      "severity": "error",
+      "related_rule": "T3-17"
+    },
+    "INTERACTION_RTC_MISSING_BATTERY_BACKUP": {
+      "severity": "error",
+      "related_rule": "T3-29"
+    },
+    "INTERACTION_SCR_GATE_MISSING_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-15"
+    },
+    "INTERACTION_SERVO_MISSING_CONTROL_SIGNAL": {
+      "severity": "warning",
+      "related_rule": "T3-36"
+    },
+    "INTERACTION_SEVEN_SEGMENT_MISSING_CURRENT_LIMIT": {
+      "severity": "error",
+      "related_rule": "T3-25"
+    },
+    "INTERACTION_SPEAKER_DIRECT_MCU_DRIVE": {
+      "severity": "error",
+      "related_rule": "T3-19"
+    },
+    "INTERACTION_SSR_INPUT_MISSING_CURRENT_LIMIT": {
+      "severity": "error",
+      "related_rule": "T3-28"
+    },
+    "INTERACTION_SWITCH_MISSING_PULL_RESISTOR": {
+      "severity": "warning",
+      "related_rule": "T3-27"
+    },
+    "INTERACTION_TRIAC_GATE_MISSING_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-16"
+    },
+    "INTERACTION_ZENER_CATHODE_MISSING_SERIES_RESISTOR": {
+      "severity": "error",
+      "related_rule": "T3-23"
+    },
+    "PIN_UNKNOWN_FOR_COMPONENT": {
+      "severity": "error",
+      "related_rule": "T1-07"
+    },
+    "POLARITY_DIODE_REVERSED": {
+      "severity": "error",
+      "related_rule": "T3-22"
+    },
+    "POLARITY_PHOTOTRANSISTOR_REVERSED": {
+      "severity": "error",
+      "related_rule": "T3-34"
+    },
+    "POLARITY_REVERSED_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-05"
+    },
+    "POLARITY_TVS_DIODE_REVERSED": {
+      "severity": "error",
+      "related_rule": "T3-32"
+    },
+    "POLARITY_ZENER_ANODE_ON_HIGH_RAIL": {
+      "severity": "error",
+      "related_rule": "T3-21"
+    },
+    "POWER_BATTERY_MISSING_PROTECTION": {
+      "severity": "error",
+      "related_rule": "T3-33"
+    },
+    "POWER_CONVERTER_MISSING_OUTPUT_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-12"
+    },
+    "POWER_CRYSTAL_MISSING_LOAD_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-11"
+    },
+    "POWER_IC_MISSING_BYPASS_CAPACITOR": {
+      "severity": "warning",
+      "related_rule": "T3-04"
+    },
+    "POWER_IC_MISSING_LITERAL_VCC_NET": {
+      "severity": "warning",
+      "related_rule": "T3-06"
+    },
+    "POWER_REGULATOR_MISSING_INPUT_CAPACITOR": {
+      "severity": "warning",
+      "related_rule": "T3-10"
+    },
+    "POWER_REGULATOR_MISSING_OUTPUT_CAPACITOR": {
+      "severity": "error",
+      "related_rule": "T3-09"
+    },
+    "POWER_SHORT_VCC_GND": {
+      "severity": "error",
+      "related_rule": "T3-01"
+    },
+    "POWER_TRANSFORMER_SECONDARY_MISSING_RECTIFIER": {
+      "severity": "error",
+      "related_rule": "T3-30"
+    },
+    "POWER_VOLTAGE_REF_MISSING_BYPASS_CAPACITOR": {
+      "severity": "warning",
+      "related_rule": "T3-37"
+    },
+    "REGISTRY_UNKNOWN_COMPONENT_TYPE": {
+      "severity": "error",
+      "related_rule": "T1-PARSE-REGISTRY"
+    },
+    "SCHEMA_VALIDATION_ERROR": {
+      "severity": "error",
+      "related_rule": "T1"
+    }
+  },
+  "component_type_policy": "all registry component types are covered by registry-aware schema diagnostics plus component-card context"
+}

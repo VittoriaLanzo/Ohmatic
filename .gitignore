@@ -8,6 +8,13 @@ __pycache__/
 .dataset_cache/
 dataset/prepared/
 
+## Dataset — training data lives on HuggingFace (private), NOT in git.
+## Repo: huggingface.co/datasets/VittoriaLanzo/ohmatic-teacher-corpus  (private)
+## Push new data:  python dataset/scripts/upload_to_hf.py
+## Refactor format: python dataset/scripts/refactor_topology_layout.py
+dataset/authored/
+dataset/generated/
+
 ## Node
 node_modules/
 frontend/dist/
@@ -37,6 +44,9 @@ target/
 
 ## Claude Code agent state (machine-local, not portable)
 .claude/
+
+## Local feature worktrees
+.worktrees/
 
 ## Machine-local Cargo config (absolute linker paths etc.)
 ## If you need to commit .cargo/config.toml, do so explicitly with documentation.
