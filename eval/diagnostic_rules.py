@@ -223,6 +223,22 @@ def _short_vcc_gnd(ctx: _Context) -> list[dict[str, Any]]:
     return items
 
 
+def _net_has_cap_to_gnd(ctx: _Context, net: dict) -> bool:
+    """True iff *net* has a capacitor whose other pin lands on a GND-type net."""
+    for cid in ctx.comps_on_net(net):
+        if ctx.component_type(cid) != "capacitor":
+            continue
+        comp = ctx.by_id.get(cid, {})
+        for pin_name in comp.get("pins", {}):
+            other_ref = f"{cid}.{pin_name}"
+            other_net = ctx.net_for_pin(other_ref)
+            if other_net is net:
+                continue
+            if other_net and ctx.net_has_type(other_net, "power_gnd"):
+                return True
+    return False
+
+
 def _net_has_resistor_to_vcc(ctx: _Context, net: dict) -> bool:
     """True iff *net* contains a resistor whose OTHER pin lands on a VCC-type net.
 
@@ -312,7 +328,10 @@ def _floating_mosfet_gate(ctx: _Context) -> list[dict[str, Any]]:
 
 def _ic_missing_bypass(ctx: _Context) -> list[dict[str, Any]]:
     vcc_net = next((n for n in ctx.nets if n.get("name") == "VCC"), None)
-    if not vcc_net or ctx.net_has_type(vcc_net, "capacitor"):
+    if not vcc_net:
+        return []
+    # A bypass cap must have one pin on VCC and the other on a GND-type net
+    if _net_has_cap_to_gnd(ctx, vcc_net):
         return []
     vcc_pins = set(vcc_net.get("pins", []))
     items = []

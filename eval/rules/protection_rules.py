@@ -9,6 +9,22 @@ if TYPE_CHECKING:
 SUPPLY_POWER_TYPES = {"power_vcc", "power_3v3", "power_5v", "power_12v"}
 
 
+def _net_is_supply(ctx: "_Context", net: dict) -> bool:
+    """True if net is a positive supply: has power symbol type OR is a regulator output."""
+    if any(ctx.component_type(cid) in SUPPLY_POWER_TYPES for cid in ctx.comps_on_net(net)):
+        return True
+    # Also treat ic_regulator VOUT/OUT pin as a supply
+    for cid in ctx.comps_on_net(net):
+        if ctx.component_type(cid) not in ("ic_regulator", "ic_power_converter"):
+            continue
+        comp = ctx.by_id.get(cid, {})
+        pins = comp.get("pins", {})
+        for pin_name, pin_net_name in pins.items():
+            if pin_name in ("VOUT", "OUT") and pin_net_name == net.get("name", ""):
+                return True
+    return False
+
+
 def protection_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
     """Entry point called from diagnostic_rules.electrical_diagnostics."""
     items: list[dict[str, Any]] = []
@@ -71,10 +87,7 @@ def _zener_anode_on_high_rail(ctx: "_Context") -> list[dict[str, Any]]:
         if not net:
             continue
         # Anode on a supply rail → forward-biased, not performing clamping
-        anode_on_supply = (
-            net.get("name") == "VCC"
-            or any(ctx.component_type(cid) in SUPPLY_POWER_TYPES for cid in ctx.comps_on_net(net))
-        )
+        anode_on_supply = _net_is_supply(ctx, net)
         if not anode_on_supply:
             continue
         items.append(ctx.make_item(
@@ -115,10 +128,7 @@ def _diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
             anode_net.get("name") == "GND"
             or ctx.net_has_type(anode_net, "power_gnd")
         )
-        cathode_on_vcc = (
-            cathode_net.get("name") == "VCC"
-            or any(ctx.component_type(cid) in SUPPLY_POWER_TYPES for cid in ctx.comps_on_net(cathode_net))
-        )
+        cathode_on_vcc = _net_is_supply(ctx, cathode_net)
         if not (anode_on_gnd and cathode_on_vcc):
             continue
         items.append(ctx.make_item(
@@ -156,9 +166,7 @@ def _zener_missing_series_resistor(ctx: "_Context") -> list[dict[str, Any]]:
         # place the zener cathode on an intermediate net (not the supply itself), so
         # any resistor elsewhere on the supply net is unrelated — it does NOT protect
         # the zener from overcurrent.
-        cathode_on_supply = any(
-            ctx.component_type(cid) in SUPPLY_POWER_TYPES for cid in ctx.comps_on_net(net)
-        )
+        cathode_on_supply = _net_is_supply(ctx, net)
         if not cathode_on_supply:
             continue
         items.append(ctx.make_item(

@@ -46,7 +46,7 @@ def _motor_stepper_direct_mcu(ctx: "_Context") -> list[dict[str, Any]]:
                 coil_comp_ids |= ctx.comps_on_net(net)
         coil_comp_ids.discard(comp_id)
         peer_types = {ctx.component_type(cid) for cid in coil_comp_ids}
-        if "ic_mcu" not in peer_types:
+        if not peer_types & {"ic_mcu", "ic_logic"}:
             continue
         if peer_types & STEPPER_DRIVER_TYPES:
             continue

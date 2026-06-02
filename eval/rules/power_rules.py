@@ -7,6 +7,12 @@ if TYPE_CHECKING:
     from eval.diagnostic_rules import _Context
 
 
+def _net_has_cap_to_gnd(ctx, net):  # type: ignore[no-untyped-def]
+    """Lazy proxy — defers import of _net_has_cap_to_gnd to avoid circular import."""
+    import eval.diagnostic_rules as _dr  # noqa: PLC0415
+    return _dr._net_has_cap_to_gnd(ctx, net)
+
+
 def power_regulation_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
     """Entry point called from diagnostic_rules.electrical_diagnostics."""
     items: list[dict[str, Any]] = []
@@ -21,6 +27,7 @@ def power_regulation_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _regulator_missing_output_cap(ctx: "_Context") -> list[dict[str, Any]]:
+    from eval.diagnostic_rules import _net_has_cap_to_gnd  # lazy import to break circular dependency
     items = []
     for component in ctx.components:
         if component.get("type") != "ic_regulator":
@@ -32,7 +39,7 @@ def _regulator_missing_output_cap(ctx: "_Context") -> list[dict[str, Any]]:
             continue
         pin_ref = f"{comp_id}.{out_pin}"
         net = ctx.net_for_pin(pin_ref)
-        if not net or ctx.net_has_type(net, "capacitor"):
+        if not net or _net_has_cap_to_gnd(ctx, net):
             continue
         items.append(ctx.make_item(
             code="POWER_REGULATOR_MISSING_OUTPUT_CAPACITOR",
@@ -63,7 +70,7 @@ def _regulator_missing_input_cap(ctx: "_Context") -> list[dict[str, Any]]:
             continue
         pin_ref = f"{comp_id}.VIN"
         net = ctx.net_for_pin(pin_ref)
-        if not net or ctx.net_has_type(net, "capacitor"):
+        if not net or _net_has_cap_to_gnd(ctx, net):
             continue
         items.append(ctx.make_item(
             code="POWER_REGULATOR_MISSING_INPUT_CAPACITOR",
@@ -96,7 +103,7 @@ def _crystal_missing_load_caps(ctx: "_Context") -> list[dict[str, Any]]:
                 continue
             pin_ref = f"{comp_id}.{osc_pin}"
             net = ctx.net_for_pin(pin_ref)
-            if not net or ctx.net_has_type(net, "capacitor"):
+            if not net or _net_has_cap_to_gnd(ctx, net):
                 continue
             items.append(ctx.make_item(
                 code="POWER_CRYSTAL_MISSING_LOAD_CAPACITOR",
@@ -127,7 +134,7 @@ def _converter_missing_output_cap(ctx: "_Context") -> list[dict[str, Any]]:
             continue
         pin_ref = f"{comp_id}.VOUT"
         net = ctx.net_for_pin(pin_ref)
-        if not net or ctx.net_has_type(net, "capacitor"):
+        if not net or _net_has_cap_to_gnd(ctx, net):
             continue
         items.append(ctx.make_item(
             code="POWER_CONVERTER_MISSING_OUTPUT_CAPACITOR",

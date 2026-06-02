@@ -15,7 +15,9 @@ def inductive_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for rule in (
         _relay_missing_flyback,
+        _relay_flyback_diode_reversed,
         _motor_dc_missing_flyback,
+        _motor_flyback_diode_reversed,
         _speaker_direct_mcu_drive,
     ):
         items.extend(rule(ctx))
@@ -64,6 +66,53 @@ def _relay_missing_flyback(ctx: "_Context") -> list[dict[str, Any]]:
     return items
 
 
+def _relay_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
+    """T3-17 polarity: flyback diode exists but is reversed (anode toward supply)."""
+    items = []
+    for component in ctx.components:
+        if component.get("type") != "relay":
+            continue
+        component_id = str(component.get("id", ""))
+        pins = component.get("pins", {})
+        if "A1" not in pins:
+            continue
+        # Collect nets for coil pins and all diodes on those nets
+        coil_nets = []
+        for coil_pin in ("A1", "A2"):
+            if coil_pin not in pins:
+                continue
+            net = ctx.net_for_pin(f"{component_id}.{coil_pin}")
+            if net:
+                coil_nets.append(net)
+        coil_comp_ids: set[str] = set()
+        for net in coil_nets:
+            coil_comp_ids |= ctx.comps_on_net(net)
+        coil_comp_ids.discard(component_id)
+        for cid in coil_comp_ids:
+            if ctx.component_type(cid) not in FLYBACK_DIODE_TYPES:
+                continue
+            comp = ctx.by_id.get(cid, {})
+            anode_net = ctx.net_for_pin(f"{cid}.A")
+            if anode_net and ctx.net_has_type(anode_net, "power_vcc"):
+                # Anode on supply side → reversed
+                items.append(ctx.make_item(
+                    code="INTERACTION_RELAY_FLYBACK_DIODE_REVERSED",
+                    path=f"$.nets[{ctx.net_index(anode_net)}].pins",
+                    message=f"{cid}: flyback diode anode (A) is on the supply side of relay {component_id} — diode is reversed",
+                    why_it_matters="A reversed flyback diode conducts continuously when the switch is ON, shorting the supply through the driver and destroying it.",
+                    expected="cathode (K) toward the positive rail, anode (A) toward the switching node",
+                    actual=f"{cid}.A on supply net '{anode_net.get('name', '')}'",
+                    repair_hint="Flip the flyback diode: cathode (K) to the positive rail (A1), anode (A) to the switching node (A2).",
+                    component_id=cid,
+                    component_type=str(comp.get("type", "")),
+                    pin_ref=f"{cid}.A",
+                    net_name=str(anode_net.get("name", "")),
+                    related_component_cards=["relay", "diode", "schottky_diode"],
+                    related_rule="T3-17",
+                ))
+    return items
+
+
 def _motor_dc_missing_flyback(ctx: "_Context") -> list[dict[str, Any]]:
     items = []
     for component in ctx.components:
@@ -105,6 +154,50 @@ def _motor_dc_missing_flyback(ctx: "_Context") -> list[dict[str, Any]]:
     return items
 
 
+def _motor_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
+    """T3-18 polarity: flyback diode exists but is reversed (anode toward supply)."""
+    items = []
+    for component in ctx.components:
+        if component.get("type") != "motor_dc":
+            continue
+        component_id = str(component.get("id", ""))
+        pins = component.get("pins", {})
+        motor_nets = []
+        for terminal in ("1", "2"):
+            if terminal not in pins:
+                continue
+            net = ctx.net_for_pin(f"{component_id}.{terminal}")
+            if net:
+                motor_nets.append(net)
+        motor_comp_ids: set[str] = set()
+        for net in motor_nets:
+            motor_comp_ids |= ctx.comps_on_net(net)
+        motor_comp_ids.discard(component_id)
+        for cid in motor_comp_ids:
+            if ctx.component_type(cid) not in FLYBACK_DIODE_TYPES:
+                continue
+            comp = ctx.by_id.get(cid, {})
+            anode_net = ctx.net_for_pin(f"{cid}.A")
+            if anode_net and ctx.net_has_type(anode_net, "power_vcc"):
+                # Anode on supply side → reversed
+                items.append(ctx.make_item(
+                    code="INTERACTION_MOTOR_FLYBACK_DIODE_REVERSED",
+                    path=f"$.nets[{ctx.net_index(anode_net)}].pins",
+                    message=f"{cid}: flyback diode anode (A) is on the supply side of motor {component_id} — diode is reversed",
+                    why_it_matters="A reversed flyback diode conducts continuously when the switch is ON, shorting the supply through the driver and destroying it.",
+                    expected="cathode (K) toward the positive rail, anode (A) toward the switching node",
+                    actual=f"{cid}.A on supply net '{anode_net.get('name', '')}'",
+                    repair_hint="Flip the flyback diode: cathode (K) to the positive rail, anode (A) to the switching node.",
+                    component_id=cid,
+                    component_type=str(comp.get("type", "")),
+                    pin_ref=f"{cid}.A",
+                    net_name=str(anode_net.get("name", "")),
+                    related_component_cards=["motor_dc", "diode", "schottky_diode"],
+                    related_rule="T3-18",
+                ))
+    return items
+
+
 def _speaker_direct_mcu_drive(ctx: "_Context") -> list[dict[str, Any]]:
     items = []
     for component in ctx.components:
@@ -126,8 +219,8 @@ def _speaker_direct_mcu_drive(ctx: "_Context") -> list[dict[str, Any]]:
                 speaker_comp_ids |= ctx.comps_on_net(net)
         speaker_comp_ids.discard(component_id)
         peer_types = {ctx.component_type(cid) for cid in speaker_comp_ids}
-        # Only fire if MCU is directly connected and no driver type is present
-        if "ic_mcu" not in peer_types:
+        # Only fire if MCU or logic IC is directly connected and no driver type is present
+        if not peer_types & {"ic_mcu", "ic_logic"}:
             continue
         if peer_types & SPEAKER_DRIVER_TYPES:
             continue
