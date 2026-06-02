@@ -44,7 +44,14 @@ IC_TYPES_WITH_VCC: frozenset[str] = frozenset({
     "ic_comparator", "ic_adc", "ic_dac", "ic_memory", "ic_eeprom",
     "ic_rtc", "ic_audio_amp", "ic_power_converter", "ic_bms",
     "ic_battery_charger", "ic_display_driver", "ic_encoder",
-    "ic_protection", "level_shifter", "voltage_ref",
+    "ic_protection",
+    # Corrected type names (registry uses ic_ prefix)
+    "ic_level_shifter",
+    # NOTE: ic_voltage_ref is a shunt reference (2/3-terminal, no VCC pin) —
+    # it is handled by T3-37 (_voltage_ref_missing_bypass) separately and must
+    # NOT be in IC_TYPES_WITH_VCC (T3-04/T3-06 would fire spuriously).
+    # Additional IC types found in corpus that need VCC bypass
+    "ic_fpga", "ic_pll", "ic_filter",
 })
 
 # Components exempt from the isolation check (T3-07).  These are boundary /
@@ -197,8 +204,13 @@ class _Context:
 
 # ── T3-01 through T3-08: core topology rules ──────────────────────────────────
 
+_ZERO_OHM_VALUES: frozenset[str] = frozenset({"0", "0r", "0ohm", "0ω", "dnp"})
+
+
 def _short_vcc_gnd(ctx: _Context) -> list[dict[str, Any]]:
     items = []
+
+    # T3-01a: single net carries both power_vcc and power_gnd
     for net in ctx.nets:
         if ctx.net_has_type(net, "power_vcc") and ctx.net_has_type(net, "power_gnd"):
             items.append(ctx.make_item(
@@ -213,7 +225,75 @@ def _short_vcc_gnd(ctx: _Context) -> list[dict[str, Any]]:
                 related_component_cards=["power_vcc", "power_gnd"],
                 related_rule="T3-01",
             ))
+
+    # T3-01b: 0-ohm resistor bridging VCC-type net to GND-type net
+    for comp in ctx.by_type.get("resistor", []):
+        value = str(comp.get("value", "")).strip().lower().replace(" ", "")
+        if value not in _ZERO_OHM_VALUES:
+            continue
+        comp_id = str(comp.get("id", ""))
+        pin_nets = [
+            ctx.net_for_pin(f"{comp_id}.{pin}")
+            for pin in comp.get("pins", {})
+        ]
+        pin_nets = [n for n in pin_nets if n is not None]
+        has_vcc = any(ctx.net_has_type(n, "power_vcc") for n in pin_nets)
+        has_gnd = any(ctx.net_has_type(n, "power_gnd") for n in pin_nets)
+        if not (has_vcc and has_gnd):
+            continue
+        items.append(ctx.make_item(
+            code="POWER_SHORT_VCC_GND",
+            path="$.components",
+            message=f"{comp_id}: 0-ohm resistor bridges a VCC-type net to a GND-type net — dead short",
+            why_it_matters="A 0-ohm link between the positive rail and ground is a dead short that blows the supply or traces on power-up.",
+            expected="0-ohm jumpers must not connect supply and ground rails",
+            actual=f"{comp_id} (value={comp.get('value','0')}) bridges VCC and GND",
+            repair_hint="Remove the 0-ohm link or replace it with a real load between supply and ground.",
+            component_id=comp_id,
+            component_type="resistor",
+            pin_ref=f"{comp_id}.1",
+            net_name="VCC/GND bridge",
+            related_component_cards=["resistor"],
+            related_rule="T3-01",
+        ))
+
     return items
+
+
+def _net_has_cap_to_gnd(ctx: _Context, net: dict) -> bool:
+    """True iff *net* has a capacitor whose other pin lands on a GND-type net."""
+    for cid in ctx.comps_on_net(net):
+        if ctx.component_type(cid) != "capacitor":
+            continue
+        comp = ctx.by_id.get(cid, {})
+        for pin_name in comp.get("pins", {}):
+            other_ref = f"{cid}.{pin_name}"
+            other_net = ctx.net_for_pin(other_ref)
+            if other_net is net:
+                continue
+            if other_net and ctx.net_has_type(other_net, "power_gnd"):
+                return True
+    return False
+
+
+def _net_has_resistor_to_vcc(ctx: _Context, net: dict) -> bool:
+    """True iff *net* contains a resistor whose OTHER pin lands on a VCC-type net.
+
+    This is the correct "pull-up / current-limit" check.  A resistor whose
+    other end goes to GND, IN+, or any other non-supply net does NOT count.
+    """
+    for cid in ctx.comps_on_net(net):
+        if ctx.component_type(cid) != "resistor":
+            continue
+        comp = ctx.by_id.get(cid, {})
+        for pin_name in comp.get("pins", {}):
+            other_ref = f"{cid}.{pin_name}"
+            other_net = ctx.net_for_pin(other_ref)
+            if other_net is net:
+                continue                        # this pin IS on the net we're checking
+            if other_net and ctx.net_has_type(other_net, "power_vcc"):
+                return True
+    return False
 
 
 def _led_missing_current_limit(ctx: _Context) -> list[dict[str, Any]]:
@@ -223,8 +303,18 @@ def _led_missing_current_limit(ctx: _Context) -> list[dict[str, Any]]:
         if "A" not in component.get("pins", {}):
             continue
         net = ctx.net_for_pin(f"{component_id}.A")
-        if not net or ctx.net_has_type(net, "resistor"):
+        if not net:
             continue
+        # Fire if:
+        #   (a) anode net has no resistor at all — no current limiter anywhere, or
+        #   (b) anode net IS a power rail (power_vcc present) — even if unrelated
+        #       resistors exist on that rail, the LED is wired directly to the supply.
+        # Do NOT fire if the anode is on an intermediate net that has a series R
+        # (the R may connect upstream to a transistor output, IC pin, etc. — not
+        # necessarily to VCC directly).
+        anode_on_power_rail = ctx.net_has_type(net, "power_vcc")
+        if ctx.net_has_type(net, "resistor") and not anode_on_power_rail:
+            continue  # intermediate net with series R → correctly wired
         pin_ref = f"{component_id}.A"
         items.append(ctx.make_item(
             code="INTERACTION_LED_MISSING_CURRENT_LIMIT",
@@ -275,7 +365,10 @@ def _floating_mosfet_gate(ctx: _Context) -> list[dict[str, Any]]:
 
 def _ic_missing_bypass(ctx: _Context) -> list[dict[str, Any]]:
     vcc_net = next((n for n in ctx.nets if n.get("name") == "VCC"), None)
-    if not vcc_net or ctx.net_has_type(vcc_net, "capacitor"):
+    if not vcc_net:
+        return []
+    # A bypass cap must have one pin on VCC and the other on a GND-type net
+    if _net_has_cap_to_gnd(ctx, vcc_net):
         return []
     vcc_pins = set(vcc_net.get("pins", []))
     items = []

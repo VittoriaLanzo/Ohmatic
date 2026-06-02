@@ -25,7 +25,13 @@ def ic_specific_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _comparator_open_drain_missing_pull(ctx: "_Context") -> list[dict[str, Any]]:
-    """T3-26: ic_comparator output pin without a pull-up resistor."""
+    """T3-26: ic_comparator output pin without a pull-up resistor to VCC.
+
+    Bug-proofed: only a resistor whose OTHER pin is on a VCC-type net counts
+    as a pull-up.  A hysteresis resistor (OUT→IN+), a pull-down (OUT→GND),
+    or a load resistor (OUT→signal) do NOT satisfy the rule.
+    """
+    from eval.diagnostic_rules import _net_has_resistor_to_vcc
     items = []
     for component in ctx.components_of_type("ic_comparator"):
         component_id = str(component.get("id", ""))
@@ -36,7 +42,7 @@ def _comparator_open_drain_missing_pull(ctx: "_Context") -> list[dict[str, Any]]
         net = ctx.net_for_pin(pin_ref)
         if not net:
             continue
-        if ctx.net_has_type(net, "resistor"):
+        if _net_has_resistor_to_vcc(ctx, net):
             continue
         items.append(ctx.make_item(
             code="INTERACTION_COMPARATOR_OPEN_DRAIN_MISSING_PULL",
@@ -94,7 +100,7 @@ def _rtc_missing_battery(ctx: "_Context") -> list[dict[str, Any]]:
 def _voltage_ref_missing_bypass(ctx: "_Context") -> list[dict[str, Any]]:
     """T3-37: voltage_ref output pin has no bypass/filter capacitor."""
     items = []
-    for component in ctx.components_of_type("voltage_ref"):
+    for component in ctx.components_of_type("ic_voltage_ref", "voltage_ref"):
         component_id = str(component.get("id", ""))
         pins = component.get("pins", {})
         if "OUT" not in pins:
@@ -200,7 +206,7 @@ def _dac_output_missing_bypass(ctx: "_Context") -> list[dict[str, Any]]:
 def _level_shifter_same_rail(ctx: "_Context") -> list[dict[str, Any]]:
     """T3-40: level_shifter VCCA and VCCB on the same net — no level shifting occurs."""
     items = []
-    for component in ctx.components_of_type("level_shifter"):
+    for component in ctx.components_of_type("ic_level_shifter", "level_shifter"):
         component_id = str(component.get("id", ""))
         pins = component.get("pins", {})
         if "VCCA" not in pins or "VCCB" not in pins:
