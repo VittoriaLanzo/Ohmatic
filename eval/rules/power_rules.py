@@ -26,9 +26,11 @@ def _regulator_missing_output_cap(ctx: "_Context") -> list[dict[str, Any]]:
         if component.get("type") != "ic_regulator":
             continue
         comp_id = str(component.get("id", ""))
-        if "VOUT" not in component.get("pins", {}):
+        pins = component.get("pins", {})
+        out_pin = next((p for p in ("VOUT", "OUT") if p in pins), None)
+        if not out_pin:
             continue
-        pin_ref = f"{comp_id}.VOUT"
+        pin_ref = f"{comp_id}.{out_pin}"
         net = ctx.net_for_pin(pin_ref)
         if not net or ctx.net_has_type(net, "capacitor"):
             continue

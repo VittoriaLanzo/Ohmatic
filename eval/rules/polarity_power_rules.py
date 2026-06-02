@@ -105,7 +105,8 @@ def _tvs_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
 
 def _battery_unprotected(ctx: "_Context") -> list[dict[str, Any]]:
     """T3-33: battery with no protection IC, fuse, or polyfuse on its output net."""
-    FUSE_TYPES = {"fuse", "polyfuse", "ferrite_bead"}
+    # ferrite_bead is an EMI filter with no overcurrent trip — NOT protection
+    FUSE_TYPES = {"fuse", "polyfuse"}
     items = []
     for component in ctx.components_of_type("battery"):
         component_id = str(component.get("id", ""))

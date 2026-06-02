@@ -23,6 +23,7 @@ def protection_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _optocoupler_missing_current_limit(ctx: "_Context") -> list[dict[str, Any]]:
+    from eval.diagnostic_rules import _net_has_resistor_to_vcc
     items = []
     for component in ctx.components:
         if component.get("type") != "optocoupler":
@@ -32,7 +33,12 @@ def _optocoupler_missing_current_limit(ctx: "_Context") -> list[dict[str, Any]]:
             continue
         pin_ref = f"{component_id}.A"
         net = ctx.net_for_pin(pin_ref)
-        if not net or ctx.net_has_type(net, "resistor"):
+        if not net:
+            continue
+        # Fire if anode is directly on a power rail (any resistor on VCC for unrelated
+        # purpose must NOT satisfy this check) OR if no resistor at all on anode net.
+        anode_on_power_rail = ctx.net_has_type(net, "power_vcc")
+        if ctx.net_has_type(net, "resistor") and not anode_on_power_rail:
             continue
         items.append(ctx.make_item(
             code="INTERACTION_OPTOCOUPLER_INPUT_MISSING_CURRENT_LIMIT",
@@ -145,13 +151,15 @@ def _zener_missing_series_resistor(ctx: "_Context") -> list[dict[str, Any]]:
         net = ctx.net_for_pin(pin_ref)
         if not net:
             continue
-        # Only fire if cathode is directly on a supply rail with no series resistor
+        # Only fire if cathode is directly on a supply rail.
+        # When cathode IS on a supply rail, always fire: a valid series-R circuit would
+        # place the zener cathode on an intermediate net (not the supply itself), so
+        # any resistor elsewhere on the supply net is unrelated — it does NOT protect
+        # the zener from overcurrent.
         cathode_on_supply = any(
             ctx.component_type(cid) in SUPPLY_POWER_TYPES for cid in ctx.comps_on_net(net)
         )
         if not cathode_on_supply:
-            continue
-        if ctx.net_has_type(net, "resistor"):
             continue
         items.append(ctx.make_item(
             code="INTERACTION_ZENER_CATHODE_MISSING_SERIES_RESISTOR",
