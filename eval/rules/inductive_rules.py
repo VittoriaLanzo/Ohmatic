@@ -10,6 +10,8 @@ FLYBACK_DIODE_TYPES = {"diode", "schottky_diode", "tvs_diode"}
 SPEAKER_DRIVER_TYPES = {"ic_audio_amp", "ic_driver", "transistor_npn", "transistor_pnp", "mosfet_n", "mosfet_p"}
 
 
+MOTOR_DRIVER_TYPES = {"ic_driver", "ic_mcu", "mosfet_n", "mosfet_p", "transistor_npn", "transistor_pnp"}
+
 def inductive_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
     """Entry point called from diagnostic_rules.electrical_diagnostics."""
     items: list[dict[str, Any]] = []
@@ -18,6 +20,7 @@ def inductive_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
         _relay_flyback_diode_reversed,
         _motor_dc_missing_flyback,
         _motor_flyback_diode_reversed,
+        _motor_dc_direct_logic_drive,
         _speaker_direct_mcu_drive,
     ):
         items.extend(rule(ctx))
@@ -195,6 +198,54 @@ def _motor_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
                     related_component_cards=["motor_dc", "diode", "schottky_diode"],
                     related_rule="T3-18",
                 ))
+    return items
+
+
+def _motor_dc_direct_logic_drive(ctx: "_Context") -> list[dict[str, Any]]:
+    """T3-18b: ic_logic or ic_mcu driving a DC motor directly without a driver stage.
+
+    Logic ICs (74HC series etc.) supply at most ~35 mA per pin. DC motors
+    draw hundreds of mA to several amps at stall.  Direct connection destroys
+    the logic IC output stages on every motor start.
+    """
+    items = []
+    for component in ctx.components:
+        if component.get("type") != "motor_dc":
+            continue
+        component_id = str(component.get("id", ""))
+        pins = component.get("pins", {})
+        motor_comp_ids: set[str] = set()
+        first_net = None
+        for terminal in ("1", "2"):
+            if terminal not in pins:
+                continue
+            net = ctx.net_for_pin(f"{component_id}.{terminal}")
+            if net:
+                if first_net is None:
+                    first_net = net
+                motor_comp_ids |= ctx.comps_on_net(net)
+        motor_comp_ids.discard(component_id)
+        peer_types = {ctx.component_type(cid) for cid in motor_comp_ids}
+        # Only fire when ic_logic (or ic_mcu) is present AND no proper driver
+        if not peer_types & {"ic_mcu", "ic_logic"}:
+            continue
+        if peer_types & MOTOR_DRIVER_TYPES:
+            continue  # a suitable driver is also present
+        items.append(ctx.make_item(
+            code="INTERACTION_MOTOR_DC_DIRECT_LOGIC_DRIVE",
+            path=f"$.nets[{ctx.net_index(first_net)}].pins" if first_net else "$.components",
+            message=f"{component_id}: motor_dc terminal is driven directly by a logic/MCU IC without a driver stage",
+            why_it_matters="Logic ICs supply at most ~35 mA; DC motors draw hundreds of mA to several amps at stall. Direct connection destroys IC output stages.",
+            expected="motor drive path includes an ic_driver, MOSFET, or transistor between the logic IC and the motor",
+            actual=f"{component_id} terminal shares net with: {peer_types & {'ic_mcu', 'ic_logic'}}",
+            repair_hint="Add a MOSFET, transistor, or motor driver IC (ic_driver) between the logic/MCU output and the motor coil.",
+            component_id=component_id,
+            component_type="motor_dc",
+            pin_ref=f"{component_id}.1",
+            net_name=str(first_net.get("name", "")) if first_net else "",
+            related_component_cards=["motor_dc", "ic_driver", "mosfet_n"],
+            related_rule="T3-18b",
+        ))
     return items
 
 

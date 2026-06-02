@@ -204,8 +204,13 @@ class _Context:
 
 # ── T3-01 through T3-08: core topology rules ──────────────────────────────────
 
+_ZERO_OHM_VALUES: frozenset[str] = frozenset({"0", "0r", "0ohm", "0ω", "dnp"})
+
+
 def _short_vcc_gnd(ctx: _Context) -> list[dict[str, Any]]:
     items = []
+
+    # T3-01a: single net carries both power_vcc and power_gnd
     for net in ctx.nets:
         if ctx.net_has_type(net, "power_vcc") and ctx.net_has_type(net, "power_gnd"):
             items.append(ctx.make_item(
@@ -220,6 +225,38 @@ def _short_vcc_gnd(ctx: _Context) -> list[dict[str, Any]]:
                 related_component_cards=["power_vcc", "power_gnd"],
                 related_rule="T3-01",
             ))
+
+    # T3-01b: 0-ohm resistor bridging VCC-type net to GND-type net
+    for comp in ctx.by_type.get("resistor", []):
+        value = str(comp.get("value", "")).strip().lower().replace(" ", "")
+        if value not in _ZERO_OHM_VALUES:
+            continue
+        comp_id = str(comp.get("id", ""))
+        pin_nets = [
+            ctx.net_for_pin(f"{comp_id}.{pin}")
+            for pin in comp.get("pins", {})
+        ]
+        pin_nets = [n for n in pin_nets if n is not None]
+        has_vcc = any(ctx.net_has_type(n, "power_vcc") for n in pin_nets)
+        has_gnd = any(ctx.net_has_type(n, "power_gnd") for n in pin_nets)
+        if not (has_vcc and has_gnd):
+            continue
+        items.append(ctx.make_item(
+            code="POWER_SHORT_VCC_GND",
+            path="$.components",
+            message=f"{comp_id}: 0-ohm resistor bridges a VCC-type net to a GND-type net — dead short",
+            why_it_matters="A 0-ohm link between the positive rail and ground is a dead short that blows the supply or traces on power-up.",
+            expected="0-ohm jumpers must not connect supply and ground rails",
+            actual=f"{comp_id} (value={comp.get('value','0')}) bridges VCC and GND",
+            repair_hint="Remove the 0-ohm link or replace it with a real load between supply and ground.",
+            component_id=comp_id,
+            component_type="resistor",
+            pin_ref=f"{comp_id}.1",
+            net_name="VCC/GND bridge",
+            related_component_cards=["resistor"],
+            related_rule="T3-01",
+        ))
+
     return items
 
 
