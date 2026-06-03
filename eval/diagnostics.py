@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import re
 import sys
@@ -23,8 +24,44 @@ REGISTRY_PATH = ROOT / "verifier/config/component_registry.toml"
 DEFAULT_TAXONOMY_PATH = ROOT / "eval/error_taxonomy.json"
 
 
+# ── Component-type normalization ──────────────────────────────────────────────
+# The corpus uses a few synonym type names for components that already have a
+# canonical registry type with identical electrical treatment. We fold synonyms to
+# canonical BEFORE any check so every rule sees the battle-tested canonical type and
+# stays fully strict (a broken `ic_eeprom` becomes `ic_memory` and still fails its
+# bypass-cap rule). This recognizes valid parts WITHOUT weakening any safety rule.
+#
+# Only exact-equivalent synonyms are folded here. Genuinely distinct types
+# (ic_battery_charger, ic_protection) are added to the registry/schema instead, so
+# they keep their own identity and the correct IC_TYPES_WITH_VCC treatment.
+TYPE_ALIASES: dict[str, str] = {
+    "voltage_ref":       "ic_voltage_ref",   # shunt reference (T3-37), not a VCC IC
+    "polyfuse":          "fuse",             # resettable PPTC = a fuse for ERC
+    "bjt_npn":           "transistor_npn",   # synonym
+    "transistor":        "mosfet_n",         # corpus uses it only for G/D/S NMOS switches
+    "ic_eeprom":         "ic_memory",        # registry ic_memory = "EEPROM, Flash, SRAM"
+    "ic_display_driver": "ic_driver",        # display driver = driver IC
+}
+
+
+def _normalize_component_types(circuit: dict[str, Any]) -> dict[str, Any]:
+    """Return a deep copy with synonym component types folded to canonical ones.
+    Never mutates the caller's dict; structure/indices are unchanged so diagnostic
+    paths stay valid."""
+    if not TYPE_ALIASES:
+        return circuit
+    out = copy.deepcopy(circuit)
+    comps = out.get("STAGE_1_TOPOLOGY", {}).get("components", [])
+    for comp in comps:
+        t = comp.get("type")
+        if t in TYPE_ALIASES:
+            comp["type"] = TYPE_ALIASES[t]
+    return out
+
+
 def analyze_schematic(circuit: dict[str, Any]) -> dict[str, Any]:
     """Return structured static diagnostics for one circuit-like object."""
+    circuit = _normalize_component_types(circuit)
     diagnostics: list[dict[str, Any]] = []
     diagnostics.extend(_forbidden_field_diagnostics(circuit))
     diagnostics.extend(_validator_diagnostics(circuit))
@@ -331,15 +368,30 @@ def _fixture_ic_without_vcc_bypass() -> dict[str, Any]:
 
 
 def _fixture_ic_not_on_literal_vcc() -> dict[str, Any]:
-    circuit = _fixture_ic_without_vcc_bypass()
-    circuit["metadata"]["title"] = "Bad IC Not Literal VCC"
-    text = json.dumps(circuit).replace('"VCC"', '"5V"')
-    circuit = json.loads(text)
-    circuit["components"][0]["pins"]["1"] = "VCC"
-    circuit["nets"].insert(0, {"name": "VCC", "pins": ["VCC1.1", "R4.1"]})
-    circuit["components"].append({"id": "R4", "type": "resistor", "part": "0603", "value": "10", "pins": {"1": "VCC", "2": "5V"}, "x": 35, "y": 20})
-    circuit["nets"][1]["pins"].append("R4.2")
-    return circuit
+    # A genuinely UNPOWERED IC: its supply pin connects to a plain net ("PWR") that
+    # carries no power-rail symbol (power_vcc/3v3/5v/12v). T3-06 now recognizes any
+    # positive supply rail (not just a net literally named "VCC"), so the only way to
+    # trip it is a supply pin with no rail at all — which is what this fixture exercises.
+    return {
+        "metadata": {"title": "Bad IC No Supply Rail", "description": "IC supply pin not on any power rail.", "version": "0.1", "tags": ["fixture"]},
+        "components": [
+            {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "0V", "pins": {"1": "GND"}, "x": 0, "y": 120},
+            {"id": "U1", "type": "ic_timer", "part": "SOIC-8", "value": "555", "pins": {"VCC": "PWR", "GND": "GND", "TRIG": "TRIG", "OUT": "OUT", "RESET": "PWR", "CTRL": "CTRL", "THRESH": "TIM", "DISCH": "TIM"}, "x": 100, "y": 60},
+            {"id": "R1", "type": "resistor", "part": "0603", "value": "10k", "pins": {"1": "PWR", "2": "TRIG"}, "x": 55, "y": 40},
+            {"id": "R2", "type": "resistor", "part": "0603", "value": "47k", "pins": {"1": "PWR", "2": "TIM"}, "x": 70, "y": 80},
+            {"id": "C1", "type": "capacitor", "part": "0603", "value": "10nF", "pins": {"1": "CTRL", "2": "GND"}, "x": 150, "y": 80},
+            {"id": "C2", "type": "capacitor", "part": "0603", "value": "1uF", "pins": {"1": "TIM", "2": "GND"}, "x": 160, "y": 100},
+            {"id": "R3", "type": "resistor", "part": "0603", "value": "1k", "pins": {"1": "OUT", "2": "GND"}, "x": 180, "y": 60},
+        ],
+        "nets": [
+            {"name": "PWR", "pins": ["U1.VCC", "U1.RESET", "R1.1", "R2.1"]},
+            {"name": "TRIG", "pins": ["U1.TRIG", "R1.2"]},
+            {"name": "TIM", "pins": ["U1.THRESH", "U1.DISCH", "R2.2", "C2.1"]},
+            {"name": "CTRL", "pins": ["U1.CTRL", "C1.1"]},
+            {"name": "OUT", "pins": ["U1.OUT", "R3.1"]},
+            {"name": "GND", "pins": ["GND1.1", "U1.GND", "C1.2", "C2.2", "R3.2"]},
+        ],
+    }
 
 
 def _fixture_reversed_capacitor() -> dict[str, Any]:

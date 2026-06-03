@@ -13,6 +13,12 @@ def _net_has_cap_to_gnd(ctx, net):  # type: ignore[no-untyped-def]
     return _dr._net_has_cap_to_gnd(ctx, net)
 
 
+def _is_ground_net(ctx, net):  # type: ignore[no-untyped-def]
+    """Lazy proxy for the ground-net detector."""
+    import eval.diagnostic_rules as _dr  # noqa: PLC0415
+    return _dr._is_ground_net(ctx, net)
+
+
 def power_regulation_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
     """Entry point called from diagnostic_rules.electrical_diagnostics."""
     items: list[dict[str, Any]] = []
@@ -104,6 +110,11 @@ def _crystal_missing_load_caps(ctx: "_Context") -> list[dict[str, Any]]:
             pin_ref = f"{comp_id}.{osc_pin}"
             net = ctx.net_for_pin(pin_ref)
             if not net or _net_has_cap_to_gnd(ctx, net):
+                continue
+            # A crystal terminal tied directly to GND is grounded, not an oscillator
+            # node — it needs no load capacitor. Only oscillator pins (on non-ground
+            # nets) require load caps. Skip grounded terminals to avoid a false positive.
+            if _is_ground_net(ctx, net):
                 continue
             items.append(ctx.make_item(
                 code="POWER_CRYSTAL_MISSING_LOAD_CAPACITOR",

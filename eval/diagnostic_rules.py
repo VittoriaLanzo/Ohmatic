@@ -16,6 +16,7 @@ To add new rule modules:
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from typing import Any, Callable
 
@@ -26,6 +27,7 @@ from eval.rules.protection_rules import protection_diagnostics
 from eval.rules.switch_display_rules import switch_display_diagnostics
 from eval.rules.ic_specific_rules import ic_specific_diagnostics
 from eval.rules.polarity_power_rules import polarity_power_diagnostics
+from eval.rules.coverage_rules import coverage_diagnostics
 
 DiagnosticFactory = Callable[..., dict[str, Any]]
 
@@ -54,6 +56,15 @@ IC_TYPES_WITH_VCC: frozenset[str] = frozenset({
     "ic_fpga", "ic_pll", "ic_filter",
 })
 
+# Positive supply-rail power symbols. An IC supply pin is satisfied by ANY of these
+# rails, not only a net literally named "VCC" — real designs name rails VCC_IN,
+# PLL_3V3, RF_3V3, etc. Recognizing them removes a false positive in T3-06 AND lets
+# T3-04 enforce bypass capacitors on every supply rail (not just one named "VCC").
+# power_vee is excluded — it is a NEGATIVE rail and never an IC positive supply.
+POSITIVE_SUPPLY_SYMBOLS: frozenset[str] = frozenset({
+    "power_vcc", "power_3v3", "power_5v", "power_12v",
+})
+
 # Components exempt from the isolation check (T3-07).  These are boundary /
 # passive devices that don't need a traced path back to VCC or GND.
 T3_07_EXEMPT: frozenset[str] = frozenset({
@@ -72,6 +83,7 @@ _RULE_MODULES: list[Callable] = [
     switch_display_diagnostics,      # T3-24, T3-25, T3-27, T3-28, T3-36
     ic_specific_diagnostics,         # T3-26, T3-29, T3-37, T3-38, T3-39, T3-40
     polarity_power_diagnostics,      # T3-30, T3-32, T3-33, T3-34, T3-35
+    coverage_diagnostics,            # T3-41 (IC ground pin), T3-45 (MCU reset float)
 ]
 
 
@@ -277,10 +289,15 @@ def _net_has_cap_to_gnd(ctx: _Context, net: dict) -> bool:
 
 
 def _net_has_resistor_to_vcc(ctx: _Context, net: dict) -> bool:
-    """True iff *net* contains a resistor whose OTHER pin lands on a VCC-type net.
+    """True iff *net* contains a resistor whose OTHER pin lands on a positive supply
+    rail.
 
     This is the correct "pull-up / current-limit" check.  A resistor whose
     other end goes to GND, IN+, or any other non-supply net does NOT count.
+    Supply recognition uses _is_positive_supply_net so a pull-up to a 3V3 / named /
+    regulator-output rail counts, not only a literal power_vcc symbol — otherwise the
+    check false-positives ("no pull-up") on the many corpus rails that aren't a
+    power_vcc symbol.
     """
     for cid in ctx.comps_on_net(net):
         if ctx.component_type(cid) != "resistor":
@@ -291,7 +308,7 @@ def _net_has_resistor_to_vcc(ctx: _Context, net: dict) -> bool:
             other_net = ctx.net_for_pin(other_ref)
             if other_net is net:
                 continue                        # this pin IS on the net we're checking
-            if other_net and ctx.net_has_type(other_net, "power_vcc"):
+            if other_net and _is_positive_supply_net(ctx, other_net):
                 return True
     return False
 
@@ -363,35 +380,96 @@ def _floating_mosfet_gate(ctx: _Context) -> list[dict[str, Any]]:
     return items
 
 
+# Net-name patterns that denote a positive supply rail even when no power symbol is
+# explicitly placed on the net (corpus convention varies: some rails are a power_vcc
+# symbol, some are just a net named VCC / 3V3 / VCC_IN / PLL_3V3 / a regulator output).
+# Matches: VCC*, VDD*, VBUS, AVDD/DVDD/VDDA/VDDIO, VIN, VOUT, and voltage tokens like
+# 3V3, 5V, 12V, 1V8, 3.3V (as a whole token, optionally with a +/_/- delimiter).
+# Deliberately does NOT match VEE/negative rails or bare signal names.
+_SUPPLY_NAME_RE = re.compile(
+    r"(?:^|[_\-+/])(?:VCC|VDD|VBUS|VDDA|AVDD|DVDD|VDDIO|VIN|VOUT|\+?\d+V\d*|\+?\d+\.\d+V)(?:$|[_\-/])",
+    re.IGNORECASE,
+)
+
+_REGULATOR_OUTPUT_TYPES: frozenset[str] = frozenset({"ic_regulator", "ic_power_converter"})
+
+
+def _name_is_supply(name: str) -> bool:
+    return bool(name) and bool(_SUPPLY_NAME_RE.search(name))
+
+
+def _is_positive_supply_net(ctx: _Context, net: dict) -> bool:
+    """True if *net* is a positive supply rail by ANY of three signals:
+    (1) carries a positive power symbol, (2) is a regulator/converter output,
+    (3) its name matches a supply-rail pattern. Covers the corpus's mixed
+    conventions so T3-04/T3-06 neither false-positive on PLL_3V3-style rails nor
+    miss name-only or regulator-fed rails."""
+    if ctx.net_has_any_type(net, POSITIVE_SUPPLY_SYMBOLS):
+        return True
+    if _name_is_supply(str(net.get("name", ""))):
+        return True
+    for cid in ctx.comps_on_net(net):
+        if ctx.component_type(cid) not in _REGULATOR_OUTPUT_TYPES:
+            continue
+        pins = ctx.by_id.get(cid, {}).get("pins", {})
+        for pin_name, pin_net_name in pins.items():
+            if pin_name in ("VOUT", "OUT") and pin_net_name == net.get("name", ""):
+                return True
+    return False
+
+
+def _positive_supply_nets(ctx: _Context) -> list[dict[str, Any]]:
+    """All nets that qualify as a positive supply rail (symbol, regulator out, or name)."""
+    return [n for n in ctx.nets if _is_positive_supply_net(ctx, n)]
+
+
+_GROUND_NAME_RE = re.compile(r"^(?:GND|GROUND|VSS|AGND|DGND|PGND|EARTH|0V)(?:$|[_\-/].*)", re.IGNORECASE)
+
+
+def _is_ground_net(ctx: _Context, net: dict) -> bool:
+    """True if *net* is a ground reference: has a power_gnd symbol OR its name matches a
+    ground pattern (GND/VSS/AGND/DGND/PGND/0V). Mirrors the supply-net robustness so
+    ground checks don't false-positive on the corpus's name-only ground rails."""
+    if ctx.net_has_type(net, "power_gnd"):
+        return True
+    return bool(_GROUND_NAME_RE.match(str(net.get("name", ""))))
+
+
 def _ic_missing_bypass(ctx: _Context) -> list[dict[str, Any]]:
-    vcc_net = next((n for n in ctx.nets if n.get("name") == "VCC"), None)
-    if not vcc_net:
+    # Compliance-first: every supply rail an IC connects to must have a local bypass
+    # capacitor to GND — not only a rail literally named "VCC". This both removes the
+    # old false negative (non-VCC rails were skipped entirely) and keeps the strict
+    # catch (an IC on a bypass-less rail still fails).
+    supply_nets = _positive_supply_nets(ctx)
+    if not supply_nets:
         return []
-    # A bypass cap must have one pin on VCC and the other on a GND-type net
-    if _net_has_cap_to_gnd(ctx, vcc_net):
-        return []
-    vcc_pins = set(vcc_net.get("pins", []))
     items = []
     for component in ctx.components:
         if component.get("type") not in IC_TYPES_WITH_VCC:
             continue
         component_id = str(component.get("id", ""))
-        if any(pin.startswith(f"{component_id}.") for pin in vcc_pins):
+        for net in supply_nets:
+            if component_id not in ctx.comps_on_net(net):
+                continue
+            if _net_has_cap_to_gnd(ctx, net):
+                continue
+            rail = str(net.get("name", ""))
             items.append(ctx.make_item(
                 code="POWER_IC_MISSING_BYPASS_CAPACITOR",
-                path=f"$.nets[{ctx.net_index(vcc_net)}].pins",
-                message=f"{component_id}: IC has no bypass capacitor on VCC net",
+                path=f"$.nets[{ctx.net_index(net)}].pins",
+                message=f"{component_id}: IC has no bypass capacitor on supply net '{rail}'",
                 why_it_matters="IC supply pins need local bypassing to avoid rail noise, resets, and unstable behavior.",
-                expected="at least one capacitor connected from VCC to GND near the IC supply",
-                actual=f"{component_id} on VCC without capacitor on VCC",
-                repair_hint="Add a capacitor with one pin on VCC and the other on GND.",
+                expected="at least one capacitor connected from the IC supply rail to GND",
+                actual=f"{component_id} on '{rail}' without a capacitor to GND",
+                repair_hint="Add a capacitor with one pin on the IC supply rail and the other on GND.",
                 component_id=component_id,
                 component_type=str(component.get("type", "")),
-                net_name="VCC",
+                net_name=rail,
                 related_component_cards=[str(component.get("type", "")), "capacitor"],
                 related_rule="T3-04",
                 severity="warning",
             ))
+            break  # one bypass diagnostic per IC is enough
     return items
 
 
@@ -429,23 +507,28 @@ def _cap_polarity_item(ctx: _Context, component_id: str, pin_ref: str, net_name:
 
 
 def _ic_missing_literal_vcc(ctx: _Context) -> list[dict[str, Any]]:
-    vcc_net = next((n for n in ctx.nets if n.get("name") == "VCC"), None)
-    vcc_pins = set(vcc_net.get("pins", [])) if vcc_net else set()
+    # An IC is powered if any of its pins sits on a positive supply rail (VCC, 3V3,
+    # 5V, 12V) — not only a net literally named "VCC". This still fires for a genuinely
+    # unpowered IC (no pin on any supply rail), so the floating-supply catch is intact.
+    supply_nets = _positive_supply_nets(ctx)
+    powered_ids: set[str] = set()
+    for net in supply_nets:
+        powered_ids |= ctx.comps_on_net(net)
     items = []
     for component in ctx.components:
         if component.get("type") not in IC_TYPES_WITH_VCC:
             continue
         component_id = str(component.get("id", ""))
-        if any(pin.startswith(f"{component_id}.") for pin in vcc_pins):
+        if component_id in powered_ids:
             continue
         items.append(ctx.make_item(
             code="POWER_IC_MISSING_LITERAL_VCC_NET",
             path="$.nets",
-            message=f"{component_id}: IC has no pin connected to literal VCC net",
-            why_it_matters="The current Stage 1 ERC only recognizes the net named exactly VCC for IC supply checks.",
-            expected="one IC supply pin connected to a net named VCC",
-            actual=f"{component_id} not present on VCC net",
-            repair_hint="Rename the primary positive IC rail to VCC or connect the IC supply pin to the VCC net.",
+            message=f"{component_id}: IC has no pin connected to any positive supply rail",
+            why_it_matters="An IC with no supply-rail connection cannot be powered and will not function.",
+            expected="one IC supply pin connected to a positive supply rail (VCC / 3V3 / 5V / 12V)",
+            actual=f"{component_id} not present on any supply rail",
+            repair_hint="Connect the IC supply pin to a positive supply rail (e.g. a power_vcc / power_3v3 net).",
             component_id=component_id,
             component_type=str(component.get("type", "")),
             net_name="VCC",

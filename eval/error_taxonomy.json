@@ -145,6 +145,14 @@
       "severity": "warning",
       "related_rule": "T3-06"
     },
+    "POWER_IC_MISSING_GROUND_PIN": {
+      "severity": "error",
+      "related_rule": "T3-41"
+    },
+    "INTERACTION_MCU_RESET_FLOATING": {
+      "severity": "warning",
+      "related_rule": "T3-45"
+    },
     "POWER_REGULATOR_MISSING_INPUT_CAPACITOR": {
       "severity": "warning",
       "related_rule": "T3-10"

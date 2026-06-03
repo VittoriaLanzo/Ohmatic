@@ -51,3 +51,9 @@ target/
 ## Machine-local Cargo config (absolute linker paths etc.)
 ## If you need to commit .cargo/config.toml, do so explicitly with documentation.
 .cargo/
+
+## Held-out benchmark DATA (moat — gitignored; scripts stay tracked)
+eval/benchmark/*.jsonl
+eval/benchmark/*.txt
+eval/benchmark/holdout_manifest.json
+eval/benchmark/reports/

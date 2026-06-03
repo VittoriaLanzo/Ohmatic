@@ -370,6 +370,20 @@ description = "Battery charger or fuel-gauge IC; pins VIN, VBAT, GND, SDA, SCL, 
 parts_list_part = "ic_battery_management"
 is_physical     = true
 
+[ic_battery_charger]
+bbox        = [20, 16]
+ref_prefix  = "U"
+description = "Li-ion/LiPo battery charger IC; pins VIN, VBAT, GND, ISET, STAT, EN"
+parts_list_part = "ic_battery_charger"
+is_physical     = true
+
+[ic_protection]
+bbox        = [16, 12]
+ref_prefix  = "U"
+description = "Battery/load protection IC (OVP, UVP, OCP); pins VDD, GND, sense, gate control"
+parts_list_part = "ic_protection"
+is_physical     = true
+
 [ic_power_converter]
 bbox        = [20, 16]
 ref_prefix  = "U"
