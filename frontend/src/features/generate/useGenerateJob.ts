@@ -49,7 +49,7 @@ export function useGenerateJob(api: GatewayApi = createGatewayApi()) {
   }, []);
 
   const submit = useCallback(
-    async (prompt: string, options: Required<GenerateOptions>) => {
+    async (prompt: string, options: GenerateOptions) => {
       // PROMPT OUTPUT ENTRY: user text becomes POST /v1/generate here.
       // Returned job_id/poll_url drives all downstream surfaces:
       // StageRail pipeline state, SchematicSvg circuit artifact, ResultPanels checks/BOM/JSON.

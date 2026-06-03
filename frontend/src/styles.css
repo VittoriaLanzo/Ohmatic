@@ -782,7 +782,7 @@ textarea:disabled {
 }
 
 .schematic-frame {
-  overflow: hidden;
+  overflow: auto;
   min-height: 370px;
   border: 0;
   border-radius: 16px;
@@ -790,6 +790,47 @@ textarea:disabled {
     radial-gradient(circle at 8% 8%, rgba(74, 222, 128, 0.1), transparent 28%),
     linear-gradient(180deg, rgba(17, 24, 39, 0.88), rgba(13, 17, 23, 0.72));
   box-shadow: inset 0 0 0 1px rgba(232, 237, 224, 0.08);
+}
+
+.schematic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.segmented-control,
+.schematic-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.68);
+  padding: 4px;
+}
+
+.segmented-control button,
+.schematic-zoom-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.segmented-control button.is-selected,
+.schematic-zoom-controls button:hover {
+  background: var(--green-soft);
+  color: var(--ink);
 }
 
 .schematic-svg,
@@ -833,21 +874,29 @@ textarea:disabled {
 }
 
 .schematic-component rect {
-  fill: rgba(17, 24, 39, 0.96);
-  stroke: var(--ink);
-  stroke-width: 1.2;
+  fill: #242522;
+  stroke: #111311;
+  stroke-width: 0.9;
 }
 
 .schematic-component circle {
-  fill: var(--green);
+  fill: #272a26;
+  stroke: #f4f1e7;
+  stroke-width: 0.35;
 }
 
 .schematic-component path {
   fill: none;
-  stroke: var(--ink);
-  stroke-width: 1.3;
+  stroke: #1c1e1b;
+  stroke-width: 0.9;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.schematic-component [data-symbol-kind] text {
+  fill: #f0eee4;
+  stroke: none;
+  font: 700 7px "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 }
 
 .schematic-svg.is-done .schematic-component {
@@ -864,32 +913,53 @@ textarea:disabled {
   animation-delay: calc(720ms + var(--draw-order) * 56ms);
 }
 
-.symbol-led path:first-child {
-  fill: rgba(22, 163, 74, 0.14);
-}
-
-.symbol-power path {
-  stroke: var(--green);
-  stroke-width: 1.6;
-}
-
 .component-id {
-  fill: var(--ink);
+  fill: #1f211e;
   font: 700 9px "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 }
 
 .component-type,
-.net-label {
+.net-label,
+.pin-label {
   fill: var(--muted);
   font: 6px "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 }
 
+.pin-label {
+  fill: #5e625b;
+  font-size: 4.2px;
+}
+
+.schematic-diagnostic-marker circle {
+  fill: rgba(255, 122, 112, 0.92);
+  stroke: #531b17;
+  stroke-width: 1.2;
+}
+
+.schematic-diagnostic-marker text,
+.schematic-diagnostic-summary text {
+  fill: #531b17;
+  stroke: none;
+  font: 800 9px "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.schematic-diagnostic-summary rect {
+  fill: rgba(255, 122, 112, 0.16);
+  stroke: rgba(157, 63, 53, 0.72);
+  stroke-width: 1;
+}
+
+.sr-only-svg {
+  opacity: 0;
+  font-size: 1px;
+}
+
 .net-line {
   fill: none;
-  stroke-width: 2;
+  stroke-width: 1.05;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.86;
+  opacity: 0.72;
 }
 
 .schematic-svg.is-done .net-line {
@@ -900,23 +970,23 @@ textarea:disabled {
 }
 
 .net-line-0 {
-  stroke: #167a43;
+  stroke: #4c5a50;
 }
 
 .net-line-1 {
-  stroke: #3b6670;
+  stroke: #5a6466;
 }
 
 .net-line-2 {
-  stroke: #a76528;
+  stroke: #6f6556;
 }
 
 .net-line-3 {
-  stroke: #7757a6;
+  stroke: #625c70;
 }
 
 .net-line-4 {
-  stroke: #9d3f35;
+  stroke: #6e5a57;
 }
 
 .metadata-grid {

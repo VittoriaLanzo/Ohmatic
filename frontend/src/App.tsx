@@ -1,4 +1,4 @@
-import { AlertCircle, RotateCcw, Send, Server, SlidersHorizontal } from "lucide-react";
+import { AlertCircle, Maximize2, RotateCcw, Send, Server, SlidersHorizontal, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { createGatewayApi } from "./api/gateway";
 import { OhmaticLogo } from "./components/OhmaticLogo";
@@ -7,7 +7,8 @@ import { SchematicSvg } from "./components/SchematicSvg";
 import { StageRail } from "./components/StageRail";
 import { useGenerateJob } from "./features/generate/useGenerateJob";
 import { humanizeStage } from "./lib/format";
-import type { GenerateOptions, Supplier } from "./types/api";
+import type { GenerateOptions } from "./types/api";
+import type { SymbolStyle } from "./components/schematic/symbols";
 
 const examples = [
   "555 timer astable oscillator, 1 Hz LED blink, 5 V supply",
@@ -15,10 +16,9 @@ const examples = [
   "NPN low-side relay driver with base resistor and flyback diode"
 ];
 
-const defaultOptions: Required<GenerateOptions> = {
+const defaultOptions: Required<Pick<GenerateOptions, "temperature" | "max_retries" | "max_components">> = {
   temperature: 0.4,
   max_retries: 1,
-  supplier: "local",
   max_components: 30
 };
 
@@ -29,7 +29,8 @@ export default function App() {
   const [prompt, setPrompt] = useState(examples[0]);
   const [temperature, setTemperature] = useState(defaultOptions.temperature);
   const [maxComponents, setMaxComponents] = useState(defaultOptions.max_components);
-  const [supplier, setSupplier] = useState<Supplier>(defaultOptions.supplier);
+  const [symbolStyle, setSymbolStyle] = useState<SymbolStyle>("ansi");
+  const [schematicZoom, setSchematicZoom] = useState(1);
   const [health, setHealth] = useState<"checking" | "ok" | "offline">("checking");
   const [completionMotion, setCompletionMotion] = useState<CompletionMotion>("idle");
 
@@ -84,7 +85,6 @@ export default function App() {
     await job.submit(prompt.trim(), {
       temperature,
       max_retries: defaultOptions.max_retries,
-      supplier,
       max_components: maxComponents
     });
   }
@@ -189,16 +189,6 @@ export default function App() {
               disabled={job.isBusy}
             />
 
-            <label htmlFor="supplier">Supplier</label>
-            <select
-              id="supplier"
-              value={supplier}
-              onChange={(event) => setSupplier(event.target.value as Supplier)}
-              disabled={job.isBusy}
-            >
-              <option value="local">Local</option>
-              <option value="octopart">Octopart</option>
-            </select>
           </fieldset>
 
           <div className="example-list" aria-label="Example prompts">
@@ -235,6 +225,48 @@ export default function App() {
             </output>
           </div>
 
+          <div className="schematic-toolbar" aria-label="Schematic controls">
+            <div className="segmented-control" role="group" aria-label="Schematic symbol style">
+              <button
+                type="button"
+                className={symbolStyle === "ansi" ? "is-selected" : ""}
+                aria-pressed={symbolStyle === "ansi"}
+                onClick={() => setSymbolStyle("ansi")}
+              >
+                ANSI
+              </button>
+              <button
+                type="button"
+                className={symbolStyle === "iec" ? "is-selected" : ""}
+                aria-pressed={symbolStyle === "iec"}
+                onClick={() => setSymbolStyle("iec")}
+              >
+                IEC
+              </button>
+            </div>
+            <div className="schematic-zoom-controls" role="group" aria-label="Schematic zoom">
+              <button type="button" aria-label="Fit schematic" title="Fit schematic" onClick={() => setSchematicZoom(1)}>
+                <Maximize2 size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom out"
+                title="Zoom out"
+                onClick={() => setSchematicZoom((current) => Math.max(0.75, Number((current - 0.15).toFixed(2))))}
+              >
+                <ZoomOut size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom in"
+                title="Zoom in"
+                onClick={() => setSchematicZoom((current) => Math.min(1.6, Number((current + 0.15).toFixed(2))))}
+              >
+                <ZoomIn size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
           <StageRail stage={visualStage} phase={visualPhase} />
 
           {job.error && (
@@ -248,7 +280,7 @@ export default function App() {
           )}
 
           <div className="schematic-frame">
-            <SchematicSvg circuit={job.result?.circuit ?? null} phase={visualPhase} />
+            <SchematicSvg circuit={job.result?.circuit ?? null} phase={visualPhase} symbolStyle={symbolStyle} zoom={schematicZoom} />
           </div>
 
           <dl className="metadata-grid">

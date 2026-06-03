@@ -1,4 +1,8 @@
-export const KNOWN_COMPONENT_TYPES = [
+import { describe, expect, it } from "vitest";
+import { KNOWN_COMPONENT_TYPES } from "../../types/circuit";
+import { SCHEMATIC_SYMBOLS, UNKNOWN_SYMBOL_TYPE } from "./symbols";
+
+const REGISTRY_TYPES = [
   "resistor",
   "capacitor",
   "inductor",
@@ -73,35 +77,17 @@ export const KNOWN_COMPONENT_TYPES = [
   "microphone",
 ] as const;
 
-export type KnownComponentType = (typeof KNOWN_COMPONENT_TYPES)[number];
-export type ComponentType = KnownComponentType | (string & {});
+describe("schematic registry coverage", () => {
+  it("keeps frontend known component types aligned with the read-only registry", () => {
+    expect([...KNOWN_COMPONENT_TYPES].sort()).toEqual([...REGISTRY_TYPES].sort());
+  });
 
-export type CircuitMetadata = {
-  title: string;
-  description: string;
-  version: "0.1";
-  tags: string[];
-  [key: string]: unknown;
-};
-
-export type CircuitComponent = {
-  id: string;
-  type: ComponentType;
-  value: string;
-  part: string;
-  x: number;
-  y: number;
-  pins: Record<string, string>;
-};
-
-export type CircuitNet = {
-  name: string;
-  pins: string[];
-};
-
-export type OhmaticCircuitV01 = {
-  metadata: CircuitMetadata;
-  components: CircuitComponent[];
-  nets: CircuitNet[];
-  [key: string]: unknown;
-};
+  it("has explicit ANSI and IEC symbol coverage for every known registry type", () => {
+    for (const type of REGISTRY_TYPES) {
+      expect(SCHEMATIC_SYMBOLS[type], type).toBeDefined();
+      expect(SCHEMATIC_SYMBOLS[type].ansi.kind, `${type} ansi`).not.toBe(UNKNOWN_SYMBOL_TYPE);
+      expect(SCHEMATIC_SYMBOLS[type].iec.kind, `${type} iec`).not.toBe(UNKNOWN_SYMBOL_TYPE);
+      expect(Object.keys(SCHEMATIC_SYMBOLS[type].anchors).length, `${type} anchors`).toBeGreaterThan(0);
+    }
+  });
+});

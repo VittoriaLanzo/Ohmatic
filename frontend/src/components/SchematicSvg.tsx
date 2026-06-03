@@ -1,14 +1,16 @@
 import type { CSSProperties } from "react";
 import type { OhmaticCircuitV01 } from "../types/circuit";
+import { buildSchematicModel } from "./schematic/model";
+import { renderSchematicSymbol, type SymbolStyle } from "./schematic/symbols";
 
 type SchematicSvgProps = {
   circuit: OhmaticCircuitV01 | null;
   phase: "idle" | "submitting" | "polling" | "done" | "error";
+  symbolStyle?: SymbolStyle;
+  zoom?: number;
 };
 
-export function SchematicSvg({ circuit, phase }: SchematicSvgProps) {
-  // CIRCUIT ARTIFACT ENTRY: renders result.circuit returned by the gateway job.
-  // Backend agents linking output should preserve metadata/components/nets, coordinates, and pin refs.
+export function SchematicSvg({ circuit, phase, symbolStyle = "ansi", zoom = 1 }: SchematicSvgProps) {
   if (!circuit) {
     return (
       <div className={`empty-schematic is-${phase}`} role="status">
@@ -19,17 +21,19 @@ export function SchematicSvg({ circuit, phase }: SchematicSvgProps) {
     );
   }
 
-  const positions = normalizePositions(circuit);
+  const model = buildSchematicModel(circuit);
+  const desc = [circuit.metadata.description, model.accessibleDiagnostics].filter(Boolean).join("; ");
 
   return (
     <svg
       className={`schematic-svg is-${phase}`}
       viewBox="0 0 360 210"
       role="img"
-      aria-labelledby="schematic-title schematic-desc"
+      aria-label={circuit.metadata.title}
+      aria-describedby="schematic-desc schematic-diagnostics"
+      style={{ "--schematic-zoom": zoom } as CSSProperties}
     >
-      <title id="schematic-title">{circuit.metadata.title}</title>
-      <desc id="schematic-desc">{circuit.metadata.description}</desc>
+      <desc id="schematic-desc">{desc}</desc>
       <defs>
         <pattern id="grid" width="18" height="18" patternUnits="userSpaceOnUse">
           <path d="M 18 0 L 0 0 0 18" fill="none" stroke="rgba(26, 26, 20, 0.08)" strokeWidth="1" />
@@ -38,126 +42,99 @@ export function SchematicSvg({ circuit, phase }: SchematicSvgProps) {
       <rect width="360" height="210" rx="6" fill="#f9f8f1" />
       <rect x="10" y="10" width="340" height="190" rx="4" fill="url(#grid)" />
 
-      <g className="schematic-nets">
-        {circuit.nets.map((net, index) => {
-          const points = net.pins
-            .map((pin) => positions.get(pin.split(".")[0]))
-            .filter((point): point is Point => Boolean(point));
-          if (points.length < 2) {
-            return null;
-          }
-          return (
-            <g key={net.name}>
-              <polyline
-                points={points.map((point) => `${point.x},${point.y}`).join(" ")}
-                className={`net-line net-line-${index % 5}`}
-                pathLength="1"
-                style={{ "--draw-order": index } as CSSProperties}
-              />
+      <g className="schematic-viewport" transform={`translate(180 105) scale(${zoom}) translate(-180 -105)`}>
+        <g className="schematic-nets">
+          {model.routes.map((route, index) => (
+            <g key={route.name} data-route-kind={route.kind}>
+              <title>{`Net ${route.name}: ${route.anchorRefs.join(", ")}`}</title>
+              {route.segments.map((segment, segmentIndex) => (
+                <path
+                  key={`${route.name}-${segmentIndex}`}
+                  d={segment}
+                  className={`net-line net-line-${index % 5}`}
+                  pathLength="1"
+                  style={{ "--draw-order": index } as CSSProperties}
+                />
+              ))}
               <text
-                x={points[0].x + 8}
-                y={points[0].y - 8}
+                x={route.label.x}
+                y={route.label.y}
                 className="net-label"
                 style={{ "--draw-order": index } as CSSProperties}
               >
-                {net.name}
+                {route.name}
               </text>
             </g>
-          );
-        })}
-      </g>
+          ))}
+        </g>
 
-      <g className="schematic-components">
-        {circuit.components.map((component, index) => {
-          const point = positions.get(component.id) ?? { x: 0, y: 0 };
-          return (
+        <g className="schematic-components">
+          {model.components.map((component, index) => (
             <g
               key={component.id}
-              transform={`translate(${point.x} ${point.y})`}
+              transform={`translate(${component.point.x} ${component.point.y})`}
               className="schematic-component"
+              data-component-type={component.type}
               style={{ "--draw-order": index } as CSSProperties}
             >
-              <ComponentSymbol type={component.type} />
-              <circle cx="-29" cy="0" r="2.8" />
-              <circle cx="29" cy="0" r="2.8" />
-              <text y="-2" textAnchor="middle" className="component-id">
+              <title>{componentTitle(component)}</title>
+              {renderSchematicSymbol(component.type, symbolStyle)}
+              {Object.entries(component.anchors).map(([pinName, anchor]) => (
+                <g key={`${component.id}.${pinName}`} data-pin-anchor={`${component.id}.${pinName}`}>
+                  <circle cx={anchor.x - component.point.x} cy={anchor.y - component.point.y} r="1.35" />
+                  <text
+                    x={anchor.x - component.point.x}
+                    y={anchor.y - component.point.y - 4}
+                    textAnchor="middle"
+                    className="pin-label"
+                  >
+                    {pinName}
+                  </text>
+                </g>
+              ))}
+              <text y="30" textAnchor="middle" className="component-id">
                 {component.id}
               </text>
-              <text y="10" textAnchor="middle" className="component-type">
-                {component.type}
+              <text y="40" textAnchor="middle" className="component-type">
+                {component.value || component.part || component.type}
               </text>
             </g>
-          );
-        })}
+          ))}
+        </g>
+
+        <g className="schematic-diagnostics">
+          {model.diagnostics.map((diagnostic, index) => (
+            <g
+              key={`${diagnostic.net}-${diagnostic.ref}-${index}`}
+              className="schematic-diagnostic-marker"
+              transform={`translate(${diagnostic.point.x + 18} ${diagnostic.point.y - 18})`}
+              role="note"
+              aria-label={diagnostic.message}
+            >
+              <circle r="7" />
+              <text y="3" textAnchor="middle">
+                !
+              </text>
+            </g>
+          ))}
+        </g>
       </g>
+
+      {model.diagnostics.length > 0 && (
+        <g className="schematic-diagnostic-summary">
+          <rect x="14" y="176" width="150" height="20" rx="4" />
+          <text x="22" y="190">
+            Pin ref issue
+          </text>
+        </g>
+      )}
+      <text id="schematic-diagnostics" className="sr-only-svg">
+        {model.accessibleDiagnostics}
+      </text>
     </svg>
   );
 }
 
-function ComponentSymbol({ type }: { type: string }) {
-  if (type === "resistor") {
-    return (
-      <g className="symbol-resistor">
-        <path d="M-26 0 L-18 0 L-14 -8 L-6 8 L2 -8 L10 8 L18 -8 L22 0 L26 0" />
-        <rect x="-25" y="-15" width="50" height="30" rx="4" />
-      </g>
-    );
-  }
-
-  if (type === "led" || type.includes("diode")) {
-    return (
-      <g className="symbol-led">
-        <path d="M-20 10 L-20 -10 L4 0 Z" />
-        <path d="M8 -11 L8 11" />
-        <path d="M12 -12 L20 -20 M17 -9 L25 -17" />
-        <rect x="-25" y="-15" width="50" height="30" rx="4" />
-      </g>
-    );
-  }
-
-  if (type.startsWith("power_") || type === "battery") {
-    return (
-      <g className="symbol-power">
-        <path d="M0 -14 L0 8 M-11 8 L11 8 M-7 13 L7 13 M-3 18 L3 18" />
-        <rect x="-25" y="-15" width="50" height="30" rx="4" />
-      </g>
-    );
-  }
-
-  if (type.startsWith("ic_")) {
-    return (
-      <g className="symbol-ic">
-        <rect x="-25" y="-16" width="50" height="32" rx="2" />
-        <path d="M-28 -9 L-34 -9 M-28 0 L-34 0 M-28 9 L-34 9 M28 -9 L34 -9 M28 0 L34 0 M28 9 L34 9" />
-      </g>
-    );
-  }
-
-  return <rect x="-25" y="-14" width="50" height="28" rx="4" />;
-}
-
-type Point = {
-  x: number;
-  y: number;
-};
-
-function normalizePositions(circuit: OhmaticCircuitV01): Map<string, Point> {
-  const xs = circuit.components.map((component) => component.x);
-  const ys = circuit.components.map((component) => component.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const spanX = Math.max(maxX - minX, 1);
-  const spanY = Math.max(maxY - minY, 1);
-
-  return new Map(
-    circuit.components.map((component) => [
-      component.id,
-      {
-        x: 42 + ((component.x - minX) / spanX) * 276,
-        y: 54 + ((component.y - minY) / spanY) * 102
-      }
-    ])
-  );
+function componentTitle(component: { id: string; type: string; value: string; part: string }) {
+  return [component.id, component.type, component.value || component.part].filter(Boolean).join(" - ");
 }

@@ -19,6 +19,7 @@ dataset/generated/
 node_modules/
 frontend/dist/
 frontend/vite-dev*.log
+frontend/ohmatic-frontend.log
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
