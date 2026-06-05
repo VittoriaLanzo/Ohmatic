@@ -83,12 +83,13 @@ class PipelineConfig:
     t5_max_new_tokens: int = 256
 
     # Qwen generator
-    qwen_model_id: str = ""          # set to HF model ID or local path
-    qwen_max_new_tokens: int = 4096
-    qwen_temperature: float = 0.2    # low temperature for deterministic circuit output
+    qwen_model_id: str = "Qwen/Qwen3-8B"   # base model
+    qwen_adapter_id: str = ""              # trained LoRA adapter (HF repo or local dir)
+    qwen_adapter_revision: str = ""        # e.g. "best-erc" / "latest"
+    qwen_max_new_tokens: int = 2560        # matches training/eval; longest valid circuit ~2.2k
 
-    # ERC retry loop
-    max_retries: int = 3             # max ERC correction attempts
+    # ERC retry loop — greedy decoding (set in HFChatModel) for deterministic JSON
+    max_retries: int = 3                   # max ERC correction attempts (the "N shots")
 
     # System prompt paths
     schema_path: Path = _ROOT / "schema.md"
@@ -119,63 +120,24 @@ class PipelineResult:
 
 # ── System prompt builder ─────────────────────────────────────────────────────
 
+# System prompt + ERC feedback come from the SHARED single sources of truth — the exact
+# same functions the training data was built with — so what the model is SERVED is
+# byte-identical to what it was TRAINED on. The previous inline versions here had drifted
+# (stale flat schema; a different ERC-error layout) and would have served the model
+# out-of-distribution prompts + feedback.
+from shared.prompt_builder import build_system_prompt as _shared_system_prompt
+from shared.erc_feedback import format_erc_errors as _format_erc_errors
+
+
 def _build_system_prompt(
-    schema_text: str,
+    schema_text: str = "",
     registry: dict | None = None,
     erc_rules: list[dict] | None = None,
 ) -> str:
-    """Build Qwen system prompt from schema + optional registry + optional ERC rules."""
-    base = (
-        "You are Ohmatic, an AI PCB schematic generator.\n"
-        "Output ONLY a single valid JSON object in the Ohmatic circuit format shown below.\n"
-        "Never output explanatory text, markdown fences, or comments — only the raw JSON.\n\n"
-        "=== CIRCUIT SCHEMA ===\n"
-        f"{schema_text}\n"
-    )
-
-    if registry:
-        base += (
-            "\n=== COMPONENT REGISTRY (available component types) ===\n"
-            + json.dumps(registry, indent=2, ensure_ascii=False) + "\n"
-        )
-
-    if erc_rules:
-        _EXTERNAL_KEYS = ("code", "severity", "message", "why", "repair")
-        external = [{k: r[k] for k in _EXTERNAL_KEYS if k in r} for r in erc_rules]
-        base += (
-            "\n=== ERC RULES (all must pass — violations will trigger correction) ===\n"
-            + json.dumps(external, indent=2, ensure_ascii=False) + "\n"
-        )
-
-    return base
-
-
-def _format_erc_errors(diags: list[dict]) -> str:
-    """Format ERC diagnostic list into a Qwen-readable correction request."""
-    lines = []
-    for d in diags:
-        sev = d.get("severity", "")
-        if sev not in ("error", "warning"):
-            continue
-        code = d.get("code", "ERC")
-        msg = d.get("message", "")
-        repair = d.get("repair", "") or d.get("repair_hint", "")
-        line = f"  [{sev.upper()}] {code}: {msg}"
-        if repair:
-            line += f"\n    Fix: {repair}"
-        lines.append(line)
-
-    if not lines:
-        return (
-            "ERC ERRORS DETECTED (unspecified).\n"
-            "Fix all circuit errors and regenerate the complete JSON."
-        )
-
-    return (
-        "ERC ERRORS DETECTED — the circuit above failed validation:\n\n"
-        + "\n".join(lines)
-        + "\n\nFix ALL errors and regenerate the complete, corrected circuit JSON."
-    )
+    """Standardized Ohmatic system prompt (schema + full registry + full ERC catalog),
+    from shared/prompt_builder. Args are ignored (kept for call-site compatibility) —
+    the canonical config drives everything."""
+    return _shared_system_prompt()
 
 
 def _parse_circuit(text: str) -> tuple[dict | None, str]:
@@ -293,8 +255,9 @@ class HFChatModel:
     def __init__(
         self,
         model_id: str,
-        max_new_tokens: int = 4096,
-        temperature: float = 0.2,
+        adapter_id: str | None = None,
+        adapter_revision: str | None = None,
+        max_new_tokens: int = 2560,
         device_map: str = "auto",
     ) -> None:
         try:
@@ -302,30 +265,38 @@ class HFChatModel:
         except ImportError:
             raise RuntimeError("Install transformers: pip install transformers")
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+        # Tokenizer comes from the adapter (it carries the trained chat template) when present.
+        self.tokenizer = AutoTokenizer.from_pretrained(adapter_id or model_id)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id, device_map=device_map, torch_dtype="auto"
         )
+        if adapter_id:
+            from peft import PeftModel
+            self.model = PeftModel.from_pretrained(
+                self.model, adapter_id, revision=adapter_revision)
+        self.model.eval()
         self.max_new_tokens = max_new_tokens
-        self.temperature = temperature
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        text = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
+        # GREEDY decoding (do_sample=False) + enable_thinking=False — identical to how the
+        # model was trained and evaluated. Sampling here would make serving drift from
+        # training and add nondeterminism to a structured-JSON task.
+        try:
+            text = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        except TypeError:
+            text = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True)
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
         with __import__("torch").no_grad():
             output = self.model.generate(
                 **inputs,
                 max_new_tokens=self.max_new_tokens,
-                temperature=self.temperature,
-                do_sample=(self.temperature > 0),
+                do_sample=False,            # greedy — temperature intentionally absent
                 pad_token_id=self.tokenizer.eos_token_id,
             )
-        # Strip the input tokens to get only the generated part
         n_input = inputs["input_ids"].shape[1]
-        generated_ids = output[0][n_input:]
-        return self.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+        return self.tokenizer.decode(output[0][n_input:], skip_special_tokens=True).strip()
 
 
 class HFT5Normalizer:
@@ -394,8 +365,8 @@ class OhmaticPipeline:
     @classmethod
     def from_config(cls, cfg: PipelineConfig) -> "OhmaticPipeline":
         """Build pipeline from PipelineConfig, loading HF models."""
-        schema_text, registry, erc_rules = _load_system_resources(cfg)
-        system_prompt = _build_system_prompt(schema_text, registry, erc_rules)
+        # System prompt = the shared single source (exactly what the model trained on).
+        system_prompt = _build_system_prompt()
 
         normalizer: TextNormalizer
         if cfg.t5_model_id:
@@ -404,11 +375,12 @@ class OhmaticPipeline:
             normalizer = _MockNormalizer()
 
         generator: ChatModel
-        if cfg.qwen_model_id:
+        if cfg.qwen_model_id or cfg.qwen_adapter_id:
             generator = HFChatModel(
-                cfg.qwen_model_id,
+                cfg.qwen_model_id or "Qwen/Qwen3-8B",
+                adapter_id=cfg.qwen_adapter_id or None,
+                adapter_revision=cfg.qwen_adapter_revision or None,
                 max_new_tokens=cfg.qwen_max_new_tokens,
-                temperature=cfg.qwen_temperature,
             )
         else:
             generator = _MockQwen()
@@ -418,14 +390,7 @@ class OhmaticPipeline:
     @classmethod
     def mock(cls, schema_path: Path | None = None) -> "OhmaticPipeline":
         """Construct a fully mocked pipeline for testing (no models loaded)."""
-        schema_text = ""
-        if schema_path and schema_path.exists():
-            schema_text = schema_path.read_text(encoding="utf-8")
-        elif (_ROOT / "schema.md").exists():
-            schema_text = (_ROOT / "schema.md").read_text(encoding="utf-8")
-
-        system_prompt = _build_system_prompt(schema_text)
-        return cls(_MockNormalizer(), _MockQwen(), system_prompt, max_retries=2)
+        return cls(_MockNormalizer(), _MockQwen(), _build_system_prompt(), max_retries=2)
 
     # ── Core run method ────────────────────────────────────────────────────────
 
