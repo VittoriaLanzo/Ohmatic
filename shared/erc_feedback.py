@@ -30,7 +30,13 @@ def format_erc_errors(diags: list[dict]) -> str:
     """
     lines = []
     for d in diags:
-        if d.get("severity") in ("error", "warning"):
+        # Blocking = severity != "info" (the codebase convention, per _passes_erc). MANY
+        # ERC rules (esp. the INTERACTION_* family) return complete diagnostics — code,
+        # message, why_it_matters, repair_hint — but DO NOT set `severity` (it is None).
+        # Filtering on ("error","warning") silently dropped all of those, which is why the
+        # original loopback covered only the few severity-setting rules. Treat any fired,
+        # non-info finding as blocking so every rule's feedback is surfaced.
+        if d.get("severity") != "info":
             code   = d.get("code", "ERC")
             msg    = d.get("message", "")
             why    = d.get("why_it_matters", "") or d.get("why", "")

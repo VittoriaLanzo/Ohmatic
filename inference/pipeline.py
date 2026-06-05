@@ -459,7 +459,10 @@ class OhmaticPipeline:
 
             # ERC check
             erc_diags = _run_erc(circuit)
-            failures = [d for d in erc_diags if d.get("severity") not in ("info", None)]
+            # Blocking = severity != "info" (codebase convention). Excluding None here was
+            # a bug: most INTERACTION_* rules fire with severity=None, so prod would neither
+            # retry nor surface them. Treat any fired, non-info diagnostic as a failure.
+            failures = [d for d in erc_diags if d.get("severity") != "info"]
             last_erc_errors = failures
 
             if not failures:
