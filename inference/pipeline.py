@@ -48,11 +48,15 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 try:
-    from eval.diagnostic_rules import electrical_diagnostics as _electrical_diagnostics
+    # Use analyze_schematic — the SAME validity standard as training/the held-out benchmark
+    # (structural/schema validation via _validator + forbidden-field checks + the electrical
+    # rules). The old path here ran ONLY electrical_diagnostics, skipping structural validation,
+    # so prod passed malformed circuits the benchmark would fail (pass@1 inflated ~0.9 vs the
+    # real ~0.50). Single-sourcing on analyze_schematic makes eval == prod == benchmark.
+    from eval.diagnostics import analyze_schematic as _analyze_schematic
 
     def _run_erc(circuit: dict) -> list[dict]:
-        def _make_item(**kw): return kw
-        return _electrical_diagnostics(circuit, _make_item)
+        return _analyze_schematic(circuit).get("diagnostics", [])
 
     ERC_AVAILABLE = True
 except Exception as _exc:
@@ -522,12 +526,12 @@ class OhmaticPipeline:
 
             last_circuit = circuit
 
-            # ERC check
+            # ERC check. _run_erc now returns analyze_schematic's full diagnostics, whose
+            # validity standard is `valid = not diagnostics` — i.e. ANY diagnostic is blocking.
+            # So treat every returned diagnostic as a failure (matching training/benchmark
+            # exactly). Filtering by severity here would pass circuits the benchmark fails.
             erc_diags = _run_erc(circuit)
-            # Blocking = severity != "info" (codebase convention). Excluding None here was
-            # a bug: most INTERACTION_* rules fire with severity=None, so prod would neither
-            # retry nor surface them. Treat any fired, non-info diagnostic as a failure.
-            failures = [d for d in erc_diags if d.get("severity") != "info"]
+            failures = list(erc_diags)
             last_erc_errors = failures
 
             if not failures:
