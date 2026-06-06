@@ -72,6 +72,21 @@ def main():
     )
     pipeline = OhmaticPipeline.from_config(cfg)
 
+    # wandb — LIVE pass@k graphs (overall + per partition), logged per prompt. Robust: a wandb
+    # failure must never take down the eval. Same project/entity as the training runs.
+    _wb = False
+    try:
+        import wandb
+        wandb.init(project="ohmatic-qwen3", entity="vittoria3103-123-no-company",
+                   name=f"prodeval-{(args.revision or 'main')}-n{args.n}-s{args.max_shots}",
+                   config={"adapter": args.adapter, "revision": args.revision or "main",
+                           "base": args.base, "n": args.n, "max_shots": args.max_shots,
+                           "eval": "prod_loop"})
+        _wb = True
+        print("[wandb] logging live to ohmatic-qwen3", flush=True)
+    except Exception as e:
+        print(f"[wandb] disabled ({e})", flush=True)
+
     max_shots = args.max_shots
     by_part = defaultdict(lambda: {"total": 0, **{f"pass@{k}": 0 for k in range(1, max_shots + 1)}})
     detail = []
@@ -113,6 +128,23 @@ def main():
             print(f"  [checkpoint] HF upload failed (local saved): {e}", flush=True)
         return summary
 
+    def _wandb_log(done):
+        if not _wb:
+            return
+        try:
+            s = _build_summary(done)
+            d = {"done": done}
+            for kk, vv in s["overall"].items():
+                if vv is not None:
+                    d[f"overall/{kk}"] = vv
+            for part, pv in s["by_partition"].items():
+                for kk, vv in pv.items():
+                    if kk.startswith("pass@") and vv is not None:
+                        d[f"{part}/{kk}"] = vv
+            wandb.log(d, step=done)
+        except Exception as e:
+            print(f"[wandb] log failed: {e}", flush=True)
+
     for i, it in enumerate(items):
         part = it.get("partition", "?")
         by_part[part]["total"] += 1
@@ -128,6 +160,7 @@ def main():
                        # the FULL pass/fail picture, not just the count
                        "fail_rules": sorted({e.get("code") for e in (result.erc_errors or [])
                                              if e.get("code")}) if not result.ok else []})
+        _wandb_log(i + 1)
         if (i + 1) % interval == 0 and (i + 1) < len(items):
             _checkpoint(i + 1)
 
@@ -135,6 +168,14 @@ def main():
     print("\n=== PRODUCTION EVAL (eval == prod pipeline) ===")
     print(json.dumps(summary, indent=2))
     print(f"\nwrote {outp}")
+    if _wb:
+        try:
+            for kk, vv in summary["overall"].items():
+                if vv is not None:
+                    wandb.run.summary[f"final/{kk}"] = vv
+            wandb.finish()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
