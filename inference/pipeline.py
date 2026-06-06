@@ -88,6 +88,7 @@ class PipelineConfig:
     qwen_adapter_id: str = ""              # trained LoRA adapter (HF repo or local dir)
     qwen_adapter_revision: str = ""        # e.g. "best-erc" / "latest"
     qwen_max_new_tokens: int = 2560        # matches training/eval; longest valid circuit ~2.2k
+    qwen_attn_implementation: str = "flash_attention_2"  # FA2 if available, else graceful fallback
 
     # ERC retry loop — greedy decoding (set in HFChatModel) for deterministic JSON
     max_retries: int = 3                   # max ERC correction attempts (the "N shots")
@@ -266,23 +267,38 @@ class HFChatModel:
         adapter_revision: str | None = None,
         max_new_tokens: int = 2560,
         device_map: str = "auto",
+        attn_implementation: str = "flash_attention_2",
     ) -> None:
         try:
             from transformers import AutoModelForCausalLM, AutoTokenizer
         except ImportError:
             raise RuntimeError("Install transformers: pip install transformers")
+        import torch as _torch
 
         # Tokenizer comes from the adapter (it carries the trained chat template) when present.
         self.tokenizer = AutoTokenizer.from_pretrained(adapter_id or model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_id, device_map=device_map, torch_dtype="auto"
-        )
+        # Prefer FlashAttention-2 (Ampere/A40 supported) — ~2x faster generation than the
+        # sdpa/xformers fallback on the long 6.2k-token prompts. GRACEFUL: FA2 is a SPEEDUP, not
+        # a correctness requirement, so if flash-attn is not installed/loadable we fall back to
+        # the default attention instead of crashing. The active impl is logged so a smoke run
+        # tells us whether FA2 actually engaged.
+        _load = dict(device_map=device_map, torch_dtype=_torch.bfloat16, low_cpu_mem_usage=True)
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id, attn_implementation=attn_implementation, **_load)
+        except Exception as _fa_exc:
+            print(f"[HFChatModel] attn '{attn_implementation}' unavailable ({_fa_exc}); "
+                  f"falling back to default attention.", file=sys.stderr, flush=True)
+            self.model = AutoModelForCausalLM.from_pretrained(model_id, **_load)
         if adapter_id:
             from peft import PeftModel
             self.model = PeftModel.from_pretrained(
                 self.model, adapter_id, revision=adapter_revision)
         self.model.eval()
         self.max_new_tokens = max_new_tokens
+        _impl = getattr(self.model.config, "_attn_implementation", "?")
+        print(f"[HFChatModel] loaded {model_id} (+adapter={adapter_id or 'none'}"
+              f"@{adapter_revision or '-'})  attn={_impl}", file=sys.stderr, flush=True)
 
     def chat(self, messages: list[dict[str, str]]) -> str:
         # GREEDY decoding (do_sample=False) + enable_thinking=False — identical to how the
@@ -420,6 +436,7 @@ class OhmaticPipeline:
                 adapter_id=cfg.qwen_adapter_id or None,
                 adapter_revision=cfg.qwen_adapter_revision or None,
                 max_new_tokens=cfg.qwen_max_new_tokens,
+                attn_implementation=cfg.qwen_attn_implementation,
             )
         else:
             generator = _MockQwen()
