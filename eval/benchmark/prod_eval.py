@@ -76,6 +76,43 @@ def main():
     by_part = defaultdict(lambda: {"total": 0, **{f"pass@{k}": 0 for k in range(1, max_shots + 1)}})
     detail = []
     t0 = time.time()
+    outp = ROOT / args.out
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    interval = max(1, len(items) // 5)   # checkpoint every ~1/5 of the run
+
+    def _build_summary(done):
+        agg = {"total": 0, **{f"pass@{k}": 0 for k in range(1, max_shots + 1)}}
+        for d in by_part.values():
+            for kk, vv in d.items():
+                agg[kk] += vv
+        def rate(d, k): return round(d[f"pass@{k}"] / d["total"], 4) if d["total"] else None
+        return {
+            "adapter": args.adapter, "revision": args.revision or "main",
+            "n": agg["total"], "n_target": len(items), "done": done,
+            "complete": done >= len(items),
+            "max_shots": max_shots, "elapsed_min": round((time.time() - t0) / 60, 1),
+            "overall": {f"pass@{k}": rate(agg, k) for k in range(1, max_shots + 1)},
+            "by_partition": {p: {**{f"pass@{k}": rate(d, k) for k in range(1, max_shots + 1)},
+                                 "n": d["total"]} for p, d in by_part.items()},
+        }
+
+    def _checkpoint(done):
+        """Write partial results locally AND upload to HF, so a crash/kill never loses the
+        completed work. Called every 1/5 of the run + at the end."""
+        summary = _build_summary(done)
+        outp.write_text(json.dumps({"summary": summary, "detail": detail}, indent=2), encoding="utf-8")
+        try:
+            from huggingface_hub import HfApi
+            HfApi(token=os.environ.get("HF_TOKEN")).upload_file(
+                path_or_fileobj=str(outp), path_in_repo="results/prod_eval.json",
+                repo_id=args.dataset_repo, repo_type="dataset")
+            print(f"  [checkpoint] {done}/{len(items)} uploaded  "
+                  f"pass@1={summary['overall'].get('pass@1')} "
+                  f"pass@{max_shots}={summary['overall'].get(f'pass@{max_shots}')}", flush=True)
+        except Exception as e:
+            print(f"  [checkpoint] HF upload failed (local saved): {e}", flush=True)
+        return summary
+
     for i, it in enumerate(items):
         part = it.get("partition", "?")
         by_part[part]["total"] += 1
@@ -86,29 +123,17 @@ def main():
             for k in range(passed_at, max_shots + 1):
                 by_part[part][f"pass@{k}"] += 1
         detail.append({"id": it.get("id"), "partition": part,
-                       "ok": result.ok, "passed_at": passed_at})
-        if (i + 1) % 10 == 0:
-            print(f"  {i+1}/{len(items)} done", flush=True)
+                       "ok": result.ok, "passed_at": passed_at,
+                       # capture the ERC rule codes still failing (the weakness map) so we keep
+                       # the FULL pass/fail picture, not just the count
+                       "fail_rules": sorted({e.get("code") for e in (result.erc_errors or [])
+                                             if e.get("code")}) if not result.ok else []})
+        if (i + 1) % interval == 0 and (i + 1) < len(items):
+            _checkpoint(i + 1)
 
-    # aggregate
-    agg = {"total": 0, **{f"pass@{k}": 0 for k in range(1, max_shots + 1)}}
-    for d in by_part.values():
-        for kk, vv in d.items():
-            agg[kk] += vv
-
-    def rate(d, k): return round(d[f"pass@{k}"] / d["total"], 4) if d["total"] else None
-    summary = {
-        "adapter": args.adapter, "revision": args.revision or "main", "n": agg["total"],
-        "max_shots": max_shots, "elapsed_min": round((time.time() - t0) / 60, 1),
-        "overall": {f"pass@{k}": rate(agg, k) for k in range(1, max_shots + 1)},
-        "by_partition": {p: {**{f"pass@{k}": rate(d, k) for k in range(1, max_shots + 1)},
-                             "n": d["total"]} for p, d in by_part.items()},
-    }
+    summary = _checkpoint(len(items))
     print("\n=== PRODUCTION EVAL (eval == prod pipeline) ===")
     print(json.dumps(summary, indent=2))
-    outp = ROOT / args.out
-    outp.parent.mkdir(parents=True, exist_ok=True)
-    outp.write_text(json.dumps({"summary": summary, "detail": detail}, indent=2), encoding="utf-8")
     print(f"\nwrote {outp}")
 
 
