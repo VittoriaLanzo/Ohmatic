@@ -89,11 +89,11 @@ describe("SchematicSvg", () => {
 
     render(<SchematicSvg circuit={powerCircuit} phase="done" symbolStyle="ansi" />);
 
-    expect(document.querySelector('[data-component-type="power_vcc"] [data-symbol-kind="power_vcc"] path')).toHaveAttribute(
+    expect(document.querySelector('[data-component-type="power_vcc"] [data-symbol-kind="power_vcc:ansi"] path')).toHaveAttribute(
       "d",
       expect.stringContaining("M0 23")
     );
-    expect(document.querySelector('[data-component-type="power_gnd"] [data-symbol-kind="power_gnd"] path')).toHaveAttribute(
+    expect(document.querySelector('[data-component-type="power_gnd"] [data-symbol-kind="power_gnd:ansi"] path')).toHaveAttribute(
       "d",
       expect.stringContaining("M0 -23")
     );

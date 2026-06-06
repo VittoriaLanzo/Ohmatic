@@ -873,19 +873,20 @@ textarea:disabled {
   animation: schematic-standby 2.2s linear infinite;
 }
 
-.schematic-component rect {
-  fill: #242522;
-  stroke: #111311;
+.schematic-component [data-symbol-kind] rect,
+.schematic-component [data-symbol-kind] circle {
+  fill: rgba(36, 37, 34, 0.12);
+  stroke: #1c1e1b;
   stroke-width: 0.9;
 }
 
-.schematic-component circle {
+.schematic-component [data-pin-anchor] circle {
   fill: #272a26;
   stroke: #f4f1e7;
   stroke-width: 0.35;
 }
 
-.schematic-component path {
+.schematic-component [data-symbol-kind] path {
   fill: none;
   stroke: #1c1e1b;
   stroke-width: 0.9;
@@ -894,7 +895,7 @@ textarea:disabled {
 }
 
 .schematic-component [data-symbol-kind] text {
-  fill: #f0eee4;
+  fill: #1c1e1b;
   stroke: none;
   font: 700 7px "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 }
