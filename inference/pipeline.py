@@ -78,8 +78,9 @@ class ChatModel(Protocol):
 
 @dataclass
 class PipelineConfig:
-    # T5 normalizer
-    t5_model_id: str = "google/flan-t5-base"
+    # T5 normalizer — trained Ohmatic restyler (held-out test: exact_match 52% vs 0.3% baseline,
+    # entity_preservation 81%). Falls back conceptually to "google/flan-t5-base" if unavailable.
+    t5_model_id: str = "VittoriaLanzo/ohmatic-t5-normalizer"
     t5_max_new_tokens: int = 256
 
     # Qwen generator
@@ -127,6 +128,12 @@ class PipelineResult:
 # out-of-distribution prompts + feedback.
 from shared.prompt_builder import build_system_prompt as _shared_system_prompt
 from shared.erc_feedback import format_erc_errors as _format_erc_errors
+from shared.t5_normalizer import (
+    T5_TASK_PREFIX as _T5_PREFIX,
+    add_prefix as _t5_add_prefix,
+    faithfulness as _t5_faithfulness,
+    looks_non_english as _t5_non_english,
+)
 
 
 def _build_system_prompt(
@@ -300,15 +307,30 @@ class HFChatModel:
 
 
 class HFT5Normalizer:
-    """Wrap a HuggingFace Seq2SeqLM checkpoint as the T5 normalizer."""
+    """Wrap a HuggingFace Seq2SeqLM checkpoint as the T5 normalizer.
 
-    TASK_PREFIX = "normalize circuit description: "
+    SCOPE: English only (see shared.t5_normalizer.looks_non_english). Non-English input is
+    out of scope and is logged as a warning.
+
+    HARD FAITHFULNESS GATE: T5's only legitimate failure is dropping a specific the user gave
+    (e.g. "3.3V isolated RS-485" -> generic "RS-485"). After generating, we compare entities
+    (voltages / part numbers / values) in the user input vs the normalized output:
+      - on_faithfulness_failure="repair" (default): re-attach the dropped specifics so Qwen
+        still receives them (constructive, never fails the request).
+      - "raise": fail fast and loud.
+      - "warn": log only.
+    Clueless inputs carry no specifics, so the gate is a no-op for them by construction.
+    """
+
+    TASK_PREFIX = _T5_PREFIX  # single-sourced (shared.t5_normalizer)
 
     def __init__(
         self,
         model_id: str,
         max_new_tokens: int = 256,
         device_map: str = "auto",
+        on_faithfulness_failure: str = "repair",
+        check_english: bool = True,
     ) -> None:
         try:
             from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -320,9 +342,15 @@ class HFT5Normalizer:
             model_id, device_map=device_map
         )
         self.max_new_tokens = max_new_tokens
+        self.on_faithfulness_failure = on_faithfulness_failure
+        self.check_english = check_english
 
     def normalize(self, prompt: str) -> str:
-        src = f"{self.TASK_PREFIX}{prompt.strip()}"
+        if self.check_english and _t5_non_english(prompt):
+            print(f"[t5] WARNING: input looks non-English; Ohmatic supports English only. "
+                  f"Proceeding best-effort.", file=sys.stderr)
+
+        src = _t5_add_prefix(prompt)
         inputs = self.tokenizer(src, return_tensors="pt").to(self.model.device)
         with __import__("torch").no_grad():
             output = self.model.generate(
@@ -334,6 +362,17 @@ class HFT5Normalizer:
         normalized = self.tokenizer.decode(output[0], skip_special_tokens=True).strip()
         if not normalized:
             raise ValueError("T5 produced empty normalization")
+
+        # ── Hard faithfulness gate ──────────────────────────────────────────────────
+        ratio, missing = _t5_faithfulness(prompt, normalized)
+        dropped = sorted(e for kind in missing.values() for e in kind)
+        if dropped:
+            msg = f"T5 dropped user specifics {dropped} (faithfulness={ratio:.2f})"
+            if self.on_faithfulness_failure == "raise":
+                raise ValueError(msg)
+            print(f"[t5] {msg}", file=sys.stderr)
+            if self.on_faithfulness_failure == "repair":
+                normalized = f"{normalized.rstrip('.')} (must include: {', '.join(dropped)})."
         return normalized
 
 
