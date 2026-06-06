@@ -275,8 +275,17 @@ class HFChatModel:
             raise RuntimeError("Install transformers: pip install transformers")
         import torch as _torch
 
-        # Tokenizer comes from the adapter (it carries the trained chat template) when present.
-        self.tokenizer = AutoTokenizer.from_pretrained(adapter_id or model_id)
+        # Tokenizer: prefer the adapter's (it carries the trained chat template). But a LoRA
+        # adapter repo often lacks a fast `tokenizer.json`, forcing a slow->fast CONVERSION that
+        # can fail on the pod ("need sentencepiece or tiktoken..."). A LoRA never changes the
+        # tokenizer, so on any failure we fall back to the BASE model, which ships a complete
+        # fast tokenizer and loads cleanly with no conversion.
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(adapter_id or model_id)
+        except Exception as _tok_exc:
+            print(f"[HFChatModel] adapter tokenizer load failed ({_tok_exc}); "
+                  f"falling back to base {model_id}.", file=sys.stderr, flush=True)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         # Prefer FlashAttention-2 (Ampere/A40 supported) — ~2x faster generation than the
         # sdpa/xformers fallback on the long 6.2k-token prompts. GRACEFUL: FA2 is a SPEEDUP, not
         # a correctness requirement, so if flash-attn is not installed/loadable we fall back to
