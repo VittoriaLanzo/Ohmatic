@@ -1,7 +1,26 @@
+#requires -Version 5.1
+<#
+  ohmatic - one-command local launcher.
+
+  Usage:
+    ohmatic start            Boot the full stack: Python backend stubs + frontend (server mode).
+    ohmatic start -Mock      Frontend only, mock mode (no backend).
+    ohmatic start -Docker    Use docker compose for the backend instead of Python stubs.
+    ohmatic stop             Stop everything ohmatic started.
+    ohmatic status           Show what is currently running.
+    ohmatic doctor           Diagnose the system (Node, Python, Docker, ports).
+    ohmatic help             Show this help.
+
+  Dead-simple path after a fresh clone:
+    ohmatic start            -> open the printed http://127.0.0.1:<port> URL.
+
+  Requires: Node.js + npm (frontend), Python 3 (backend stubs). Docker only for -Docker.
+#>
 param(
-  [string]$Area = "help",
-  [string]$Action = "help",
-  [switch]$Server,
+  [Parameter(Position = 0)][string]$Command = "help",
+  [Parameter(Position = 1)][string]$Subcommand = "",
+  [switch]$Mock,
+  [switch]$Docker,
   [switch]$Foreground,
   [string]$HostName = "127.0.0.1",
   [int]$Port = 5173
@@ -10,15 +29,78 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $frontend = Join-Path $root "frontend"
+$runDir = Join-Path $root ".ohmatic-run"
+
+# Backend services: name, working dir (holds server.py), and the port it binds.
+# The frontend only needs the gateway on :8080; the others mirror the real topology.
+$Services = @(
+  @{ Name = "gateway";   Dir = (Join-Path $root "gateway/stub");   Port = 8080 },
+  @{ Name = "inference"; Dir = (Join-Path $root "inference/stub"); Port = 8001 },
+  @{ Name = "verifier";  Dir = (Join-Path $root "verifier/stub");  Port = 8002 },
+  @{ Name = "enricher";  Dir = (Join-Path $root "enricher/stub");  Port = 8003 }
+)
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
+function Write-Ok([string]$Message)   { Write-Host "  ok  $Message" -ForegroundColor Green }
+function Write-Warn2([string]$Message) { Write-Host "  !   $Message" -ForegroundColor Yellow }
 
 function Show-Usage {
-  Write-Host "Usage:"
-  Write-Host "  /ohmatic frontend start"
-  Write-Host "  .\ohmatic.cmd frontend start"
   Write-Host ""
-  Write-Host "Default: mock mode, http://127.0.0.1:5173"
-  Write-Host "Server:  .\ohmatic.cmd frontend start -Server"
-  Write-Host "Logs:    .\ohmatic.cmd frontend start -Foreground"
+  Write-Host "ohmatic - local launcher" -ForegroundColor White
+  Write-Host ""
+  Write-Host "  ohmatic start          Full stack: Python backend stubs + frontend (server mode)"
+  Write-Host "  ohmatic start -Mock    Frontend only, mock mode (no backend)"
+  Write-Host "  ohmatic start -Docker  Backend via docker compose instead of Python stubs"
+  Write-Host "  ohmatic stop           Stop everything ohmatic started"
+  Write-Host "  ohmatic status         Show what is running"
+  Write-Host "  ohmatic doctor         Diagnose the system (Node, Python, Docker, ports)"
+  Write-Host "  ohmatic help           Show this help"
+  Write-Host ""
+  Write-Host "  Fresh clone -> 'ohmatic start' -> open the printed URL." -ForegroundColor DarkGray
+}
+
+function Test-PythonWorks([string]$Exe, [string[]]$Pre) {
+  # A python on PATH is not necessarily usable: a broken install (missing Lib)
+  # still resolves but cannot import its own stdlib. Probe before trusting it.
+  try {
+    & $Exe @Pre "-c" "import sys" *> $null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  }
+}
+
+function Get-PythonCmd {
+  $candidates = New-Object System.Collections.ArrayList
+
+  foreach ($name in @("python", "python3")) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($cmd) { [void]$candidates.Add(@{ File = $cmd.Source; PreArgs = @() }) }
+  }
+  $py = Get-Command "py" -ErrorAction SilentlyContinue
+  if ($py) { [void]$candidates.Add(@{ File = $py.Source; PreArgs = @("-3") }) }
+
+  # Common install locations, in case PATH only exposes a broken interpreter.
+  $globs = @(
+    (Join-Path $env:USERPROFILE "anaconda3\python.exe"),
+    (Join-Path $env:USERPROFILE "miniconda3\python.exe"),
+    (Join-Path $env:USERPROFILE "AppData\Local\Programs\Python\Python3*\python.exe"),
+    (Join-Path $env:LOCALAPPDATA  "Programs\Python\Python3*\python.exe")
+  )
+  foreach ($pattern in $globs) {
+    Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+      [void]$candidates.Add(@{ File = $_.FullName; PreArgs = @() })
+    }
+  }
+
+  foreach ($candidate in $candidates) {
+    if (Test-PythonWorks $candidate.File $candidate.PreArgs) { return $candidate }
+  }
+  return $null
 }
 
 function Test-PortFree([string]$Address, [int]$CandidatePort) {
@@ -39,82 +121,346 @@ function Test-PortFree([string]$Address, [int]$CandidatePort) {
 
 function Find-Port([string]$Address, [int]$StartPort) {
   for ($candidate = $StartPort; $candidate -lt ($StartPort + 20); $candidate++) {
-    if (Test-PortFree $Address $candidate) {
-      return $candidate
+    if (Test-PortFree $Address $candidate) { return $candidate }
+  }
+  throw "No free port found from $StartPort to $($StartPort + 19)."
+}
+
+function Test-HttpOk([string]$Url) {
+  try {
+    $resp = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
+    return ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500)
+  } catch {
+    return $false
+  }
+}
+
+function Save-Pid([string]$Name, [int]$ProcessId) {
+  if (-not (Test-Path -LiteralPath $runDir)) {
+    New-Item -ItemType Directory -Path $runDir | Out-Null
+  }
+  Set-Content -LiteralPath (Join-Path $runDir "$Name.pid") -Value $ProcessId -Encoding ascii
+}
+
+function Get-PortsFile { Join-Path $runDir "ports.txt" }
+
+function Read-RunPorts {
+  $map = @{}
+  $pf = Get-PortsFile
+  if (Test-Path -LiteralPath $pf) {
+    foreach ($line in (Get-Content -LiteralPath $pf -ErrorAction SilentlyContinue)) {
+      $parts = $line -split '\s+'
+      if ($parts.Count -ge 2 -and ($parts[1] -as [int])) { $map[$parts[0]] = [int]$parts[1] }
     }
   }
-  throw "No free frontend port found from $StartPort to $($StartPort + 19)."
+  return $map
 }
 
-function Start-DetachedFrontend([string]$Address, [int]$SelectedPort, [bool]$UseServer) {
-  $log = Join-Path $frontend "ohmatic-frontend.log"
-  $modePrefix = if ($UseServer) { "set VITE_OHMATIC_USE_MOCK=&" } else { "set VITE_OHMATIC_USE_MOCK=1&" }
-  $command = "$modePrefix npm.cmd run dev -- --host $Address --port $SelectedPort > `"$log`" 2>&1"
-
-  $info = [System.Diagnostics.ProcessStartInfo]::new()
-  $info.FileName = "cmd.exe"
-  $info.Arguments = "/d /c `"$command`""
-  $info.WorkingDirectory = $frontend
-  $info.UseShellExecute = $false
-  $info.CreateNoWindow = $true
-
-  $process = [System.Diagnostics.Process]::Start($info)
-  Start-Sleep -Milliseconds 900
-  return @{ Process = $process; Log = $log }
+function Add-RunPort([string]$Name, [int]$P) {
+  if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir | Out-Null }
+  Add-Content -LiteralPath (Get-PortsFile) -Value "$Name $P" -Encoding ascii
 }
 
-if ($Area -eq "help" -and $Action -eq "help") {
-  Show-Usage
-  exit 0
-}
-
-if ($Area -ne "frontend" -or $Action -ne "start") {
-  Show-Usage
-  exit 2
-}
-
-if (-not (Test-Path -LiteralPath (Join-Path $frontend "package.json"))) {
-  throw "frontend/package.json not found from $root"
-}
-
-if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
-  throw "npm.cmd was not found on PATH. Install Node.js or use the bundled project environment."
-}
-
-Push-Location $frontend
-try {
-  if (-not (Test-Path -LiteralPath "node_modules")) {
-    Write-Host "Installing frontend dependencies..."
-    & npm.cmd install
-    if ($LASTEXITCODE -ne 0) {
-      exit $LASTEXITCODE
+function Stop-ByPidFile([string]$PidFile) {
+  $name = [System.IO.Path]::GetFileNameWithoutExtension($PidFile)
+  $processId = (Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+  if ($processId -and ($processId -as [int])) {
+    if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
+      # taskkill /T tears down the child tree (vite spawns esbuild, etc.).
+      & taskkill.exe /PID $processId /T /F 2>&1 | Out-Null
+      Write-Ok "stopped $name (pid $processId)"
+    } else {
+      Write-Warn2 "$name (pid $processId) was not running"
     }
   }
+  Remove-Item -LiteralPath $PidFile -ErrorAction SilentlyContinue
+}
 
+function Start-DetachedProcess([string]$File, [string[]]$ArgList, [string]$WorkDir, [string]$LogPath) {
+  # File redirection happens at the OS level, so the child keeps writing to the log
+  # even after this launcher process exits. stdout and stderr cannot share one file.
+  $errPath = [System.IO.Path]::ChangeExtension($LogPath, ".err.log")
+  $startArgs = @{
+    FilePath               = $File
+    ArgumentList           = $ArgList
+    WorkingDirectory       = $WorkDir
+    WindowStyle            = "Hidden"
+    PassThru               = $true
+    RedirectStandardOutput = $LogPath
+    RedirectStandardError  = $errPath
+  }
+  return Start-Process @startArgs
+}
+
+# ---------------------------------------------------------------------------
+# backend
+# ---------------------------------------------------------------------------
+
+# Returns the gateway's chosen port (the only one the frontend needs to reach).
+function Start-BackendStubs {
+  $python = Get-PythonCmd
+  if (-not $python) {
+    throw "Python 3 not found on PATH. Install Python 3 or use 'ohmatic start -Docker'."
+  }
+  if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir | Out-Null }
+  Remove-Item -LiteralPath (Get-PortsFile) -ErrorAction SilentlyContinue
+
+  $gatewayPort = 8080
+  foreach ($svc in $Services) {
+    $serverPy = Join-Path $svc.Dir "server.py"
+    if (-not (Test-Path -LiteralPath $serverPy)) {
+      Write-Warn2 "$($svc.Name): server.py missing, skipped"
+      continue
+    }
+    # Each service binds a free port; nothing is hardcoded, so busy machines just work.
+    $chosen = Find-Port $HostName $svc.Port
+    $log = Join-Path $runDir "$($svc.Name).log"
+    $argList = @($python.PreArgs + @("server.py"))
+    $env:OHMATIC_PORT = "$chosen"
+    $process = Start-DetachedProcess $python.File $argList $svc.Dir $log
+    Remove-Item Env:OHMATIC_PORT -ErrorAction SilentlyContinue
+    Save-Pid $svc.Name $process.Id
+    Add-RunPort $svc.Name $chosen
+    if ($svc.Name -eq "gateway") { $gatewayPort = $chosen }
+    Write-Ok "$($svc.Name) -> http://$HostName`:$chosen  (pid $($process.Id))"
+  }
+  # The gateway is confirmed by the health gate below; the other stubs surface in 'status'.
+  return $gatewayPort
+}
+
+function Start-BackendDocker {
+  if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw "docker not found on PATH. Drop -Docker to use the Python stub backend."
+  }
+  Write-Step "Starting backend via docker compose"
+  Push-Location $root
+  try {
+    & docker compose up -d
+    if ($LASTEXITCODE -ne 0) { throw "docker compose up failed (exit $LASTEXITCODE)." }
+  } finally {
+    Pop-Location
+  }
+}
+
+function Wait-ForGateway([int]$GatewayPort = 8080) {
+  $url = "http://$HostName`:$GatewayPort/health"
+  Write-Step "Waiting for gateway $url"
+  for ($i = 0; $i -lt 30; $i++) {
+    if (Test-HttpOk $url) { Write-Ok "gateway healthy"; return $true }
+    Start-Sleep -Milliseconds 500
+  }
+  Write-Warn2 "gateway did not answer /health in time (check .ohmatic-run\gateway.log)"
+  return $false
+}
+
+# ---------------------------------------------------------------------------
+# frontend
+# ---------------------------------------------------------------------------
+
+function Ensure-FrontendDeps {
+  if (-not (Test-Path -LiteralPath (Join-Path $frontend "package.json"))) {
+    throw "frontend/package.json not found under $root"
+  }
+  if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue) -and -not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    throw "npm not found on PATH. Install Node.js (https://nodejs.org)."
+  }
+  if (-not (Test-Path -LiteralPath (Join-Path $frontend "node_modules"))) {
+    Write-Step "Installing frontend dependencies (first run)"
+    Push-Location $frontend
+    try {
+      & npm install
+      if ($LASTEXITCODE -ne 0) { throw "npm install failed (exit $LASTEXITCODE)." }
+    } finally {
+      Pop-Location
+    }
+  }
+}
+
+function Start-Frontend([bool]$UseMock) {
+  Ensure-FrontendDeps
   if (-not (Test-PortFree $HostName $Port)) {
-    Write-Host "Ohmatic frontend already has a listener on http://$HostName`:$Port"
-    exit 0
-  }
-
-  $selectedPort = Find-Port $HostName $Port
-  if ($Server) {
-    Remove-Item Env:VITE_OHMATIC_USE_MOCK -ErrorAction SilentlyContinue
-    Write-Host "Ohmatic frontend: server mode"
+    $existing = $Port
+    $Port = Find-Port $HostName ($Port + 1)
+    Write-Warn2 "port $existing busy, using $Port"
   } else {
+    $Port = Find-Port $HostName $Port
+  }
+
+  if ($UseMock) {
     $env:VITE_OHMATIC_USE_MOCK = "1"
-    Write-Host "Ohmatic frontend: mock mode"
+    Write-Step "Frontend: mock mode"
+  } else {
+    Remove-Item Env:VITE_OHMATIC_USE_MOCK -ErrorAction SilentlyContinue
+    $gw = if ($env:OHMATIC_GATEWAY_URL) { $env:OHMATIC_GATEWAY_URL } else { "http://$HostName`:8080" }
+    Write-Step "Frontend: server mode (proxying /v1 + /health -> $gw)"
   }
 
-  Write-Host "Open: http://$HostName`:$selectedPort"
+  $url = "http://$HostName`:$Port"
   if ($Foreground) {
-    & npm.cmd run dev -- --host $HostName --port $selectedPort
-    exit $LASTEXITCODE
+    Push-Location $frontend
+    try { & npm run dev -- --host $HostName --port $Port } finally { Pop-Location }
+    return $url
   }
 
-  $started = Start-DetachedFrontend $HostName $selectedPort $Server.IsPresent
-  Write-Host "PID: $($started.Process.Id)"
-  Write-Host "Log: $($started.Log)"
-  exit 0
-} finally {
-  Pop-Location
+  $npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+  if (-not $npmCmd) { $npmCmd = (Get-Command npm).Source }
+  $log = Join-Path $runDir "frontend.log"
+  if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir | Out-Null }
+  $argList = @("run", "dev", "--", "--host", $HostName, "--port", "$Port")
+  $process = Start-DetachedProcess $npmCmd $argList $frontend $log
+  Save-Pid "frontend" $process.Id
+  Write-Ok "frontend -> $url  (pid $($process.Id))"
+  return $url
+}
+
+# ---------------------------------------------------------------------------
+# commands
+# ---------------------------------------------------------------------------
+
+function Invoke-Start {
+  Write-Step "Ohmatic starting"
+  $gatewayPort = 8080
+  if (-not $Mock) {
+    if ($Docker) {
+      Start-BackendDocker
+    } else {
+      Write-Step "Starting Python backend stubs"
+      $gatewayPort = Start-BackendStubs
+    }
+    Wait-ForGateway $gatewayPort | Out-Null
+    # Point the dev-server proxy at the gateway's actual port; the browser stays same-origin.
+    $env:OHMATIC_GATEWAY_URL = "http://$HostName`:$gatewayPort"
+  } else {
+    Write-Warn2 "mock mode: backend not started"
+  }
+  $url = Start-Frontend ([bool]$Mock)
+  Write-Host ""
+  Write-Host "Ohmatic is up:" -ForegroundColor White
+  Write-Host "  Frontend : $url" -ForegroundColor Green
+  if (-not $Mock) { Write-Host "  Gateway  : http://$HostName`:$gatewayPort" -ForegroundColor Green }
+  Write-Host "  Stop     : ohmatic stop" -ForegroundColor DarkGray
+  Write-Host "  Logs     : .ohmatic-run\*.log" -ForegroundColor DarkGray
+}
+
+function Invoke-Stop {
+  Write-Step "Stopping ohmatic"
+  if (Test-Path -LiteralPath $runDir) {
+    Get-ChildItem -LiteralPath $runDir -Filter "*.pid" -ErrorAction SilentlyContinue | ForEach-Object {
+      Stop-ByPidFile $_.FullName
+    }
+    Remove-Item -LiteralPath (Get-PortsFile) -ErrorAction SilentlyContinue
+  }
+  if ($Docker -or (Get-Command docker -ErrorAction SilentlyContinue)) {
+    Push-Location $root
+    try { & docker compose down *> $null } catch { } finally { Pop-Location }
+  }
+  Write-Ok "done"
+}
+
+function Invoke-Doctor {
+  Write-Step "Ohmatic doctor"
+  $okFrontend = $true
+  $okBackend = $false
+
+  # --- OS / shell ---
+  Write-Host "  os        Windows ($([System.Environment]::OSVersion.Version)), PowerShell $($PSVersionTable.PSVersion)" -ForegroundColor Gray
+
+  # --- Node + npm (required for the frontend) ---
+  $node = Get-Command node -ErrorAction SilentlyContinue
+  if ($node) {
+    $nodeVer = (& $node.Source --version) 2>$null
+    Write-Ok "node      $nodeVer  ($($node.Source))"
+  } else {
+    Write-Host "  FAIL node      not found - install Node.js 18+ (https://nodejs.org)" -ForegroundColor Red
+    $okFrontend = $false
+  }
+  $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+  if (-not $npm) { $npm = Get-Command npm -ErrorAction SilentlyContinue }
+  if ($npm) {
+    $npmVer = (& $npm.Source --version) 2>$null
+    Write-Ok "npm       $npmVer"
+  } else {
+    Write-Host "  FAIL npm       not found - ships with Node.js" -ForegroundColor Red
+    $okFrontend = $false
+  }
+
+  # --- Python (default backend) ---
+  $python = Get-PythonCmd
+  if ($python) {
+    $pyVer = (& $python.File @($python.PreArgs) "-c" "import sys;print(sys.version.split()[0])") 2>$null
+    Write-Ok "python    $pyVer  ($($python.File) $($python.PreArgs -join ' '))"
+    $okBackend = $true
+  } else {
+    Write-Warn2 "python    no working interpreter found (broken or missing) - backend needs Python 3 or Docker"
+  }
+
+  # --- Docker (alternative backend) ---
+  $docker = Get-Command docker -ErrorAction SilentlyContinue
+  if ($docker) {
+    $dockerVer = (& $docker.Source --version) 2>$null
+    Write-Ok "docker    $dockerVer  (enables: ohmatic start -Docker)"
+    $okBackend = $true
+  } else {
+    Write-Host "  --  docker    not found (optional - only needed for -Docker)" -ForegroundColor DarkGray
+  }
+
+  # --- Ports ---
+  $ports = @(8080, 8001, 8002, 8003, $Port)
+  $busy = @()
+  foreach ($p in $ports) { if (-not (Test-PortFree $HostName $p)) { $busy += $p } }
+  if ($busy.Count -eq 0) { Write-Ok "ports     $($ports -join ', ') all free" }
+  else { Write-Warn2 "ports     in use: $($busy -join ', ') (ohmatic will auto-pick the next free frontend port)" }
+
+  # --- Verdict ---
+  Write-Host ""
+  if ($okFrontend -and $okBackend) {
+    Write-Host "Verdict: ready. Run 'ohmatic start'." -ForegroundColor Green
+  } elseif ($okFrontend) {
+    Write-Host "Verdict: frontend OK but no backend runtime. Run 'ohmatic start -Mock', or install Python 3 / Docker." -ForegroundColor Yellow
+  } else {
+    Write-Host "Verdict: install Node.js first, then re-run 'ohmatic doctor'." -ForegroundColor Red
+  }
+}
+
+function Invoke-Status {
+  Write-Step "Ohmatic status"
+  $ports = Read-RunPorts
+  foreach ($svc in $Services) {
+    $p = if ($ports.ContainsKey($svc.Name)) { $ports[$svc.Name] } else { $svc.Port }
+    $ok = Test-HttpOk "http://$HostName`:$p/health"
+    if ($ok) { Write-Ok "$($svc.Name.PadRight(10)) listening on :$p" }
+    else { Write-Host "  --  $($svc.Name.PadRight(10)) not running (:$p)" -ForegroundColor DarkGray }
+  }
+  $fePid = Join-Path $runDir "frontend.pid"
+  if (Test-Path -LiteralPath $fePid) {
+    $processId = Get-Content -LiteralPath $fePid | Select-Object -First 1
+    if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
+      Write-Ok "frontend    running (pid $processId)"
+    } else {
+      Write-Host "  --  frontend    not running" -ForegroundColor DarkGray
+    }
+  } else {
+    Write-Host "  --  frontend    not running" -ForegroundColor DarkGray
+  }
+}
+
+# ---------------------------------------------------------------------------
+# dispatch
+# ---------------------------------------------------------------------------
+
+switch ($Command.ToLowerInvariant()) {
+  "start" {
+    # Legacy: 'ohmatic frontend start' == mock frontend only.
+    if ($Subcommand -eq "" -or $Subcommand.ToLowerInvariant() -eq "all") { Invoke-Start }
+    else { Show-Usage; exit 2 }
+  }
+  "frontend" {
+    if ($Subcommand.ToLowerInvariant() -eq "start") { $script:Mock = $true; Invoke-Start }
+    else { Show-Usage; exit 2 }
+  }
+  "stop"   { Invoke-Stop }
+  "status" { Invoke-Status }
+  "doctor" { Invoke-Doctor }
+  "help"   { Show-Usage }
+  default  { Show-Usage; exit 2 }
 }

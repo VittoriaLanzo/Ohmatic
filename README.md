@@ -9,6 +9,63 @@
 
 ---
 
+## Quick Start
+
+Clone, then run **one command**. It brings up the full local stack — backend + frontend, wired
+together — and prints a URL you open in any browser.
+
+```bash
+git clone https://github.com/VittoriaLanzo/Ohmatic.git
+cd Ohmatic
+```
+
+**Windows** (cmd or PowerShell):
+
+```bat
+ohmatic start
+```
+
+**Linux / macOS** (or Git Bash on Windows):
+
+```bash
+bash ohmatic start      # or: chmod +x ohmatic && ./ohmatic start
+```
+
+Open the printed `http://127.0.0.1:<port>` URL. That's the whole setup.
+
+What `start` does for you, on any machine:
+
+- finds a **working** Python 3 interpreter (skips broken/partial installs on `PATH`) and boots the
+  four backend stubs — gateway, inference, verifier, enricher
+- starts the frontend in **server mode**, so the browser talks to a real local gateway, not a mock
+- **picks free ports automatically** — nothing is hardcoded, so a busy machine just works
+- installs frontend dependencies on first run
+- waits for the gateway to report healthy, then prints the URL
+
+The only prerequisites are **Node.js + npm** (frontend) and **Python 3** (backend stubs). Docker is
+optional. Not sure if your machine is ready? Run `ohmatic doctor` first.
+
+### Commands
+
+| Command | What it does |
+|---------|--------------|
+| `ohmatic start` | Full stack: Python backend stubs + frontend (server mode). |
+| `ohmatic start -Mock` / `--mock` | Frontend only, mock data, no backend. |
+| `ohmatic start -Docker` / `--docker` | Run the backend via `docker compose` instead of Python stubs. |
+| `ohmatic stop` | Stop everything the launcher started. |
+| `ohmatic status` | Show what is currently running, on which ports. |
+| `ohmatic doctor` | Diagnose the machine (Node, Python, Docker, free ports) and give a verdict. |
+
+`ohmatic doctor` is the cure for "works on my machine": it reports exactly what is present, missing,
+or broken — for example a Python on `PATH` that cannot load its own stdlib — and tells you whether
+the machine can run the stack.
+
+> Cross-platform note: `ohmatic` (bash) targets Linux/macOS; `ohmatic.cmd` / `ohmatic.ps1` target
+> Windows. Use the launcher native to your OS for reliable process management. State (pids, logs,
+> chosen ports) lives in `.ohmatic-run/`.
+
+---
+
 ## What Ohmatic Is
 
 Ohmatic is an agentic electronics workbench. It takes prompts like:
@@ -24,11 +81,13 @@ and turns them into structured circuit artifacts:
 - BOM rows ready for supplier enrichment
 - a frontend workspace that renders the result as a schematic, parts table, checks panel, and JSON contract
 
-The core idea is simple: natural language is allowed at the input, but the output must become typed, validated, and inspectable before it is useful.
+The core idea is simple: natural language is allowed at the input, but the output must become typed,
+validated, and inspectable before it is useful.
 
 ## Current Progress
 
-Ohmatic is no longer just a prompt-to-JSON sketch. The repo now has a real foundation layer, a verifier implementation, service contracts, and a frontend generator workspace.
+Ohmatic is no longer just a prompt-to-JSON sketch. The repo has a real foundation layer, a verifier
+implementation, service contracts, and a frontend generator workspace.
 
 | Layer | Status | Notes |
 |-------|--------|-------|
@@ -36,19 +95,23 @@ Ohmatic is no longer just a prompt-to-JSON sketch. The repo now has a real found
 | Service contracts | Done | `shared/docs/contracts.md` is the source of truth for HTTP surfaces. |
 | Verifier / DRC | Done for Stage 0 | Rust verifier implements the three-tier validation model. |
 | Dataset seeds | Done for Stage 0 | Example circuits exercise schema and DRC behavior. |
-| Frontend workspace | Done for v1 | React/Vite app with gateway adapter, mock mode, schematic graph, BOM, checks, JSON, and animated logo. |
+| Frontend workspace | Done for v1 | React/Vite app with gateway adapter, mock mode, schematic graph, BOM, checks, JSON, animated logo. |
+| Local launcher | Done | `ohmatic start` boots the full stack on Windows/Linux/macOS with dynamic ports. |
 | Gateway orchestration | In progress | Public API shape is fixed; full live orchestration plugs into the existing channels. |
 | Inference and enrichment | In progress | Internal services are contract-defined; production model/supplier paths are next. |
+
+> The parser models (Qwen3-8B) are still training. The stubs return deterministic, schema-valid
+> responses so the full toolchain — frontend, gateway shape, verifier, DRC — is usable today.
 
 ## Product Flow
 
 ```mermaid
 flowchart LR
   prompt["Prompt"]
-  gateway["Gateway :8080"]
-  inference["Inference :8001"]
-  verifier["Verifier :8002"]
-  enricher["Enricher :8003"]
+  gateway["Gateway"]
+  inference["Inference"]
+  verifier["Verifier"]
+  enricher["Enricher"]
   ui["Frontend workspace"]
 
   prompt --> gateway
@@ -59,19 +122,26 @@ flowchart LR
   gateway --> ui
 ```
 
-The browser talks to the gateway only. It never calls inference, verifier, or enricher directly.
+The browser talks to the gateway only. It never calls inference, verifier, or enricher directly. In
+local dev the Vite dev server proxies `/v1` and `/health` to the gateway's chosen port, so the
+browser stays same-origin regardless of which port the gateway landed on.
 
 ## Frontend
 
-The frontend lives in `frontend/` and opens directly into the generator workspace. It is built with Vite, React, and TypeScript.
+The frontend lives in `frontend/` and opens directly into the generator workspace. It is built with
+Vite, React, and TypeScript. `ohmatic start` runs it for you; to work on it directly:
+
+```bash
+cd frontend
+npm install
+npm run dev                       # mock mode if VITE_OHMATIC_USE_MOCK=1, else server mode
+```
 
 What it already supports:
 
 - prompt composer and generation options
 - gateway health check
-- `POST /v1/generate`
-- polling through returned `poll_url`
-- live pipeline status
+- `POST /v1/generate`, polling through the returned `poll_url`, live pipeline status
 - schematic SVG rendering from `result.circuit`
 - DRC warning display from `result.drc_warnings`
 - BOM table from `result.bom`, with a component-derived fallback while enrichment is offline
@@ -79,35 +149,14 @@ What it already supports:
 - mock adapter for backend-offline UI work
 - reduced-motion support for the animated logo and PCB motion system
 
-Run it in mock mode:
+Environment variables:
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-PowerShell mock mode:
-
-```powershell
-cd frontend
-$env:VITE_OHMATIC_USE_MOCK="1"
-npm run dev
-```
-
-Connect it to a gateway:
-
-```bash
-VITE_OHMATIC_API_BASE_URL=http://localhost:8080 npm run dev
-```
-
-Production or server mode can optionally provide:
-
-```text
-VITE_OHMATIC_API_KEY=<token>
-```
-
-When present, the frontend sends `Authorization: Bearer <token>`.
+| Variable | Purpose |
+|----------|---------|
+| `VITE_OHMATIC_USE_MOCK=1` | Use the in-browser mock adapter (no backend). |
+| `VITE_OHMATIC_API_BASE_URL` | Point the browser client at an absolute gateway URL. |
+| `OHMATIC_GATEWAY_URL` | Point the dev-server proxy at the gateway (set by the launcher for dynamic ports). |
+| `VITE_OHMATIC_API_KEY` | When set, the frontend sends `Authorization: Bearer <token>`. |
 
 ## Backend Contract
 
@@ -138,17 +187,23 @@ Done jobs return:
     "circuit": {},
     "drc_warnings": [],
     "bom": [],
-    "latency_ms": {
-      "inference": 2708,
-      "drc": 42,
-      "bom": 180
-    }
+    "latency_ms": { "inference": 2708, "drc": 42, "bom": 180 }
   },
   "error": null
 }
 ```
 
 Full contract: [`shared/docs/contracts.md`](shared/docs/contracts.md)
+
+Each backend stub reads its port from the `OHMATIC_PORT` environment variable (default `8080`/`8001`/
+`8002`/`8003`), which is how the launcher gives them dynamic ports. Running a stub directly:
+
+```bash
+OHMATIC_PORT=8080 python gateway/stub/server.py
+```
+
+Prefer the Docker topology? `ohmatic start -Docker` / `--docker` brings the same services up with
+`docker compose`.
 
 ## Circuit Graph
 
@@ -170,17 +225,11 @@ The frontend schematic renderer expects the backend to return `OhmaticCircuitV01
       "part": "0603",
       "x": 50,
       "y": 50,
-      "pins": {
-        "1": "VCC",
-        "2": "LED_A"
-      }
+      "pins": { "1": "VCC", "2": "LED_A" }
     }
   ],
   "nets": [
-    {
-      "name": "VCC",
-      "pins": ["VCC1.1", "R1.1"]
-    }
+    { "name": "VCC", "pins": ["VCC1.1", "R1.1"] }
   ]
 }
 ```
@@ -193,30 +242,6 @@ Important graph rules:
 - backend BOM rows should use component IDs so the Parts table can line up with the circuit graph
 
 Schema: [`shared/schema/circuit_v01.json`](shared/schema/circuit_v01.json)
-
-## Local Backend
-
-Start the service stack:
-
-```bash
-docker compose up
-```
-
-Submit a prompt:
-
-```bash
-curl -s -X POST http://localhost:8080/v1/generate \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "LED with 330 ohm resistor"}'
-```
-
-Poll the returned URL:
-
-```bash
-curl -s http://localhost:8080/v1/jobs/<job_id>/status
-```
-
-Note: Docker currently starts the public service stubs. The frontend contract is already aligned with the gateway shape, so replacing the stubs with live orchestration should not require browser-facing API changes.
 
 ## Verification
 
@@ -245,8 +270,9 @@ python dataset/validate.py dataset/examples.json
 
 ```text
 Ohmatic/
+  ohmatic / ohmatic.cmd / ohmatic.ps1   One-command local launcher (POSIX + Windows)
   frontend/                    Vite + React generator workspace
-  gateway/                     Public API gateway service
+  gateway/                     Public API gateway service (stub under gateway/stub)
   inference/                   Prompt-to-circuit generation service
   verifier/                    Three-tier DRC verifier
   enricher/                    BOM and supplier enrichment service
@@ -256,12 +282,13 @@ Ohmatic/
     ohmatic-types/             Rust circuit types and validation
   dataset/                     Seed circuits and validation helpers
   assets/                      Brand and README media
-  docker-compose.yml           Local service stack
+  docker-compose.yml           Local service stack (used by `ohmatic start -Docker`)
 ```
 
 ## Contributing
 
-Read [`shared/docs/contracts.md`](shared/docs/contracts.md) before changing any service boundary. Contract drift is the fastest way to break Ohmatic.
+Read [`shared/docs/contracts.md`](shared/docs/contracts.md) before changing any service boundary.
+Contract drift is the fastest way to break Ohmatic.
 
 Useful contributions right now:
 
@@ -271,7 +298,8 @@ Useful contributions right now:
 - schema-aware JSON inspection in the frontend Contract panel
 - supplier enrichment adapters for production BOM data
 
-For schema or contract changes, update the Rust types, JSON schema, dataset validation path, and frontend TypeScript types together.
+For schema or contract changes, update the Rust types, JSON schema, dataset validation path, and
+frontend TypeScript types together.
 
 ## Citation
 
@@ -286,4 +314,4 @@ For schema or contract changes, update the Rust types, JSON schema, dataset vali
 
 ## License
 
-Ohmatic is licensed under the GNU Affero General Public License v3.0. See [`LICENSE`](LICENSE).
+See [`LICENSE`](LICENSE).

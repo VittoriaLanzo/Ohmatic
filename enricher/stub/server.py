@@ -88,5 +88,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Enricher stub listening on :8003")
-    HTTPServer(("0.0.0.0", 8003), Handler).serve_forever()
+    import os
+    port = int(os.environ.get("OHMATIC_PORT", "8003"))
+    print(f"Enricher stub listening on :{port}")
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()

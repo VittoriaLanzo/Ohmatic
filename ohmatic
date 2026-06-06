@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# ohmatic - one-command local launcher (Linux / macOS / Git Bash).
+#
+#   ./ohmatic start            Full stack: Python backend stubs + frontend (server mode).
+#   ./ohmatic start --mock     Frontend only, mock mode (no backend).
+#   ./ohmatic start --docker   Backend via docker compose instead of Python stubs.
+#   ./ohmatic stop             Stop everything ohmatic started.
+#   ./ohmatic status           Show what is running.
+#   ./ohmatic doctor           Diagnose the system (Node, Python, Docker, ports).
+#
+# Dead-simple path after a fresh clone:  ./ohmatic start  -> open the printed URL.
+# Requires: Node.js + npm (frontend), Python 3 (backend stubs). Docker only for --docker.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FRONTEND="$ROOT/frontend"
+RUN_DIR="$ROOT/.ohmatic-run"
+HOST="127.0.0.1"
+FRONTEND_PORT="${OHMATIC_FRONTEND_PORT:-5173}"
+
+# name:dir:port  - the frontend only needs the gateway on :8080; the rest mirror topology.
+SERVICES=(
+  "gateway:$ROOT/gateway/stub:8080"
+  "inference:$ROOT/inference/stub:8001"
+  "verifier:$ROOT/verifier/stub:8002"
+  "enricher:$ROOT/enricher/stub:8003"
+)
+
+# colours (disabled when not a TTY)
+if [ -t 1 ]; then C_CYAN=$'\033[36m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'; C_DIM=$'\033[90m'; C_OFF=$'\033[0m'
+else C_CYAN=""; C_GREEN=""; C_YELLOW=""; C_RED=""; C_DIM=""; C_OFF=""; fi
+step() { printf "%s==> %s%s\n" "$C_CYAN" "$1" "$C_OFF"; }
+ok()   { printf "  %sok%s  %s\n" "$C_GREEN" "$C_OFF" "$1"; }
+warn() { printf "  %s!%s   %s\n" "$C_YELLOW" "$C_OFF" "$1"; }
+fail() { printf "  %sFAIL%s %s\n" "$C_RED" "$C_OFF" "$1"; }
+dim()  { printf "  %s--  %s%s\n" "$C_DIM" "$1" "$C_OFF"; }
+
+# --- helpers ---------------------------------------------------------------
+
+# A python on PATH may be broken (missing stdlib); probe before trusting it.
+python_works() { "$@" -c "import sys" >/dev/null 2>&1; }
+
+PYTHON=()
+detect_python() {
+  PYTHON=()
+  local c
+  for c in python3 python; do
+    if command -v "$c" >/dev/null 2>&1 && python_works "$c"; then PYTHON=("$c"); return 0; fi
+  done
+  for c in "$HOME/miniconda3/bin/python" "$HOME/anaconda3/bin/python" \
+           "$HOME/miniconda3/python.exe" "$HOME/anaconda3/python.exe"; do
+    if [ -x "$c" ] && python_works "$c"; then PYTHON=("$c"); return 0; fi
+  done
+  return 1
+}
+
+npm_bin() { command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || true; }
+
+port_free() { # $1 host $2 port -> 0 free, 1 in use
+  if (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; then exec 3>&- 3<&-; return 1; fi
+  return 0
+}
+
+find_port() { # $1 host $2 start -> echoes a free port
+  local p="$2"
+  for _ in $(seq 1 20); do
+    if port_free "$1" "$p"; then echo "$p"; return 0; fi
+    p=$((p + 1))
+  done
+  echo "ERROR: no free port from $2" >&2; return 1
+}
+
+http_ok() { curl -fsS -m 2 "$1" >/dev/null 2>&1; }
+
+save_pid() { mkdir -p "$RUN_DIR"; echo "$2" > "$RUN_DIR/$1.pid"; }
+
+kill_tree() {
+  local pid="$1" child
+  if command -v pgrep >/dev/null 2>&1; then
+    for child in $(pgrep -P "$pid" 2>/dev/null || true); do kill_tree "$child"; done
+  fi
+  kill "$pid" 2>/dev/null || true
+}
+
+# Best-effort: free a port regardless of how the process was launched. Covers the
+# Git Bash case where $! is an MSYS pid that does not map to the native listener.
+kill_port() {
+  local port="$1" pid
+  if command -v lsof >/dev/null 2>&1; then
+    for pid in $(lsof -ti "tcp:$port" 2>/dev/null || true); do kill "$pid" 2>/dev/null || true; done
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser -k "$port/tcp" >/dev/null 2>&1 || true
+  elif command -v netstat >/dev/null 2>&1 && command -v taskkill >/dev/null 2>&1; then
+    # Git Bash / Windows: map the listening port to its native PID and kill it.
+    for pid in $(netstat -ano 2>/dev/null | grep -E "[:.]$port[[:space:]].*LISTENING" | awk '{print $NF}' | sort -u); do
+      taskkill //PID "$pid" //F >/dev/null 2>&1 || true
+    done
+  fi
+}
+
+# --- backend ---------------------------------------------------------------
+
+start_backend_stubs() {
+  if ! detect_python; then
+    echo "Python 3 not found or broken. Install Python 3 or use './ohmatic start --docker'." >&2
+    exit 1
+  fi
+  mkdir -p "$RUN_DIR"
+  local svc name dir port
+  for svc in "${SERVICES[@]}"; do
+    name="${svc%%:*}"; dir="$(echo "$svc" | cut -d: -f2)"; port="${svc##*:}"
+    if [ ! -f "$dir/server.py" ]; then warn "$name: server.py missing, skipped"; continue; fi
+    if ! port_free "$HOST" "$port"; then ok "$name already listening on :$port"; continue; fi
+    ( cd "$dir" && nohup "${PYTHON[@]}" server.py >"$RUN_DIR/$name.log" 2>&1 & echo $! > "$RUN_DIR/$name.pid" )
+    ok "$name -> http://$HOST:$port  (pid $(cat "$RUN_DIR/$name.pid"))"
+  done
+}
+
+start_backend_docker() {
+  command -v docker >/dev/null 2>&1 || { echo "docker not found. Drop --docker to use Python stubs." >&2; exit 1; }
+  step "Starting backend via docker compose"
+  ( cd "$ROOT" && docker compose up -d )
+}
+
+wait_for_gateway() {
+  step "Waiting for gateway http://$HOST:8080/health"
+  local i
+  for i in $(seq 1 30); do
+    if http_ok "http://$HOST:8080/health"; then ok "gateway healthy"; return 0; fi
+    sleep 0.5
+  done
+  warn "gateway did not answer /health in time (check .ohmatic-run/gateway.log)"
+  return 0
+}
+
+# --- frontend --------------------------------------------------------------
+
+ensure_frontend_deps() {
+  [ -f "$FRONTEND/package.json" ] || { echo "frontend/package.json not found under $ROOT" >&2; exit 1; }
+  local npm; npm="$(npm_bin)"
+  [ -n "$npm" ] || { echo "npm not found. Install Node.js (https://nodejs.org)." >&2; exit 1; }
+  if [ ! -d "$FRONTEND/node_modules" ]; then
+    step "Installing frontend dependencies (first run)"
+    ( cd "$FRONTEND" && "$npm" install )
+  fi
+}
+
+start_frontend() { # $1 = "mock" | "server"
+  ensure_frontend_deps
+  local npm; npm="$(npm_bin)"
+  local port; port="$(find_port "$HOST" "$FRONTEND_PORT")"
+  if [ "$1" = "mock" ]; then export VITE_OHMATIC_USE_MOCK=1; step "Frontend: mock mode"
+  else unset VITE_OHMATIC_USE_MOCK; step "Frontend: server mode (proxying /v1 + /health -> gateway :8080)"; fi
+  mkdir -p "$RUN_DIR"
+  ( cd "$FRONTEND" && nohup "$npm" run dev -- --host "$HOST" --port "$port" >"$RUN_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
+  FRONTEND_URL="http://$HOST:$port"
+  ok "frontend -> $FRONTEND_URL  (pid $(cat "$RUN_DIR/frontend.pid"))"
+}
+
+# --- commands --------------------------------------------------------------
+
+cmd_start() {
+  local mode="server" backend="stubs"
+  for a in "$@"; do case "$a" in
+    --mock) mode="mock" ;;
+    --docker) backend="docker" ;;
+  esac; done
+  step "Ohmatic starting"
+  if [ "$mode" = "mock" ]; then
+    warn "mock mode: backend not started"
+  else
+    if [ "$backend" = "docker" ]; then start_backend_docker; else step "Starting Python backend stubs"; start_backend_stubs; fi
+    wait_for_gateway
+  fi
+  start_frontend "$mode"
+  echo
+  printf "%sOhmatic is up:%s\n" "$C_GREEN" "$C_OFF"
+  echo "  Frontend : $FRONTEND_URL"
+  [ "$mode" = "mock" ] || echo "  Gateway  : http://$HOST:8080"
+  echo "  Stop     : ./ohmatic stop"
+  echo "  Logs     : .ohmatic-run/*.log"
+}
+
+cmd_stop() {
+  step "Stopping ohmatic"
+  if [ -d "$RUN_DIR" ]; then
+    local f name pid
+    for f in "$RUN_DIR"/*.pid; do
+      [ -e "$f" ] || continue
+      name="$(basename "$f" .pid)"; pid="$(cat "$f" 2>/dev/null || true)"
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then kill_tree "$pid"; ok "stopped $name (pid $pid)"; else warn "$name was not running"; fi
+      rm -f "$f"
+    done
+  fi
+  # Fallback sweep: ensure the known backend ports are actually free.
+  local svc port
+  for svc in "${SERVICES[@]}"; do port="${svc##*:}"; if ! port_free "$HOST" "$port"; then kill_port "$port"; fi; done
+  if command -v docker >/dev/null 2>&1; then ( cd "$ROOT" && docker compose down >/dev/null 2>&1 || true ); fi
+  ok "done"
+}
+
+cmd_status() {
+  step "Ohmatic status"
+  local svc name port
+  for svc in "${SERVICES[@]}"; do
+    name="${svc%%:*}"; port="${svc##*:}"
+    if http_ok "http://$HOST:$port/health"; then ok "$(printf '%-10s' "$name") listening on :$port"; else dim "$(printf '%-10s' "$name") not running (:$port)"; fi
+  done
+  if [ -f "$RUN_DIR/frontend.pid" ] && kill -0 "$(cat "$RUN_DIR/frontend.pid")" 2>/dev/null; then
+    ok "frontend   running (pid $(cat "$RUN_DIR/frontend.pid"))"
+  else dim "frontend   not running"; fi
+}
+
+cmd_doctor() {
+  step "Ohmatic doctor"
+  local ok_fe=1 ok_be=0
+  printf "  %sos        %s, bash %s%s\n" "$C_DIM" "$(uname -s -m 2>/dev/null || echo unknown)" "${BASH_VERSION:-?}" "$C_OFF"
+
+  if command -v node >/dev/null 2>&1; then ok "node      $(node --version)  ($(command -v node))"; else fail "node      not found - install Node.js 18+ (https://nodejs.org)"; ok_fe=0; fi
+  local npm; npm="$(npm_bin)"
+  if [ -n "$npm" ]; then ok "npm       $("$npm" --version)"; else fail "npm       not found - ships with Node.js"; ok_fe=0; fi
+
+  if detect_python; then ok "python    $("${PYTHON[@]}" -c 'import sys;print(sys.version.split()[0])')  (${PYTHON[*]})"; ok_be=1
+  else warn "python    no working interpreter found - backend needs Python 3 or Docker"; fi
+
+  if command -v docker >/dev/null 2>&1; then ok "docker    $(docker --version)  (enables: ./ohmatic start --docker)"; ok_be=1
+  else dim "docker    not found (optional - only needed for --docker)"; fi
+
+  local busy="" p
+  for p in 8080 8001 8002 8003 "$FRONTEND_PORT"; do port_free "$HOST" "$p" || busy="$busy $p"; done
+  if [ -z "$busy" ]; then ok "ports     8080 8001 8002 8003 $FRONTEND_PORT all free"; else warn "ports     in use:$busy (frontend port auto-advances)"; fi
+
+  echo
+  if [ "$ok_fe" = 1 ] && [ "$ok_be" = 1 ]; then printf "%sVerdict: ready. Run './ohmatic start'.%s\n" "$C_GREEN" "$C_OFF"
+  elif [ "$ok_fe" = 1 ]; then printf "%sVerdict: frontend OK but no backend runtime. Run './ohmatic start --mock', or install Python 3 / Docker.%s\n" "$C_YELLOW" "$C_OFF"
+  else printf "%sVerdict: install Node.js first, then re-run './ohmatic doctor'.%s\n" "$C_RED" "$C_OFF"; fi
+}
+
+usage() {
+  cat <<'EOF'
+
+ohmatic - local launcher
+
+  ./ohmatic start          Full stack: Python backend stubs + frontend (server mode)
+  ./ohmatic start --mock   Frontend only, mock mode (no backend)
+  ./ohmatic start --docker Backend via docker compose instead of Python stubs
+  ./ohmatic stop           Stop everything ohmatic started
+  ./ohmatic status         Show what is running
+  ./ohmatic doctor         Diagnose the system (Node, Python, Docker, ports)
+
+  Fresh clone -> './ohmatic start' -> open the printed URL.
+EOF
+}
+
+case "${1:-help}" in
+  start)  shift; cmd_start "$@" ;;
+  stop)   cmd_stop ;;
+  status) cmd_status ;;
+  doctor) cmd_doctor ;;
+  help|--help|-h) usage ;;
+  *) usage; exit 2 ;;
+esac

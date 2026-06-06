@@ -121,5 +121,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Gateway stub listening on :8080")
-    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+    import os
+    port = int(os.environ.get("OHMATIC_PORT", "8080"))
+    print(f"Gateway stub listening on :{port}")
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()

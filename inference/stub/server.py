@@ -97,5 +97,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Inference stub listening on :8001")
-    HTTPServer(("0.0.0.0", 8001), Handler).serve_forever()
+    import os
+    port = int(os.environ.get("OHMATIC_PORT", "8001"))
+    print(f"Inference stub listening on :{port}")
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()

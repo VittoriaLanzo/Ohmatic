@@ -80,5 +80,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Verifier stub listening on :8002")
-    HTTPServer(("0.0.0.0", 8002), Handler).serve_forever()
+    import os
+    port = int(os.environ.get("OHMATIC_PORT", "8002"))
+    print(f"Verifier stub listening on :{port}")
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()

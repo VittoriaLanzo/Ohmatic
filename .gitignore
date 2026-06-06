@@ -43,6 +43,9 @@ target/
 ## WakaTime / Hackatime
 .wakatime-project
 
+## ohmatic launcher run-state (pids + logs, machine-local)
+.ohmatic-run/
+
 ## Claude Code agent state (machine-local, not portable)
 .claude/
 

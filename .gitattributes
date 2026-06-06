@@ -4,3 +4,10 @@ schema.md linguist-generated=true
 
 # Normalize line endings
 * text=auto
+
+# Launcher scripts: bash must stay LF (or it breaks on Linux/macOS as `bad interpreter`);
+# Windows scripts must stay CRLF.
+ohmatic     text eol=lf
+*.sh        text eol=lf
+ohmatic.ps1 text eol=crlf
+ohmatic.cmd text eol=crlf
