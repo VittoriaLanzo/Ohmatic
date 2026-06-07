@@ -114,6 +114,9 @@ class PipelineResult:
     attempts: int = 0
     erc_errors: list[dict] = field(default_factory=list)
     parse_error: str = ""
+    # Populated only when run(return_trace=True). Each element is one attempt:
+    # {"attempt": int, "circuit": dict|None, "raw": str, "diagnostics": list[dict], "passed": bool}
+    trace: list[dict] = field(default_factory=list)
 
     def __str__(self) -> str:
         if self.ok:
@@ -463,7 +466,7 @@ class OhmaticPipeline:
 
     # ── Core run method ────────────────────────────────────────────────────────
 
-    def run(self, raw_prompt: str) -> PipelineResult:
+    def run(self, raw_prompt: str, return_trace: bool = False) -> PipelineResult:
         """
         Run the full pipeline.
 
@@ -472,6 +475,13 @@ class OhmaticPipeline:
         3. ERC validates the circuit.
         4. On failure: append ERC errors, let Qwen retry.
         5. Return result after max_retries or first passing circuit.
+
+        Args:
+            raw_prompt:   The user's raw circuit description.
+            return_trace: When True, populate result.trace with per-attempt dicts:
+                          {"attempt": int, "circuit": dict|None, "raw": str,
+                           "diagnostics": list[dict], "passed": bool}.
+                          Default False preserves the original behavior (empty trace).
         """
         if not raw_prompt.strip():
             return PipelineResult(ok=False, parse_error="Empty prompt")
@@ -493,6 +503,7 @@ class OhmaticPipeline:
         last_circuit: dict | None = None
         last_erc_errors: list[dict] = []
         last_parse_error = ""
+        trace: list[dict] = []
 
         for attempt in range(1, self.max_retries + 2):  # +1 for the initial attempt
             # Generate
@@ -504,6 +515,7 @@ class OhmaticPipeline:
                     normalized_prompt=normalized,
                     attempts=attempt,
                     parse_error=f"Generator error: {exc}",
+                    trace=trace if return_trace else [],
                 )
 
             # Parse JSON
@@ -511,6 +523,14 @@ class OhmaticPipeline:
             last_parse_error = parse_error
 
             if circuit is None:
+                if return_trace:
+                    trace.append({
+                        "attempt": attempt,
+                        "circuit": None,
+                        "raw": response,
+                        "diagnostics": [],
+                        "passed": False,
+                    })
                 if attempt > self.max_retries:
                     break
                 # Ask Qwen to fix its JSON syntax
@@ -536,13 +556,31 @@ class OhmaticPipeline:
 
             if not failures:
                 # ✓ Circuit passes ERC — done
+                if return_trace:
+                    trace.append({
+                        "attempt": attempt,
+                        "circuit": circuit,
+                        "raw": response,
+                        "diagnostics": [],
+                        "passed": True,
+                    })
                 return PipelineResult(
                     ok=True,
                     circuit=circuit,
                     circuit_json=json.dumps(circuit, ensure_ascii=False),
                     normalized_prompt=normalized,
                     attempts=attempt,
+                    trace=trace if return_trace else [],
                 )
+
+            if return_trace:
+                trace.append({
+                    "attempt": attempt,
+                    "circuit": circuit,
+                    "raw": response,
+                    "diagnostics": list(failures),
+                    "passed": False,
+                })
 
             if attempt > self.max_retries:
                 break  # Exhausted retries
@@ -563,4 +601,5 @@ class OhmaticPipeline:
             attempts=self.max_retries + 1,
             erc_errors=last_erc_errors,
             parse_error=last_parse_error,
+            trace=trace if return_trace else [],
         )

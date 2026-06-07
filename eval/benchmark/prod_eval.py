@@ -54,6 +54,10 @@ def main():
     ap.add_argument("--n", type=int, default=96)
     ap.add_argument("--max-shots", type=int, default=3, help="total attempts (1 generate + N-1 corrections)")
     ap.add_argument("--out", default="results/prod_eval.json")
+    ap.add_argument("--save-traces", action="store_true", default=False,
+                    help="Harvest per-shot loop traces (broken->feedback->fixed) alongside the eval.")
+    ap.add_argument("--traces-out", default="results/prod_eval_traces.jsonl",
+                    help="Path for the JSONL trace file (default: results/prod_eval_traces.jsonl).")
     args = ap.parse_args()
 
     token = os.environ.get("HF_TOKEN")
@@ -95,6 +99,14 @@ def main():
     outp.parent.mkdir(parents=True, exist_ok=True)
     interval = max(1, len(items) // 5)   # checkpoint every ~1/5 of the run
 
+    # Traces file — opened once and written line by line so a mid-run crash loses nothing.
+    traces_outp = ROOT / args.traces_out
+    if args.save_traces:
+        traces_outp.parent.mkdir(parents=True, exist_ok=True)
+        _traces_fh = open(traces_outp, "w", encoding="utf-8")
+    else:
+        _traces_fh = None
+
     def _build_summary(done):
         agg = {"total": 0, **{f"pass@{k}": 0 for k in range(1, max_shots + 1)}}
         for d in by_part.values():
@@ -118,12 +130,24 @@ def main():
         outp.write_text(json.dumps({"summary": summary, "detail": detail}, indent=2), encoding="utf-8")
         try:
             from huggingface_hub import HfApi
-            HfApi(token=os.environ.get("HF_TOKEN")).upload_file(
+            api = HfApi(token=os.environ.get("HF_TOKEN"))
+            api.upload_file(
                 path_or_fileobj=str(outp), path_in_repo="results/prod_eval.json",
                 repo_id=args.dataset_repo, repo_type="dataset")
             print(f"  [checkpoint] {done}/{len(items)} uploaded  "
                   f"pass@1={summary['overall'].get('pass@1')} "
                   f"pass@{max_shots}={summary['overall'].get(f'pass@{max_shots}')}", flush=True)
+            # Upload traces file alongside results when --save-traces is active.
+            if args.save_traces and _traces_fh is not None:
+                try:
+                    _traces_fh.flush()
+                    api.upload_file(
+                        path_or_fileobj=str(traces_outp),
+                        path_in_repo="results/prod_eval_traces.jsonl",
+                        repo_id=args.dataset_repo, repo_type="dataset")
+                    print(f"  [checkpoint] traces uploaded ({traces_outp.name})", flush=True)
+                except Exception as te:
+                    print(f"  [checkpoint] traces HF upload failed (local saved): {te}", flush=True)
         except Exception as e:
             print(f"  [checkpoint] HF upload failed (local saved): {e}", flush=True)
         return summary
@@ -148,7 +172,7 @@ def main():
     for i, it in enumerate(items):
         part = it.get("partition", "?")
         by_part[part]["total"] += 1
-        result = pipeline.run(it["prompt"])
+        result = pipeline.run(it["prompt"], return_trace=args.save_traces)
         # result.attempts is the attempt the circuit passed at (ok), else max_retries+1.
         passed_at = result.attempts if result.ok else None
         if passed_at:
@@ -160,11 +184,30 @@ def main():
                        # the FULL pass/fail picture, not just the count
                        "fail_rules": sorted({e.get("code") for e in (result.erc_errors or [])
                                              if e.get("code")}) if not result.ok else []})
+        # Write trace line — never crash the eval on trace errors.
+        if args.save_traces and _traces_fh is not None:
+            try:
+                trace_line = json.dumps({
+                    "id": it.get("id"),
+                    "partition": part,
+                    "prompt": it["prompt"],
+                    "ok": result.ok,
+                    "passed_at": passed_at,
+                    "trace": result.trace,
+                }, ensure_ascii=False)
+                _traces_fh.write(trace_line + "\n")
+            except Exception as te:
+                print(f"[traces] write failed for item {it.get('id')}: {te}", flush=True)
         _wandb_log(i + 1)
         if (i + 1) % interval == 0 and (i + 1) < len(items):
             _checkpoint(i + 1)
 
     summary = _checkpoint(len(items))
+    if _traces_fh is not None:
+        try:
+            _traces_fh.close()
+        except Exception:
+            pass
     print("\n=== PRODUCTION EVAL (eval == prod pipeline) ===")
     print(json.dumps(summary, indent=2))
     print(f"\nwrote {outp}")
