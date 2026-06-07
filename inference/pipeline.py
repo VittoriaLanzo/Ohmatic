@@ -95,7 +95,7 @@ class PipelineConfig:
     qwen_attn_implementation: str = "flash_attention_2"  # FA2 if available, else graceful fallback
 
     # ERC retry loop — greedy decoding (set in HFChatModel) for deterministic JSON
-    max_retries: int = 3                   # max ERC correction attempts (the "N shots")
+    max_retries: int = 3                   # 4 total attempts (1 generate + 3 corrections); pass@k plateaus at 4.
 
     # System prompt paths
     schema_path: Path = _ROOT / "schema.md"

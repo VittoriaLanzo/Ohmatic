@@ -213,13 +213,15 @@ def _validator_diagnostics(circuit: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dict[str, Any]:
+    # ── Already-handled: unknown component type ──────────────────────────────
     unknown_type = re.match(r"component '([^']+)' invalid type: (.+)", error)
     if unknown_type:
         component_id, component_type = unknown_type.groups()
         index = _component_index(circuit, component_id)
+        _comp_root = "$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components"
         return _base_item(
             code="REGISTRY_UNKNOWN_COMPONENT_TYPE",
-            path=f"$.components[{index}].type" if index >= 0 else "$.components[*].type",
+            path=f"{_comp_root}[{index}].type" if index >= 0 else f"{_comp_root}[*].type",
             message=error,
             why_it_matters="Unknown component types cannot be constrained by the registry, component cards, grammar, or verifier.",
             expected=sorted(validate.load_registry_component_types(REGISTRY_PATH)),
@@ -230,14 +232,16 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
             related_rule="T1-PARSE-REGISTRY",
         )
 
+    # ── Already-handled: unknown pin on a known component ────────────────────
     unknown_pin = re.match(r"net '([^']+)' references unknown pin ([^ ]+) on ([A-Za-z0-9_]+)", error)
     if unknown_pin:
         net_name, pin_name, component_id = unknown_pin.groups()
         net_index, pin_index, pin_ref = _net_pin_location(circuit, net_name, component_id, pin_name)
         component_type = _component_type(circuit, component_id)
+        _net_root = "$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets"
         return _base_item(
             code="PIN_UNKNOWN_FOR_COMPONENT",
-            path=f"$.nets[{net_index}].pins[{pin_index}]" if net_index >= 0 and pin_index >= 0 else "$.nets[*].pins[*]",
+            path=f"{_net_root}[{net_index}].pins[{pin_index}]" if net_index >= 0 and pin_index >= 0 else f"{_net_root}[*].pins[*]",
             message=error,
             why_it_matters="A net pin reference must match a declared component pin exactly or the circuit cannot be mapped to a schematic.",
             expected=sorted(_component_pins(circuit, component_id)),
@@ -251,6 +255,563 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
             related_rule="T1-07",
         )
 
+    # ── Net references unknown component ─────────────────────────────────────
+    unknown_comp_ref = re.match(r"net '([^']+)' references unknown component: (.+)", error)
+    if unknown_comp_ref:
+        net_name, component_id = unknown_comp_ref.groups()
+        component_id = component_id.strip()
+        return _base_item(
+            code="NET_UNKNOWN_COMPONENT_REF",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="Every pin reference in a net must resolve to a declared component; an unresolved reference makes the netlist unroutable.",
+            expected="a component id declared in STAGE_1_TOPOLOGY.components",
+            actual=component_id,
+            repair_hint=(
+                f"Add a component with id '{component_id}' to STAGE_1_TOPOLOGY.components, "
+                f"or remove '{component_id}' from net '{net_name}'.pins so every net pin points "
+                f"at a declared component."
+            ),
+            component_id=component_id,
+            net_name=net_name,
+            related_rule="T1-06",
+        )
+
+    # ── Spatial node has no matching topology component ───────────────────────
+    spatial_no_topo = re.match(r"spatial_nodes '([^']+)' has no matching component in STAGE_1_TOPOLOGY", error)
+    if spatial_no_topo:
+        node_id = spatial_no_topo.group(1)
+        return _base_item(
+            code="SPATIAL_NODE_MISSING_TOPOLOGY_COMPONENT",
+            path=f"$.STAGE_2_LAYOUT.spatial_nodes",
+            message=error,
+            why_it_matters="Every STAGE_2_LAYOUT spatial node must map 1:1 to a STAGE_1_TOPOLOGY component; orphan nodes break layout rendering.",
+            expected="a STAGE_1_TOPOLOGY component with the same id",
+            actual=node_id,
+            repair_hint=(
+                f"Add a STAGE_1_TOPOLOGY component with id '{node_id}', "
+                f"or delete the STAGE_2_LAYOUT.spatial_nodes entry '{node_id}'. "
+                f"Every spatial node must map 1:1 to a component."
+            ),
+            component_id=node_id,
+            related_rule="T1-LAYOUT",
+        )
+
+    # ── Topology component missing spatial node ───────────────────────────────
+    topo_no_spatial = re.match(r"component '([^']+)' has no entry in STAGE_2_LAYOUT\.spatial_nodes", error)
+    if topo_no_spatial:
+        component_id = topo_no_spatial.group(1)
+        return _base_item(
+            code="TOPOLOGY_COMPONENT_MISSING_SPATIAL_NODE",
+            path=f"$.STAGE_2_LAYOUT.spatial_nodes",
+            message=error,
+            why_it_matters="Every topology component must have coordinates in STAGE_2_LAYOUT so the schematic renderer can place it.",
+            expected=f"a spatial_nodes entry with id '{component_id}'",
+            actual="(missing)",
+            repair_hint=(
+                f"Add {{\"id\": \"{component_id}\", \"x\": <number>, \"y\": <number>}} "
+                f"to STAGE_2_LAYOUT.spatial_nodes."
+            ),
+            component_id=component_id,
+            related_rule="T1-LAYOUT",
+        )
+
+    # ── Missing required power_vcc component ─────────────────────────────────
+    if error == "Missing required power_vcc component":
+        return _base_item(
+            code="MISSING_POWER_VCC",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="Every circuit must have a power_vcc component to anchor the positive supply rail; without it ERC cannot verify IC power or voltage rails.",
+            expected="at least one component with type 'power_vcc'",
+            actual="(none found)",
+            repair_hint=(
+                "Add a component of type 'power_vcc' (e.g. "
+                "{\"id\": \"VCC1\", \"type\": \"power_vcc\", \"value\": \"5V\", "
+                "\"part\": \"VCC\", \"pins\": {\"1\": \"VCC\"}}) "
+                "and connect it to the VCC net."
+            ),
+            related_rule="T1-POWER",
+        )
+
+    # ── Missing required power_gnd component ─────────────────────────────────
+    if error == "Missing required power_gnd component":
+        return _base_item(
+            code="MISSING_POWER_GND",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="Every circuit must have a power_gnd component to anchor the ground reference; without it ERC cannot verify return paths.",
+            expected="at least one component with type 'power_gnd'",
+            actual="(none found)",
+            repair_hint=(
+                "Add a component of type 'power_gnd' (e.g. "
+                "{\"id\": \"GND1\", \"type\": \"power_gnd\", \"value\": \"0V\", "
+                "\"part\": \"GND\", \"pins\": {\"1\": \"GND\"}}) "
+                "and connect it to the GND net."
+            ),
+            related_rule="T1-POWER",
+        )
+
+    # ── Missing 'metadata' field ──────────────────────────────────────────────
+    if error == "Missing 'metadata' field":
+        return _base_item(
+            code="MISSING_METADATA",
+            path="$.metadata",
+            message=error,
+            why_it_matters="The metadata block is required; it carries title, description, version, and tags used by the corpus pipeline.",
+            expected="a 'metadata' object with fields: title, description, version, tags",
+            actual="(missing)",
+            repair_hint=(
+                "Add a top-level 'metadata' key: "
+                "{\"title\": \"<name>\", \"description\": \"<one sentence>\", "
+                "\"version\": \"0.1\", \"tags\": [\"<tag>\"]}."
+            ),
+            related_rule="T1-META",
+        )
+
+    # ── metadata missing required fields ─────────────────────────────────────
+    meta_missing_fields = re.match(r"metadata missing required fields: (\[.+\])", error)
+    if meta_missing_fields:
+        fields_str = meta_missing_fields.group(1)
+        return _base_item(
+            code="METADATA_MISSING_FIELDS",
+            path="$.metadata",
+            message=error,
+            why_it_matters="Incomplete metadata blocks the corpus pipeline and training data builder.",
+            expected="all of: title, description, version, tags",
+            actual=f"missing {fields_str}",
+            repair_hint=(
+                f"Add the missing fields {fields_str} to the metadata object. "
+                "Required shape: {\"title\": str, \"description\": str, \"version\": \"0.1\", \"tags\": [str]}."
+            ),
+            related_rule="T1-META",
+        )
+
+    # ── version must be '0.1' ─────────────────────────────────────────────────
+    bad_version = re.match(r"version must be '0\.1', got '([^']*)'", error)
+    if bad_version:
+        actual_ver = bad_version.group(1)
+        return _base_item(
+            code="METADATA_BAD_VERSION",
+            path="$.metadata.version",
+            message=error,
+            why_it_matters="The schema version field must be exactly '0.1' to pass the corpus validator and training data builder.",
+            expected="0.1",
+            actual=actual_ver,
+            repair_hint="Set metadata.version to the string \"0.1\" (not a number, not any other value).",
+            related_rule="T1-META",
+        )
+
+    # ── component id violates pattern ─────────────────────────────────────────
+    bad_id_pattern = re.match(r"component '([^']+)' id violates pattern \^.+\$", error)
+    if bad_id_pattern:
+        component_id = bad_id_pattern.group(1)
+        return _base_item(
+            code="COMPONENT_ID_PATTERN_VIOLATION",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="Component ids must follow ^[A-Z][A-Za-z0-9_]*$ so net pin refs (e.g. R1.1) parse unambiguously.",
+            expected="^[A-Z][A-Za-z0-9_]*$ (start uppercase, then alphanumeric or underscore)",
+            actual=component_id,
+            repair_hint=(
+                f"Rename component '{component_id}' so the id starts with an uppercase letter "
+                f"and contains only letters, digits, and underscores "
+                f"(e.g. '{component_id[0].upper() + component_id[1:] if component_id else 'X1'}')."
+            ),
+            component_id=component_id,
+            related_rule="T1-05",
+        )
+
+    # ── Duplicate component id ────────────────────────────────────────────────
+    dup_comp_id = re.match(r"Duplicate component id: (.+)", error)
+    if dup_comp_id:
+        component_id = dup_comp_id.group(1).strip()
+        return _base_item(
+            code="DUPLICATE_COMPONENT_ID",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="Duplicate component ids make net pin references ambiguous and cause netlist validation to fail.",
+            expected="unique ids across all components",
+            actual=component_id,
+            repair_hint=(
+                f"Rename one of the duplicate '{component_id}' components to a unique id "
+                f"(e.g. append a number suffix), then update all net pin refs that reference it."
+            ),
+            component_id=component_id,
+            related_rule="T1-05",
+        )
+
+    # ── component[i] missing 'id' ─────────────────────────────────────────────
+    comp_missing_id = re.match(r"component\[(\d+)\] missing 'id'", error)
+    if comp_missing_id:
+        index = int(comp_missing_id.group(1))
+        return _base_item(
+            code="COMPONENT_MISSING_ID",
+            path=(
+                f"$.STAGE_1_TOPOLOGY.components[{index}]"
+                if "STAGE_1_TOPOLOGY" in circuit
+                else f"$.components[{index}]"
+            ),
+            message=error,
+            why_it_matters="Every component must have a string 'id' field so nets can reference its pins.",
+            expected="a non-empty string id starting with an uppercase letter",
+            actual="(missing)",
+            repair_hint=(
+                f"Add an 'id' field to components[{index}] "
+                f"(e.g. \"id\": \"R{index + 1}\"). "
+                "The id must match ^[A-Z][A-Za-z0-9_]*$."
+            ),
+            related_rule="T1-05",
+        )
+
+    # ── component 'X' missing 'field' ────────────────────────────────────────
+    comp_missing_field = re.match(r"component '([^']+)' missing '([^']+)'", error)
+    if comp_missing_field:
+        component_id, field_name = comp_missing_field.groups()
+        field_hints = {
+            "type":  "Set 'type' to a valid component type from verifier/config/component_registry.toml.",
+            "value": "Set 'value' to a string describing the component value (e.g. \"10k\", \"100nF\", \"5V\").",
+            "part":  "Set 'part' to a string identifying the package/part (e.g. \"0603\", \"SOT-23\", \"DIP-8\").",
+            "pins":  "Add a 'pins' dict mapping each pin name to its net name (e.g. {\"1\": \"VCC\", \"2\": \"GND\"}).",
+            "x":     "Add an 'x' coordinate (number) for the component position in the flat schematic format.",
+            "y":     "Add a 'y' coordinate (number) for the component position in the flat schematic format.",
+        }
+        hint = field_hints.get(field_name, f"Add the required '{field_name}' field to component '{component_id}'.")
+        return _base_item(
+            code="COMPONENT_MISSING_FIELD",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters=f"The '{field_name}' field is required on every component for schema compliance and netlist routing.",
+            expected=f"'{field_name}' field present",
+            actual="(missing)",
+            repair_hint=hint,
+            component_id=component_id,
+            related_rule="T1-05",
+        )
+
+    # ── component 'X' has unexpected fields ──────────────────────────────────
+    comp_unexpected_fields = re.match(r"component '([^']+)' has unexpected fields: (\[.+\])", error)
+    if comp_unexpected_fields:
+        component_id, fields_str = comp_unexpected_fields.groups()
+        return _base_item(
+            code="COMPONENT_UNEXPECTED_FIELDS",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="Extra fields on components are rejected by the strict schema validator and may carry forbidden supplier/BOM data.",
+            expected="only: id, type, value, part, pins (plus x, y in flat format)",
+            actual=fields_str,
+            repair_hint=f"Remove the unexpected fields {fields_str} from component '{component_id}'.",
+            component_id=component_id,
+            related_rule="T1-05",
+        )
+
+    # ── component 'X' has x/y in STAGE_1_TOPOLOGY ────────────────────────────
+    comp_xy_in_topo = re.match(r"component '([^']+)' has x/y in STAGE_1_TOPOLOGY", error)
+    if comp_xy_in_topo:
+        component_id = comp_xy_in_topo.group(1)
+        return _base_item(
+            code="COMPONENT_COORDS_IN_TOPOLOGY",
+            path="$.STAGE_1_TOPOLOGY.components",
+            message=error,
+            why_it_matters="In the two-stage format, x/y coordinates belong only in STAGE_2_LAYOUT.spatial_nodes, not on topology components.",
+            expected="no x/y on STAGE_1_TOPOLOGY components",
+            actual="x and/or y present on component",
+            repair_hint=(
+                f"Remove 'x' and 'y' from STAGE_1_TOPOLOGY component '{component_id}' "
+                f"and put them in STAGE_2_LAYOUT.spatial_nodes as "
+                f"{{\"id\": \"{component_id}\", \"x\": <number>, \"y\": <number>}}."
+            ),
+            component_id=component_id,
+            related_rule="T1-LAYOUT",
+        )
+
+    # ── component 'X' pins must be dict / must not be empty ──────────────────
+    comp_pins_dict = re.match(r"component '([^']+)' pins must be dict", error)
+    if comp_pins_dict:
+        component_id = comp_pins_dict.group(1)
+        return _base_item(
+            code="COMPONENT_PINS_NOT_DICT",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="Pins must be a JSON object mapping pin names to net names so nets can reference them.",
+            expected="a JSON object like {\"1\": \"VCC\", \"2\": \"GND\"}",
+            actual="non-dict value",
+            repair_hint=f"Replace 'pins' on component '{component_id}' with a dict mapping pin names to net names.",
+            component_id=component_id,
+            related_rule="T1-05",
+        )
+
+    comp_pins_empty = re.match(r"component '([^']+)' pins must not be empty", error)
+    if comp_pins_empty:
+        component_id = comp_pins_empty.group(1)
+        return _base_item(
+            code="COMPONENT_PINS_EMPTY",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="A component with no pins cannot be connected to any net and is unreachable by the netlist.",
+            expected="at least one pin in the pins dict",
+            actual="{}",
+            repair_hint=(
+                f"Add at least one pin to component '{component_id}'.pins "
+                f"(e.g. {{\"1\": \"VCC\", \"2\": \"GND\"}})."
+            ),
+            component_id=component_id,
+            related_rule="T1-05",
+        )
+
+    # ── component pin not connected to any net ────────────────────────────────
+    pin_not_connected = re.match(r"component pin ([A-Za-z0-9_]+\.[A-Za-z0-9_+\-]+) not connected to any net", error)
+    if pin_not_connected:
+        pin_ref = pin_not_connected.group(1)
+        component_id, pin_name = pin_ref.split(".", 1)
+        return _base_item(
+            code="UNCONNECTED_PIN",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="Every declared component pin must appear in exactly one net; unconnected pins indicate an incomplete netlist.",
+            expected=f"pin '{pin_ref}' referenced in at least one net",
+            actual="(not referenced in any net)",
+            repair_hint=(
+                f"Add '{pin_ref}' to an appropriate net's pins list, "
+                f"or if the pin is intentionally unused add it to a dedicated 'NC' net."
+            ),
+            component_id=component_id,
+            pin_ref=pin_ref,
+            related_rule="T1-CONNECTIVITY",
+        )
+
+    # ── pin ref appears in more than one net (short) ──────────────────────────
+    short_ref = re.match(r"pin ref ([A-Za-z0-9_]+\.[A-Za-z0-9_+\-]+) appears in more than one net \(electrical short\)", error)
+    if short_ref:
+        pin_ref = short_ref.group(1)
+        component_id, pin_name = pin_ref.split(".", 1)
+        return _base_item(
+            code="PIN_SHORT_ACROSS_NETS",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="A pin appearing in two nets creates an electrical short that would destroy components in a real circuit.",
+            expected=f"pin '{pin_ref}' referenced in exactly one net",
+            actual="referenced in more than one net",
+            repair_hint=(
+                f"Remove '{pin_ref}' from all but one net. "
+                f"If the intent is to bridge two signals, merge those nets into one."
+            ),
+            component_id=component_id,
+            pin_ref=pin_ref,
+            related_rule="T1-SHORT",
+        )
+
+    # ── net missing 'pins' field / pins not a list / fewer than 2 pins ───────
+    net_missing_pins = re.match(r"net '([^']+)' missing 'pins' field", error)
+    if net_missing_pins:
+        net_name = net_missing_pins.group(1)
+        return _base_item(
+            code="NET_MISSING_PINS",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="A net without a 'pins' list cannot describe any connections; the netlist is incomplete.",
+            expected="a 'pins' list with at least 2 pin refs",
+            actual="(missing)",
+            repair_hint=f"Add a 'pins' list to net '{net_name}' with at least 2 pin refs like [\"C1.1\", \"U1.VCC\"].",
+            net_name=net_name,
+            related_rule="T1-06",
+        )
+
+    net_too_few_pins = re.match(r"net '([^']+)' must have at least 2 pins, got (\d+)", error)
+    if net_too_few_pins:
+        net_name, count = net_too_few_pins.groups()
+        return _base_item(
+            code="NET_TOO_FEW_PINS",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="A net with fewer than 2 pins connects nothing; every net must join at least 2 component pins.",
+            expected="at least 2 pin refs in the net",
+            actual=f"{count} pin(s)",
+            repair_hint=(
+                f"Add more pin refs to net '{net_name}'.pins so it has at least 2 entries, "
+                f"or remove the net if it is not needed."
+            ),
+            net_name=net_name,
+            related_rule="T1-06",
+        )
+
+    net_dup_name = re.match(r"Duplicate net name: (.+)", error)
+    if net_dup_name:
+        net_name = net_dup_name.group(1).strip()
+        return _base_item(
+            code="DUPLICATE_NET_NAME",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="Duplicate net names are ambiguous and make the netlist unroutable.",
+            expected="unique net names",
+            actual=net_name,
+            repair_hint=(
+                f"Merge the two '{net_name}' nets into one (combine their pin lists), "
+                f"or rename one to a distinct name."
+            ),
+            net_name=net_name,
+            related_rule="T1-06",
+        )
+
+    # ── net 'X' invalid pin ref ───────────────────────────────────────────────
+    invalid_pin_ref = re.match(r"net '([^']+)' invalid pin ref: (.+)", error)
+    if invalid_pin_ref:
+        net_name, bad_ref = invalid_pin_ref.groups()
+        bad_ref = bad_ref.strip()
+        return _base_item(
+            code="NET_INVALID_PIN_REF",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="Pin refs must match ^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_+\\-]+$ so they can be split into component_id.pin_name.",
+            expected="format ComponentId.pin (e.g. 'R1.1', 'U1.VCC')",
+            actual=bad_ref,
+            repair_hint=(
+                f"Replace '{bad_ref}' in net '{net_name}'.pins with a valid pin ref "
+                f"in the form 'ComponentId.pin_name' where ComponentId starts with an uppercase letter."
+            ),
+            net_name=net_name,
+            related_rule="T1-06",
+        )
+
+    # ── net 'X' contains duplicate pin ref ───────────────────────────────────
+    dup_pin_ref = re.match(r"net '([^']+)' contains duplicate pin ref: (.+)", error)
+    if dup_pin_ref:
+        net_name, pin_ref = dup_pin_ref.groups()
+        pin_ref = pin_ref.strip()
+        return _base_item(
+            code="NET_DUPLICATE_PIN_REF",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="A pin appearing twice in the same net is redundant and may indicate a copy-paste error.",
+            expected=f"each pin ref appears at most once in net '{net_name}'",
+            actual=f"'{pin_ref}' listed more than once",
+            repair_hint=f"Remove the duplicate '{pin_ref}' entry from net '{net_name}'.pins, keeping only one occurrence.",
+            net_name=net_name,
+            pin_ref=pin_ref,
+            related_rule="T1-06",
+        )
+
+    # ── spatial_nodes duplicate id ────────────────────────────────────────────
+    spatial_dup = re.match(r"spatial_nodes: duplicate id '([^']+)'", error)
+    if spatial_dup:
+        node_id = spatial_dup.group(1)
+        return _base_item(
+            code="SPATIAL_NODES_DUPLICATE_ID",
+            path="$.STAGE_2_LAYOUT.spatial_nodes",
+            message=error,
+            why_it_matters="Duplicate spatial node ids make layout rendering ambiguous; each component maps to exactly one position.",
+            expected="unique ids across all spatial_nodes",
+            actual=node_id,
+            repair_hint=f"Remove the duplicate STAGE_2_LAYOUT.spatial_nodes entry with id '{node_id}', keeping only one.",
+            component_id=node_id,
+            related_rule="T1-LAYOUT",
+        )
+
+    # ── STAGE_1_TOPOLOGY / STAGE_2_LAYOUT must be a JSON object ──────────────
+    if error == "STAGE_1_TOPOLOGY must be a JSON object":
+        return _base_item(
+            code="STAGE1_NOT_OBJECT",
+            path="$.STAGE_1_TOPOLOGY",
+            message=error,
+            why_it_matters="STAGE_1_TOPOLOGY must be a JSON object containing 'components' and 'nets' arrays.",
+            expected="a JSON object {\"components\": [...], \"nets\": [...]}",
+            actual="non-object value",
+            repair_hint="Replace STAGE_1_TOPOLOGY with a JSON object: {\"components\": [...], \"nets\": [...]}.",
+            related_rule="T1-FORMAT",
+        )
+
+    if error == "STAGE_2_LAYOUT must be a JSON object":
+        return _base_item(
+            code="STAGE2_NOT_OBJECT",
+            path="$.STAGE_2_LAYOUT",
+            message=error,
+            why_it_matters="STAGE_2_LAYOUT must be a JSON object containing the 'spatial_nodes' array.",
+            expected="a JSON object {\"spatial_nodes\": [...]}",
+            actual="non-object value",
+            repair_hint="Replace STAGE_2_LAYOUT with a JSON object: {\"spatial_nodes\": [{\"id\": \"...\", \"x\": 0, \"y\": 0}, ...]}.",
+            related_rule="T1-FORMAT",
+        )
+
+    # ── 'components' / 'nets' must be non-empty list ──────────────────────────
+    if error == "'components' must be a non-empty list":
+        return _base_item(
+            code="COMPONENTS_EMPTY_OR_MISSING",
+            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            message=error,
+            why_it_matters="A circuit with no components is meaningless; at minimum power_vcc, power_gnd, and one load component are required.",
+            expected="a non-empty list of component objects",
+            actual="empty list or non-list",
+            repair_hint=(
+                "Set 'components' to a non-empty list. Every circuit needs at least "
+                "power_vcc, power_gnd, and one functional component."
+            ),
+            related_rule="T1-05",
+        )
+
+    if error == "'nets' must be a non-empty list":
+        return _base_item(
+            code="NETS_EMPTY_OR_MISSING",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="A circuit with no nets has no connections; at minimum VCC and GND nets are required.",
+            expected="a non-empty list of net objects",
+            actual="empty list or non-list",
+            repair_hint=(
+                "Set 'nets' to a non-empty list. Every circuit needs at least VCC and GND nets "
+                "with pin refs connecting the power components."
+            ),
+            related_rule="T1-06",
+        )
+
+    # ── net unexpected fields ─────────────────────────────────────────────────
+    net_unexpected = re.match(r"net '([^']+)' has unexpected fields: (\[.+\])", error)
+    if net_unexpected:
+        net_name, fields_str = net_unexpected.groups()
+        return _base_item(
+            code="NET_UNEXPECTED_FIELDS",
+            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            message=error,
+            why_it_matters="Extra fields on nets are rejected by the strict schema validator.",
+            expected="only: name, pins",
+            actual=fields_str,
+            repair_hint=f"Remove the unexpected fields {fields_str} from net '{net_name}'. Nets only allow 'name' and 'pins'.",
+            net_name=net_name,
+            related_rule="T1-06",
+        )
+
+    # ── spatial_nodes unexpected fields ──────────────────────────────────────
+    spatial_unexpected = re.match(r"spatial_nodes '([^']+)' has unexpected fields: (\[.+\])", error)
+    if spatial_unexpected:
+        node_id, fields_str = spatial_unexpected.groups()
+        return _base_item(
+            code="SPATIAL_NODE_UNEXPECTED_FIELDS",
+            path="$.STAGE_2_LAYOUT.spatial_nodes",
+            message=error,
+            why_it_matters="Extra fields on spatial nodes are rejected by the strict schema validator.",
+            expected="only: id, x, y",
+            actual=fields_str,
+            repair_hint=f"Remove the unexpected fields {fields_str} from STAGE_2_LAYOUT.spatial_nodes entry '{node_id}'.",
+            component_id=node_id,
+            related_rule="T1-LAYOUT",
+        )
+
+    # ── Forbidden supplier/BOM field ──────────────────────────────────────────
+    forbidden_field = re.match(r"forbidden field at ([^:]+): (.+)", error)
+    if forbidden_field:
+        field_path, field_name = forbidden_field.groups()
+        field_name = field_name.strip()
+        return _base_item(
+            code="FORBIDDEN_SUPPLIER_FIELD",
+            path=field_path.strip(),
+            message=error,
+            why_it_matters="Supplier/BOM/API-key fields must never appear in Step 2 circuit JSON; they leak external dependencies into local deterministic data.",
+            expected="no supplier/BOM/API fields",
+            actual=field_name,
+            repair_hint=f"Remove the '{field_name}' field at {field_path.strip()}. Step 2 may only contain circuit structure.",
+            related_rule="STEP2-FORBID-SUPPLIER",
+        )
+
+    # ── Catch-all (should now rarely fire) ────────────────────────────────────
     return _base_item(
         code="SCHEMA_VALIDATION_ERROR",
         path="$",
@@ -263,22 +824,36 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
     )
 
 
+def _circuit_components(circuit: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return component list from either flat or STAGE_1_TOPOLOGY format."""
+    if "STAGE_1_TOPOLOGY" in circuit:
+        return circuit["STAGE_1_TOPOLOGY"].get("components", [])
+    return circuit.get("components", [])
+
+
+def _circuit_nets(circuit: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return nets list from either flat or STAGE_1_TOPOLOGY format."""
+    if "STAGE_1_TOPOLOGY" in circuit:
+        return circuit["STAGE_1_TOPOLOGY"].get("nets", [])
+    return circuit.get("nets", [])
+
+
 def _component_index(circuit: dict[str, Any], component_id: str) -> int:
-    for index, component in enumerate(circuit.get("components", [])):
+    for index, component in enumerate(_circuit_components(circuit)):
         if isinstance(component, dict) and component.get("id") == component_id:
             return index
     return -1
 
 
 def _component_type(circuit: dict[str, Any], component_id: str) -> str:
-    for component in circuit.get("components", []):
+    for component in _circuit_components(circuit):
         if isinstance(component, dict) and component.get("id") == component_id:
             return str(component.get("type", ""))
     return ""
 
 
 def _component_pins(circuit: dict[str, Any], component_id: str) -> set[str]:
-    for component in circuit.get("components", []):
+    for component in _circuit_components(circuit):
         if isinstance(component, dict) and component.get("id") == component_id and isinstance(component.get("pins"), dict):
             return set(component["pins"])
     return set()
@@ -286,7 +861,7 @@ def _component_pins(circuit: dict[str, Any], component_id: str) -> set[str]:
 
 def _net_pin_location(circuit: dict[str, Any], net_name: str, component_id: str, pin_name: str) -> tuple[int, int, str]:
     target = f"{component_id}.{pin_name}"
-    for net_index, net in enumerate(circuit.get("nets", [])):
+    for net_index, net in enumerate(_circuit_nets(circuit)):
         if not isinstance(net, dict) or net.get("name") != net_name:
             continue
         for pin_index, pin_ref in enumerate(net.get("pins", [])):
