@@ -95,6 +95,35 @@ def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
     return circuit.get("components", []), circuit.get("nets", [])
 
 
+def _safe_rule(rule: Callable[..., Any], ctx: "_Context",
+               make_item: DiagnosticFactory) -> list[dict[str, Any]]:
+    """Run one diagnostic rule, converting any exception into a blocking diagnostic.
+
+    The diagnostic rules were written for well-formed circuits. The STaR harvest and
+    the prod correction loop feed ARBITRARY model-generated JSON through here, which
+    can be malformed (missing 'type'/'id', wrong shapes). A single rule raising must
+    never abort the whole analysis (that crashes the caller). Instead we flag the
+    circuit invalid — a circuit that cannot be analyzed is, by definition, not
+    ERC-clean — and continue with the remaining rules.
+    """
+    try:
+        return list(rule(ctx))
+    except Exception as exc:  # noqa: BLE001 — robustness boundary, must catch all
+        name = getattr(rule, "__name__", "rule")
+        return [make_item(
+            code="ERC_RULE_ERROR",
+            path="$",
+            message=f"diagnostic rule '{name}' could not evaluate this circuit "
+                    f"({type(exc).__name__})",
+            why_it_matters="The rule failed because the circuit is malformed or "
+                           "incomplete; a circuit that cannot be analyzed cannot be "
+                           "certified ERC-clean.",
+            repair_hint="Ensure every component has the required 'id' and 'type' "
+                        "fields and that nets reference existing component pins.",
+            related_rule="ERC-ROBUST",
+        )]
+
+
 def electrical_diagnostics(circuit: dict[str, Any], make_item: DiagnosticFactory) -> list[dict[str, Any]]:
     components, nets = _extract_topology(circuit)
     if not isinstance(components, list) or not isinstance(nets, list):
@@ -112,10 +141,10 @@ def electrical_diagnostics(circuit: dict[str, Any], make_item: DiagnosticFactory
         _isolated_component,
         _button_missing_pull,
     ):
-        items.extend(rule(ctx))
+        items.extend(_safe_rule(rule, ctx, make_item))
     # T3-09 → T3-40: domain-specific rule modules
     for dispatcher in _RULE_MODULES:
-        items.extend(dispatcher(ctx))
+        items.extend(_safe_rule(dispatcher, ctx, make_item))
     return items
 
 
@@ -206,10 +235,12 @@ class _Context:
     def _types_on_net(self, net: dict[str, Any]) -> frozenset[str]:
         key = id(net)
         if key not in self._net_types:
+            # A component may be missing its "type" (malformed/partial model output);
+            # use a truthiness guard so analysis never KeyErrors on bad input.
             self._net_types[key] = frozenset(
                 self.by_id[cid]["type"]
                 for cid in self.comps_on_net(net)
-                if cid in self.by_id
+                if cid in self.by_id and self.by_id[cid].get("type")
             )
         return self._net_types[key]
 
