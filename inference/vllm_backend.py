@@ -25,7 +25,7 @@ from inference.vllm_backend import VLLMChatModel
 
 model = VLLMChatModel(
     model_dir="/workspace/merged-corr",    # fully-merged Qwen3-8B + best-erc + correction
-    max_model_len=8192,
+    max_model_len=16384,
 )
 
 # Batched (harvest hot path):
@@ -65,9 +65,10 @@ class VLLMChatModel:
     Args:
         model_dir       : Local path to the fully-merged HF model directory.
         max_model_len   : Maximum total context (prompt + generation) tokens.
-                          Must cover the Ohmatic system prompt (~3 800 tok) +
-                          the longest prompt (~400 tok) + max_new_tokens (2 560).
-                          Recommended: 8 192 (fits on A40 48 GB with gpu_mem_util=0.90).
+                          Must cover the Ohmatic system prompt (~6 200 tok) +
+                          the longest user prompt (~2 200 tok) + max_new_tokens (2 560).
+                          Default: 16 384 (fits on A40 48 GB with gpu_mem_util=0.90;
+                          Qwen3-8B supports up to 32 768).
         gpu_mem_util    : Fraction of GPU VRAM to allocate for the KV cache.
                           0.90 is the sweet spot for A40 48 GB: leaves ~4.8 GB for
                           activations while giving the scheduler maximum KV cache.
@@ -82,7 +83,7 @@ class VLLMChatModel:
     def __init__(
         self,
         model_dir: str,
-        max_model_len: int = 8192,
+        max_model_len: int = 16384,
         gpu_mem_util: float = 0.90,
         dtype: str = "bfloat16",
         tensor_parallel: int = 1,
@@ -102,6 +103,7 @@ class VLLMChatModel:
 
         self._model_dir = model_dir
         self._max_tokens_default = 2560  # matches pipeline.py / _Gen default
+        self._max_model_len = max_model_len
 
         # Load tokenizer separately — we need apply_chat_template for prompt building.
         # vLLM has its own tokenizer internally but does not expose apply_chat_template
@@ -149,6 +151,10 @@ class VLLMChatModel:
                 tokenize=False,
                 add_generation_prompt=True,
             )
+
+    def _count_prompt_tokens(self, prompt_text: str) -> int:
+        """Return the token count of an already-formatted prompt string."""
+        return len(self._tok.encode(prompt_text))
 
     # ── Public batched generate ───────────────────────────────────────────────
 
@@ -207,21 +213,68 @@ class VLLMChatModel:
             )
 
         # Build flat list of formatted prompt strings.
-        prompts: list[str] = [
+        raw_prompts: list[str] = [
             self._format_prompt(msgs) for msgs in list_of_message_lists
         ]
 
-        # ONE vLLM call over ALL prompts — continuous batching happens here.
-        # vLLM returns one RequestOutput per prompt, preserving input order.
-        outputs = self._llm.generate(prompts, sampling_params)
+        # ── Over-length pre-filter ────────────────────────────────────────────
+        # Any prompt whose token count leaves no room for generation is skipped
+        # here so a single long prompt can NEVER crash the entire batch.
+        # Budget: max_model_len - max_tok tokens reserved for generation output.
+        input_budget = self._max_model_len - max_tok
+        valid_indices: list[int] = []
+        skipped_count = 0
+        for idx, p in enumerate(raw_prompts):
+            tok_count = self._count_prompt_tokens(p)
+            if tok_count > input_budget:
+                print(
+                    f"[VLLMChatModel.generate] SKIP prompt[{idx}]: "
+                    f"{tok_count} input tokens > budget {input_budget} "
+                    f"(max_model_len={self._max_model_len}, max_tok={max_tok})",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                skipped_count += 1
+            else:
+                valid_indices.append(idx)
 
-        # Decode: for each prompt, collect all n completions.
-        results: list[list[str]] = []
-        for req_output in outputs:
-            completions = [
-                co.text.strip() for co in req_output.outputs
-            ]
-            results.append(completions)
+        if skipped_count:
+            print(
+                f"[VLLMChatModel.generate] skipped {skipped_count} over-length "
+                f"prompt(s) out of {len(raw_prompts)}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+        # Build result list pre-filled with empty completions for skipped prompts.
+        results: list[list[str]] = [[] for _ in raw_prompts]
+
+        if not valid_indices:
+            return results
+
+        prompts: list[str] = [raw_prompts[i] for i in valid_indices]
+
+        # ONE vLLM call over ALL valid prompts — continuous batching happens here.
+        # vLLM returns one RequestOutput per prompt, preserving input order.
+        # Belt-and-suspenders: catch per-request ValueError so one bad prompt
+        # cannot crash the whole batch even after the pre-filter.
+        try:
+            outputs = self._llm.generate(prompts, sampling_params)
+        except ValueError as exc:
+            # Should not happen after pre-filter, but guard anyway.
+            print(
+                f"[VLLMChatModel.generate] vLLM ValueError on batch: {exc} — "
+                "returning empty completions for all prompts in this batch.",
+                file=sys.stderr,
+                flush=True,
+            )
+            return results
+
+        # Decode: map outputs back to original indices.
+        for out_idx, req_output in enumerate(outputs):
+            orig_idx = valid_indices[out_idx]
+            completions = [co.text.strip() for co in req_output.outputs]
+            results[orig_idx] = completions
 
         return results
 
@@ -243,6 +296,11 @@ class VLLMChatModel:
         NOTE: In normal harvest use (--backend vllm) the harvest loop is replaced
         by a batched variant that calls generate() directly on a whole-prompt batch.
         This method is kept for compatibility / fallback / testing only.
+
+        The over-length pre-filter inside generate() applies here too: if the
+        single prompt exceeds the input budget, generate() returns [[]] and this
+        method returns [] — the harvest correction loop interprets an empty list
+        as no valid candidates and skips the prompt gracefully.
         """
         results = self.generate(
             [messages],
