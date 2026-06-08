@@ -59,13 +59,43 @@ def _normalize_component_types(circuit: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _analyzer_error_item(group_name: str, exc: Exception) -> dict[str, Any]:
+    """Blocking diagnostic for an analysis group that raised on malformed input."""
+    return _base_item(
+        code="ERC_ANALYZER_ERROR",
+        path="$",
+        message=f"analysis group '{group_name}' could not evaluate this circuit "
+                f"({type(exc).__name__})",
+        why_it_matters="A circuit that cannot be analyzed is malformed and cannot be "
+                       "certified ERC-clean.",
+        repair_hint="Return well-formed circuit JSON matching the schema (components "
+                    "with id/type, nets with pins).",
+        related_rule="ERC-ROBUST",
+    )
+
+
 def analyze_schematic(circuit: dict[str, Any]) -> dict[str, Any]:
-    """Return structured static diagnostics for one circuit-like object."""
-    circuit = _normalize_component_types(circuit)
+    """Return structured static diagnostics for one circuit-like object.
+
+    Robust to arbitrary / malformed input: callers (the STaR harvest and the prod
+    correction loop) feed model-generated JSON through here, so NO analysis group may
+    raise. A group that fails on a malformed circuit yields a blocking diagnostic
+    instead, keeping the circuit (correctly) invalid without crashing the caller.
+    """
+    try:
+        circuit = _normalize_component_types(circuit)
+    except Exception:  # noqa: BLE001 — robustness boundary
+        circuit = circuit if isinstance(circuit, dict) else {}
     diagnostics: list[dict[str, Any]] = []
-    diagnostics.extend(_forbidden_field_diagnostics(circuit))
-    diagnostics.extend(_validator_diagnostics(circuit))
-    diagnostics.extend(diagnostic_rules.electrical_diagnostics(circuit, _base_item))
+    for group in (_forbidden_field_diagnostics, _validator_diagnostics):
+        try:
+            diagnostics.extend(group(circuit))
+        except Exception as exc:  # noqa: BLE001 — robustness boundary
+            diagnostics.append(_analyzer_error_item(getattr(group, "__name__", "group"), exc))
+    try:
+        diagnostics.extend(diagnostic_rules.electrical_diagnostics(circuit, _base_item))
+    except Exception as exc:  # noqa: BLE001 — robustness boundary
+        diagnostics.append(_analyzer_error_item("electrical_diagnostics", exc))
     return {
         "valid": not diagnostics,
         "diagnostics": diagnostics,
