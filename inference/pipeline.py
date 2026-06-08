@@ -97,6 +97,18 @@ class PipelineConfig:
     # ERC retry loop — greedy decoding (set in HFChatModel) for deterministic JSON
     max_retries: int = 3                   # 4 total attempts (1 generate + 3 corrections); pass@k plateaus at 4.
 
+    # ── Generation backend ────────────────────────────────────────────────────
+    # 'hf'   : use HFChatModel (default, works everywhere, no GPU constraint)
+    # 'vllm' : use VLLMChatModel (requires vllm installed + GPU; qwen_model_id must
+    #          point to a FULLY-MERGED model dir — no LoRA at serve time).
+    #          When backend='vllm', qwen_adapter_id and qwen_adapter_revision are
+    #          ignored (merging happens upstream via train/merge_adapter.py).
+    backend: str = "hf"
+
+    # vLLM-specific tuning knobs (only used when backend='vllm')
+    vllm_max_model_len: int = 8192         # context window; must cover system prompt + prompt + max_new_tokens
+    vllm_gpu_mem_util: float = 0.90        # fraction of GPU VRAM for KV cache
+
     # System prompt paths
     schema_path: Path = _ROOT / "schema.md"
     registry_path: Path = _ROOT / "verifier" / "config" / "component_registry.toml"
@@ -435,7 +447,15 @@ class OhmaticPipeline:
 
     @classmethod
     def from_config(cls, cfg: PipelineConfig) -> "OhmaticPipeline":
-        """Build pipeline from PipelineConfig, loading HF models."""
+        """Build pipeline from PipelineConfig, loading HF or vLLM models.
+
+        When cfg.backend == 'vllm':
+            cfg.qwen_model_id must point to a FULLY-MERGED model dir on disk
+            (produced by train/merge_adapter.py).  qwen_adapter_id and
+            qwen_adapter_revision are ignored — vLLM serves the plain merged model.
+        When cfg.backend == 'hf' (default):
+            behaviour is unchanged — HFChatModel loads base + LoRA as before.
+        """
         # System prompt = the shared single source (exactly what the model trained on).
         system_prompt = _build_system_prompt()
 
@@ -446,7 +466,16 @@ class OhmaticPipeline:
             normalizer = _MockNormalizer()
 
         generator: ChatModel
-        if cfg.qwen_model_id or cfg.qwen_adapter_id:
+        if cfg.backend == "vllm":
+            # vLLM path — qwen_model_id must be a fully-merged local dir.
+            from inference.vllm_backend import VLLMChatModel  # lazy: vllm not on dev machines
+            generator = VLLMChatModel(
+                model_dir=cfg.qwen_model_id or "Qwen/Qwen3-8B",
+                max_model_len=cfg.vllm_max_model_len,
+                gpu_mem_util=cfg.vllm_gpu_mem_util,
+                dtype="bfloat16",
+            )
+        elif cfg.qwen_model_id or cfg.qwen_adapter_id:
             generator = HFChatModel(
                 cfg.qwen_model_id or "Qwen/Qwen3-8B",
                 adapter_id=cfg.qwen_adapter_id or None,
