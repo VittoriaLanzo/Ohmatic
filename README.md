@@ -4,7 +4,7 @@
 
 <p align="center">
   Describe a circuit in plain language → get a <b>verified</b> schematic, or an honest refusal.<br/>
-  Never a broken design.
+  <b>Never a broken design.</b>
 </p>
 
 ---
@@ -16,18 +16,56 @@ user prompt ──► T5 normalizer ──► Qwen3-8B (fine-tuned) ──► ER
                                         ▲                        │
                                         └── self-correction ◄────┘  (up to 3 rounds)
                                                                  │
-                                              pass ──► schematic JSON
+                                              pass ──► schematic JSON (topology + layout)
                                               fail ──► killswitch: ask the user to clarify
 ```
 
-- **T5 normalizer** maps messy, real-world phrasing onto the model's trained input distribution.
-- **The generator** is Qwen3-8B fine-tuned in two self-improvement rounds (the second on its own
-  ERC-verified generations — STaR-style), emitting a two-stage circuit JSON (topology + layout).
-- **ERC** (electrical rule checker, `eval/diagnostics.py`) validates every candidate: connectivity,
-  power integrity, pin legality, structure. On failure the model receives the findings and repairs
-  its own design.
-- **Killswitch**: if nothing passes after the correction rounds, the user gets a clarification
-  request — an unverified circuit is never delivered.
+Every candidate design is validated by a deterministic **electrical rule checker** before it can
+reach the user. If the model can't produce a passing design within its correction budget, the
+product refuses and asks for clarification — an unverified circuit is never delivered.
+
+## Benchmark
+
+75 novel "real-user" prompts (messy, underspecified, typo-ridden — authored by a model that is
+**not** in the evaluation, overlap-checked against all training data), run end-to-end through the
+full product pipeline. Verified by the same ERC engine that gates production.
+
+<table>
+  <tr>
+    <th>model</th><th>N</th><th>delivered clean</th><th>95% CI</th>
+    <th>blocked by killswitch</th><th><b>broken circuits delivered</b></th><th>latency</th>
+  </tr>
+  <tr>
+    <td><b>Ohmatic bf16</b> (full pipeline)</td><td>75</td>
+    <td><b>93.3%</b></td><td>85.3 – 97.1%</td><td>6.7%</td>
+    <td><b>0 — none</b></td><td>122 s</td>
+  </tr>
+  <tr>
+    <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>34</td>
+    <td>73.5%</td><td>56.9 – 85.4%</td><td>26.5%</td>
+    <td><b>0 — none</b></td><td>40 s</td>
+  </tr>
+</table>
+
+<sub>Wilson 95% intervals. <b>Key finding:</b> quantization degrades the generator — the killswitch
+fires 4× more often — but in 109 requests <b>not one</b> ERC-failing circuit reached the user, in
+either configuration. Quality loss converts to reduced availability, never to bad output.
+Frontier-model comparison legs (hosted APIs, identical prompts + verifier) are in progress.</sub>
+
+### Reproduce
+
+```bash
+# stage 1 — generate (per model leg; append-only, crash-resumable)
+python -m eval.benchmark.cross_model.generate --model star-r2-bf16 --suite realuser
+# stage 2 — verify: every output through the identical extract → ERC path (free, rerunnable)
+python -m eval.benchmark.cross_model.verify
+# stage 3 — tables (Wilson CI, precision vs availability, per-category)
+python -m eval.benchmark.cross_model.report --by-category
+```
+
+Hosted legs need `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; local legs need a GPU and `HF_TOKEN`.
+All pins, the model matrix, and the fairness contract live in
+[`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md).
 
 ## Quick start
 
@@ -36,8 +74,9 @@ git clone https://github.com/VittoriaLanzo/Ohmatic.git && cd Ohmatic
 ohmatic start            # Windows; `bash ohmatic start` on Linux/macOS
 ```
 
-Boots the local stack (gateway, service stubs, frontend) and prints a URL. No GPU needed —
-the stub inference returns a fixed valid circuit so the whole loop is explorable.
+Boots the local stack — gateway, service stubs, frontend — and prints a URL. No GPU needed: the
+stub inference returns a fixed valid circuit so the whole loop is explorable. `./ohmatic stop`
+shuts it down.
 
 Run the real pipeline (GPU + model weights):
 
@@ -47,19 +86,21 @@ python -m inference.cli "5V to 3.3V LDO with reverse-polarity protection" \
   --qwen-model VittoriaLanzo/Ohmatic-Qwen3-8B
 ```
 
-Model weights (bf16 + GGUF Q8_0/Q4_K_M) live on Hugging Face and are private during evaluation.
+Model weights (bf16 + GGUF Q8_0 / Q4_K_M) live on Hugging Face — private during evaluation.
 
-## Repo map
+## Architecture
 
-| Path | What |
-|---|---|
-| `inference/` | the production pipeline (T5 → Qwen → ERC → retries → killswitch) + CLI |
-| `eval/` | the ERC engine (`diagnostics.py` + `rules/`) and benchmarks |
-| `eval/benchmark/cross_model/` | reproducible cross-model benchmark — see its README |
-| `shared/` | single sources of truth: system prompt, ERC feedback format, T5 contract |
-| `dataset/` | schema, validator, corpus tooling (data itself lives on private HF) |
-| `gateway/ frontend/` | local demo stack (`ohmatic start`) |
-| `train/` | training scripts (temporary residence — moving to private HF) |
+| Stage | Component | What it does |
+|---|---|---|
+| Normalize | `shared/t5_normalizer.py` + fine-tuned T5 | maps any phrasing onto the model's trained input distribution; a hard faithfulness gate re-attaches any user-given specifics (voltages, parts) the rewrite dropped |
+| Generate | Qwen3-8B fine-tune (`inference/pipeline.py`) | emits a two-stage circuit JSON — `STAGE_1_TOPOLOGY` (components, nets, pins) + `STAGE_2_LAYOUT` (spatial nodes). Trained in two self-improvement rounds: round 1 on a synthetic corpus, round 2 STaR-style on its own ERC-verified generations, each round merge-frozen into the base |
+| Verify | `eval/diagnostics.py` + `eval/rules/` | the ERC engine: connectivity, power integrity, pin legality, schema/structure — one source of truth shared by training, the benchmark, and production |
+| Correct | the pipeline loop | on ERC failure the model receives the findings (`shared/erc_feedback.py`, the exact format it trained on) and repairs its own design, up to 3 rounds |
+| Refuse | the killswitch | retries exhausted → `blocked=True` + a clarification request; the broken candidate stays internal |
+| Serve | `gateway/` + `frontend/` | async job API (`POST /v1/generate` → poll) and the web UI; `ohmatic start` runs it all locally with stubs |
+
+The system prompt the model is served is byte-identical to the one it trained on
+(`shared/prompt_builder.py` — single source of truth).
 
 ## Tests
 
@@ -67,5 +108,5 @@ Model weights (bf16 + GGUF Q8_0/Q4_K_M) live on Hugging Face and are private dur
 pytest tests/ -q
 ```
 
-ERC behavior is pinned by a golden regression (`tests/test_erc_golden.py`); the fixture derives
-from private held-out data and is built locally — the test skips without it.
+ERC behavior is pinned by a 182-circuit golden regression (`tests/test_erc_golden.py`); the fixture
+derives from private held-out data and is built locally — the test skips without it.
