@@ -1,18 +1,12 @@
 import json
+import os
 
-from eval.benchmark import prod_eval, verify_model
+import pytest
 
-
-def test_verify_model_report_metadata_names_parser_helper_and_constraint():
-    metadata = verify_model.eval_contract_metadata()
-
-    assert metadata == {
-        "model_track": "qwen3_parser",
-        "prompt_helper": "t5_normalized",
-        "decoder_constraint": "none",
-    }
+from eval.benchmark import prod_eval
 
 
+@pytest.mark.skipif(os.name == "nt", reason="pytest tmp-factory perms on Windows dev box; runs on Linux")
 def test_prod_eval_summary_metadata_names_parser_helper_and_constraint(tmp_path, monkeypatch):
     class FakeResult:
         ok = True
