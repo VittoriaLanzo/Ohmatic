@@ -30,6 +30,10 @@ product refuses and asks for clarification — an unverified circuit is never de
 **not** in the evaluation, overlap-checked against all training data), run end-to-end through the
 full product pipeline. Verified by the same ERC engine that gates production.
 
+<p align="center">
+  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean with zero broken deliveries vs Claude Fable 5 76.0% with 24% broken circuits delivered" width="900" />
+</p>
+
 <table>
   <tr>
     <th>model</th><th>N</th><th>delivered clean</th><th>95% CI</th>
