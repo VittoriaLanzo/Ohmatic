@@ -88,7 +88,12 @@ _RULE_MODULES: list[Callable] = [
 
 
 def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
-    """Return (components, nets) from either flat or STAGE_1_TOPOLOGY format."""
+    """Return (components, nets) from either flat or STAGE_1_TOPOLOGY format.
+
+    Deliberately NOT validate.resolve_circuit_topology: that resolver tolerates a
+    non-dict STAGE_1_TOPOLOGY (``... or {}``) and would silently yield empty lists,
+    whereas here a non-dict STAGE_1 must RAISE so _safe_rule turns it into a blocking
+    ERC_RULE/ANALYZER_ERROR — an un-analyzable circuit is not ERC-clean."""
     if "STAGE_1_TOPOLOGY" in circuit:
         topo = circuit["STAGE_1_TOPOLOGY"]
         return topo.get("components", []), topo.get("nets", [])

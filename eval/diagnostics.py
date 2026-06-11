@@ -906,16 +906,12 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
 
 def _circuit_components(circuit: dict[str, Any]) -> list[dict[str, Any]]:
     """Return component list from either flat or STAGE_1_TOPOLOGY format."""
-    if "STAGE_1_TOPOLOGY" in circuit:
-        return circuit["STAGE_1_TOPOLOGY"].get("components", [])
-    return circuit.get("components", [])
+    return validate.resolve_circuit_topology(circuit)["components"]
 
 
 def _circuit_nets(circuit: dict[str, Any]) -> list[dict[str, Any]]:
     """Return nets list from either flat or STAGE_1_TOPOLOGY format."""
-    if "STAGE_1_TOPOLOGY" in circuit:
-        return circuit["STAGE_1_TOPOLOGY"].get("nets", [])
-    return circuit.get("nets", [])
+    return validate.resolve_circuit_topology(circuit)["nets"]
 
 
 def _component_index(circuit: dict[str, Any], component_id: str) -> int:
