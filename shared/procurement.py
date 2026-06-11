@@ -135,6 +135,14 @@ def build_jameco_preflight_response(*, config: AvantLinkConfig | None = None) ->
 # env-gated: set OHMATIC_LINKOUT_WRAP_<SUPPLIER> to a template containing {url}
 # (e.g. an Impact/CJ deep-link wrapper) once the program approves you — links
 # then carry the disclosure. Without it, plain disclosed-free search links.
+#
+# TODO(vittoria): after affiliate approvals, set in .env (NEVER commit values):
+#   OHMATIC_LINKOUT_WRAP_DIGIKEY  - Impact (impact.com) deep-link template, {url} placeholder
+#   OHMATIC_LINKOUT_WRAP_NEWARK   - CJ Affiliate deep-link template, {url} placeholder
+#   (LCSC has no self-serve affiliate program - links stay plain)
+# Verified 2026-06-12: newark/lcsc search URLs fetch HTTP 200 with result pages;
+# digikey 403s PROGRAMMATIC fetches (Akamai bot wall) but opens fine in a real
+# browser - which is the only way these links are ever used (link-OUT).
 LINKOUT_SUPPLIERS: dict[str, dict[str, str]] = {
     "digikey": {
         "search": "https://www.digikey.com/en/products?keywords={query}",
