@@ -1,0 +1,75 @@
+{"id": "ru-001", "category": "power-supply", "messiness": "clean", "prompt": "Design a 5V to 3.3V linear regulator that can deliver at least 500mA with proper input and output decoupling capacitors."}
+{"id": "ru-002", "category": "power-supply", "messiness": "underspecified", "prompt": "i need a circuit to get a stable voltage for my arduino from a wall adapter"}
+{"id": "ru-003", "category": "power-supply", "messiness": "messy", "prompt": "hey can u build me a buck converter that takes 12v and drops it to 5v for about 1 amp no idea what parts"}
+{"id": "ru-004", "category": "power-supply", "messiness": "mixed-units", "prompt": "want a boost converter from a single 1,5V cell up to 3V3 for a small sensor, maybe 100 mA load"}
+{"id": "ru-005", "category": "power-supply", "messiness": "rambling", "prompt": "So my buddy and I are restoring an old radio in his garage and the transformer puts out around 9V AC, and honestly half the fun is just the soldering, but what I actually need from you is a full-wave bridge rectifier with smoothing to give me clean DC out."}
+{"id": "ru-006", "category": "power-supply", "messiness": "clean", "prompt": "Design an adjustable LM317-based regulator set to output 6V from a 12V input with output current around 300mA."}
+{"id": "ru-007", "category": "power-supply", "messiness": "mixed-units", "prompt": "need a 4u7 cap input LDO giving 3,3 volts out from 5 volt usb, low dropout please"}
+{"id": "ru-008", "category": "power-supply", "messiness": "messy", "prompt": "make a lil power supply that turns 24v into 12v for a fan idk how many amps maybe half an amp"}
+{"id": "ru-009", "category": "led-lighting", "messiness": "clean", "prompt": "Design a constant-current driver for a single 1W white LED running from 12V, targeting about 350mA."}
+{"id": "ru-010", "category": "led-lighting", "messiness": "messy", "prompt": "hey can u make me a led thing that blinks like once a sec runnin off a 9v battery"}
+{"id": "ru-011", "category": "led-lighting", "messiness": "underspecified", "prompt": "i want some leds to fade in and out slowly"}
+{"id": "ru-012", "category": "led-lighting", "messiness": "mixed-units", "prompt": "drive 3 red leds in series off 12V, each wants about 20mA, what resistor (use 1/4W) do i need"}
+{"id": "ru-013", "category": "led-lighting", "messiness": "rambling", "prompt": "Okay so I'm decorating my bike for a night ride and I've got this little 3.7V lipo I pulled from a vape, super sketchy I know, but anyway can you design me a simple circuit to drive a strip of like 6 LEDs from it with current limiting so they don't pop."}
+{"id": "ru-014", "category": "led-lighting", "messiness": "clean", "prompt": "Build a PWM dimmer for a 12V LED strip using a single MOSFET driven by an external PWM signal, rated for 2A."}
+{"id": "ru-015", "category": "led-lighting", "messiness": "underspecified", "prompt": "need a low battery indicator led"}
+{"id": "ru-016", "category": "led-lighting", "messiness": "messy", "prompt": "make 2 leds alternate back n forth like a railroad crossing off 5v"}
+{"id": "ru-017", "category": "timer-oscillator", "messiness": "clean", "prompt": "Design a 555 astable oscillator running at 1kHz with roughly 50% duty cycle on a 5V supply."}
+{"id": "ru-018", "category": "timer-oscillator", "messiness": "underspecified", "prompt": "i need a timer that turns something off after a while"}
+{"id": "ru-019", "category": "timer-oscillator", "messiness": "messy", "prompt": "555 chip making a slow blink like 1 hz for a led on 9v can u spec the caps n resistors"}
+{"id": "ru-020", "category": "timer-oscillator", "messiness": "mixed-units", "prompt": "want a monostable 555 one-shot giving a 2,5 sec pulse when i press a button, 5V rail"}
+{"id": "ru-021", "category": "timer-oscillator", "messiness": "rambling", "prompt": "My cat keeps jumping on the counter and I read online you can scare them with a little beeper, so before she ruins another loaf of bread, I need you to design a 555 astable in the audible range, say around 2kHz, that drives a small piezo buzzer from 9V."}
+{"id": "ru-022", "category": "timer-oscillator", "messiness": "clean", "prompt": "Design a 50% duty-cycle square wave generator at 10kHz suitable for clocking a logic counter, 5V supply."}
+{"id": "ru-023", "category": "timer-oscillator", "messiness": "mixed-units", "prompt": "need a 555 astable, freq about 1k5 Hz, supply 4V5 from 3 AA cells"}
+{"id": "ru-024", "category": "sensor-interface", "messiness": "clean", "prompt": "Design a thermistor voltage-divider front end for a 10k NTC feeding an ADC pin, with output filtering, on a 3.3V rail."}
+{"id": "ru-025", "category": "sensor-interface", "messiness": "underspecified", "prompt": "i want to measure light with my microcontroller"}
+{"id": "ru-026", "category": "sensor-interface", "messiness": "messy", "prompt": "hook up an ldr so my arduino knows when its dark needs to read on an analog pin 5v"}
+{"id": "ru-027", "category": "sensor-interface", "messiness": "mixed-units", "prompt": "hall sensor output into a comparator, trip point around 2V5, running off 5 volt"}
+{"id": "ru-028", "category": "sensor-interface", "messiness": "rambling", "prompt": "I've been getting into homebrewing and my fermentation chamber temperature drifts way too much, the wife thinks I'm obsessed honestly, but what I really need is a circuit to condition a thermistor signal and buffer it with an op-amp before it goes to my ADC, 3.3V system."}
+{"id": "ru-029", "category": "sensor-interface", "messiness": "clean", "prompt": "Design a precision LDR-based light sensor with an op-amp buffer producing a clean 0 to 3.3V output for an ADC."}
+{"id": "ru-030", "category": "sensor-interface", "messiness": "underspecified", "prompt": "need to read a potentiometer position"}
+{"id": "ru-031", "category": "motor-actuator", "messiness": "clean", "prompt": "Design an H-bridge to drive a small 6V brushed DC motor in both directions using two logic-level control inputs, motor current about 1A."}
+{"id": "ru-032", "category": "motor-actuator", "messiness": "underspecified", "prompt": "i need to switch a relay from my arduino"}
+{"id": "ru-033", "category": "motor-actuator", "messiness": "messy", "prompt": "turn a 12v relay on n off with a 3.3v gpio pin gotta have the flyback diode"}
+{"id": "ru-034", "category": "motor-actuator", "messiness": "mixed-units", "prompt": "drive a little 5V hobby servo from a microcontroller, control signal is a 50Hz pwm, current maybe 0,5 A peak"}
+{"id": "ru-035", "category": "motor-actuator", "messiness": "rambling", "prompt": "Building a little automated chicken coop door because the foxes are getting bold this year, and I finally got the gearmotor mounted, so now I just need a transistor circuit so a 5V microcontroller pin can switch a 12V DC motor on and off, with proper flyback protection."}
+{"id": "ru-036", "category": "motor-actuator", "messiness": "clean", "prompt": "Design a low-side MOSFET driver to switch a 12V solenoid rated at 0.8A from a 3.3V logic signal, including flyback suppression."}
+{"id": "ru-037", "category": "motor-actuator", "messiness": "messy", "prompt": "need a transistor to drive a small vibration motor off a gpio its like 3v 80ma"}
+{"id": "ru-038", "category": "audio", "messiness": "clean", "prompt": "Design a single-supply non-inverting op-amp audio preamp with a gain of about 10 and proper input AC coupling, running from 9V."}
+{"id": "ru-039", "category": "audio", "messiness": "underspecified", "prompt": "i want to make a small speaker amplifier"}
+{"id": "ru-040", "category": "audio", "messiness": "messy", "prompt": "make a lil amp using an lm386 for a tiny 8 ohm speaker off a 9v block"}
+{"id": "ru-041", "category": "audio", "messiness": "mixed-units", "prompt": "first order low pass audio filter cutoff about 3k4 Hz, line level, give me the R and C"}
+{"id": "ru-042", "category": "audio", "messiness": "rambling", "prompt": "My grandfather left me his old guitar and I've been learning to play, badly, but I want to build a passive tone control to roll off some of the harshness, so design me a simple passive RC treble-cut tone stack for a guitar signal."}
+{"id": "ru-043", "category": "audio", "messiness": "clean", "prompt": "Design a transistor-driven piezo buzzer alarm tone circuit at roughly 3kHz driven from a 5V logic enable line."}
+{"id": "ru-044", "category": "audio", "messiness": "underspecified", "prompt": "need a microphone preamp"}
+{"id": "ru-045", "category": "battery-charging", "messiness": "clean", "prompt": "Design a single-cell Li-ion charger using a TP4056 from USB 5V input with a 1A charge current and a charge-status LED."}
+{"id": "ru-046", "category": "battery-charging", "messiness": "underspecified", "prompt": "i need something to charge a battery from usb"}
+{"id": "ru-047", "category": "battery-charging", "messiness": "messy", "prompt": "lipo protection circuit so i dont over discharge my 3.7v cell cut off around 3 volts"}
+{"id": "ru-048", "category": "battery-charging", "messiness": "mixed-units", "prompt": "charge a 6V lead acid from a small solar panel, panel does about 9V open circuit, limit to ~0,3 A"}
+{"id": "ru-049", "category": "battery-charging", "messiness": "rambling", "prompt": "So I've got this off-grid weather station idea for the cabin, my dad gave me an old 18650 from a laptop pack, and the whole point is it should run forever on sun, but the bit I'm stuck on is the charging, so design me a circuit to charge that single 18650 from a 6V solar panel safely."}
+{"id": "ru-050", "category": "battery-charging", "messiness": "clean", "prompt": "Design a battery voltage monitor that lights an LED when a 12V lead-acid battery drops below 11.5V."}
+{"id": "ru-051", "category": "battery-charging", "messiness": "messy", "prompt": "need to charge 4 nimh aa cells in series from a wall wart trickle charge is fine"}
+{"id": "ru-052", "category": "battery-charging", "messiness": "underspecified", "prompt": "battery low warning beeper"}
+{"id": "ru-053", "category": "comms-interface", "messiness": "clean", "prompt": "Design a bidirectional logic level shifter between 5V and 3.3V for an I2C bus with proper pull-up resistors."}
+{"id": "ru-054", "category": "comms-interface", "messiness": "underspecified", "prompt": "i need to connect a 5v sensor to a 3.3v board"}
+{"id": "ru-055", "category": "comms-interface", "messiness": "messy", "prompt": "rs485 transceiver hookup for a long cable run with the 120 ohm termination n biasing 5v"}
+{"id": "ru-056", "category": "comms-interface", "messiness": "mixed-units", "prompt": "opto isolate a digital signal, input side 3V3 logic, output pulls up to 5 volt, speed only ~1k baud"}
+{"id": "ru-057", "category": "comms-interface", "messiness": "rambling", "prompt": "I'm wiring up a sensor in my workshop that's a good 15 meters from the controller and there's a big motor nearby that throws noise everywhere, super annoying, so I need you to design an RS-485 driver/receiver interface with line termination so the data survives that run, 5V system."}
+{"id": "ru-058", "category": "comms-interface", "messiness": "clean", "prompt": "Design an optocoupler-based isolation circuit for a UART TX line at 9600 baud, 3.3V on the input side and 5V on the output side."}
+{"id": "ru-059", "category": "comms-interface", "messiness": "underspecified", "prompt": "level shift a single gpio between two boards"}
+{"id": "ru-060", "category": "comms-interface", "messiness": "mixed-units", "prompt": "single channel uni-directional level shifter 1V8 up to 3,3V using a mosfet"}
+{"id": "ru-061", "category": "protection", "messiness": "clean", "prompt": "Design a reverse-polarity protection circuit using a P-channel MOSFET for a 12V input rail carrying up to 2A."}
+{"id": "ru-062", "category": "protection", "messiness": "underspecified", "prompt": "protect my circuit if i plug the power in backwards"}
+{"id": "ru-063", "category": "protection", "messiness": "messy", "prompt": "need esd protection on a usb data line tvs diode or smth"}
+{"id": "ru-064", "category": "protection", "messiness": "mixed-units", "prompt": "crowbar overvoltage protection on a 5 volt rail, trip if it goes over like 5V8, blow a fuse"}
+{"id": "ru-065", "category": "protection", "messiness": "rambling", "prompt": "My kids keep mashing the button on my project box like it's a video game controller and it's bouncing all over the place causing double triggers, so design me a hardware debounce circuit for a single push button feeding a logic input on 3.3V."}
+{"id": "ru-066", "category": "protection", "messiness": "clean", "prompt": "Design an input protection circuit combining a series resettable PTC fuse and a TVS diode for a 12V automotive supply."}
+{"id": "ru-067", "category": "protection", "messiness": "messy", "prompt": "debounce a switch with an rc filter n schmitt gate for my counter 5v"}
+{"id": "ru-068", "category": "logic-mcu-glue", "messiness": "clean", "prompt": "Design a clean power-on reset circuit for a microcontroller with an active-low reset and a manual reset button on a 3.3V supply."}
+{"id": "ru-069", "category": "logic-mcu-glue", "messiness": "underspecified", "prompt": "i need a pullup on a button input"}
+{"id": "ru-070", "category": "logic-mcu-glue", "messiness": "messy", "prompt": "voltage divider to read a 12v signal on a 3.3v adc pin pls"}
+{"id": "ru-071", "category": "logic-mcu-glue", "messiness": "mixed-units", "prompt": "divide 24 volt down to about 3,3V for an mcu input, draw under 1 mA through the divider"}
+{"id": "ru-072", "category": "logic-mcu-glue", "messiness": "rambling", "prompt": "I'm finally getting around to that arcade button panel I promised my nephew, eight buttons total, and the wiring is a rats nest, but the real question is just how to interface a single momentary button to a microcontroller input cleanly, so design me a button input with pull-up and a series resistor on 5V."}
+{"id": "ru-073", "category": "logic-mcu-glue", "messiness": "clean", "prompt": "Design a circuit using a 74HC595 shift register driven by a microcontroller's SPI pins to expand to 8 output lines, 5V supply."}
+{"id": "ru-074", "category": "logic-mcu-glue", "messiness": "underspecified", "prompt": "expand my outputs i dont have enough pins"}
+{"id": "ru-075", "category": "logic-mcu-glue", "messiness": "messy", "prompt": "make a resistor divider so 5v logic talks to a 3.3v input pin"}
