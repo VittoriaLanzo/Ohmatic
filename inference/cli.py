@@ -16,8 +16,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from inference.pipeline import OhmaticPipeline, PipelineConfig
 
@@ -26,7 +24,6 @@ def generate_circuit_cli(
     prompt: str,
     t5_model_id: str = "",
     qwen_model_id: str = "",
-    temperature: float = 0.2,
     max_retries: int = 3,
     use_mock: bool = False,
 ) -> Dict[str, Any] | None:
@@ -37,7 +34,6 @@ def generate_circuit_cli(
         prompt:        Raw user prompt (any NL style)
         t5_model_id:   HF model ID or local path for T5 normalizer
         qwen_model_id: HF model ID or local path for Qwen generator
-        temperature:   Qwen sampling temperature (low = more deterministic)
         max_retries:   Max ERC correction attempts
         use_mock:      Use mock models (no loading) — for tests/demos
 
@@ -50,7 +46,6 @@ def generate_circuit_cli(
         cfg = PipelineConfig(
             t5_model_id=t5_model_id,
             qwen_model_id=qwen_model_id,
-            qwen_temperature=temperature,
             max_retries=max_retries,
         )
         pipeline = OhmaticPipeline.from_config(cfg)
@@ -93,8 +88,6 @@ Examples:
     parser.add_argument("prompt", help="Natural language circuit description (any style)")
     parser.add_argument("--t5-model", default="", help="HF model ID or path for T5 normalizer")
     parser.add_argument("--qwen-model", default="", help="HF model ID or path for Qwen generator")
-    parser.add_argument("--temperature", type=float, default=0.2,
-                        help="Qwen sampling temperature (default: 0.2)")
     parser.add_argument("--max-retries", type=int, default=3,
                         help="Max ERC correction attempts (default: 3)")
     parser.add_argument("--mock", action="store_true",
@@ -107,7 +100,6 @@ Examples:
         prompt=args.prompt,
         t5_model_id=args.t5_model,
         qwen_model_id=args.qwen_model,
-        temperature=args.temperature,
         max_retries=args.max_retries,
         use_mock=args.mock,
     )

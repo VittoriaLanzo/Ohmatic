@@ -166,6 +166,8 @@ cmd_start() {
     --docker) backend="docker" ;;
   esac; done
   step "Ohmatic starting"
+  hw_assess
+  ok "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY}) -> $RUN_DIR/doctor.json"
   if [ "$mode" = "mock" ]; then
     warn "mock mode: backend not started"
   else
@@ -211,6 +213,38 @@ cmd_status() {
   else dim "frontend   not running"; fi
 }
 
+
+# Hardware assessment: RAM + NVIDIA VRAM -> which Ohmatic model this machine can run.
+# Writes $RUN_DIR/doctor.json (served by the gateway at /v1/doctor for the frontend).
+hw_assess() {
+  mkdir -p "$RUN_DIR"
+  local ram_gb=0 vram_mb=0 gpu=""
+  case "$(uname -s)" in
+    Linux)  ram_gb=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null) ;;
+    Darwin) ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 )) ;;
+    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null | tr -d ' ') ;;
+  esac
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+    gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 | tr -d '')
+  fi
+  ram_gb=${ram_gb:-0}; vram_mb=${vram_mb:-0}
+  local tier="stub" why="not enough RAM/VRAM for local inference - stub/cloud mode"
+  if   [ "$vram_mb" -ge 20000 ]; then tier="bf16";       why="${gpu} (${vram_mb} MB VRAM) fits the full bf16 model"
+  elif [ "$vram_mb" -ge 10000 ]; then tier="q8_0";       why="${gpu} (${vram_mb} MB VRAM) fits the Q8_0 GGUF"
+  elif [ "$vram_mb" -ge  6000 ]; then tier="q4_k_m";     why="${gpu} (${vram_mb} MB VRAM) fits the Q4_K_M GGUF"
+  elif [ "$ram_gb" -ge 12 ];     then tier="q4_k_m_cpu"; why="${ram_gb} GB RAM runs Q4_K_M on CPU (slow)"
+  fi
+  printf '{"ram_gb": %s, "vram_mb": %s, "gpu": "%s", "recommended_model": "%s", "reason": "%s", "checked_at": "%s"}
+'     "$ram_gb" "$vram_mb" "$gpu" "$tier" "$why" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RUN_DIR/doctor.json"
+  OHMATIC_TIER="$tier"; OHMATIC_TIER_WHY="$why"; OHMATIC_RAM_GB="$ram_gb"; OHMATIC_VRAM_MB="$vram_mb"
+}
+
+cmd_stats() {
+  step "Ohmatic stats"
+  if detect_python; then "${PYTHON[@]}" tools/stats.py; else fail "needs Python 3"; fi
+}
+
 cmd_doctor() {
   step "Ohmatic doctor"
   local ok_fe=1 ok_be=0
@@ -225,6 +259,11 @@ cmd_doctor() {
 
   if command -v docker >/dev/null 2>&1; then ok "docker    $(docker --version)  (enables: ./ohmatic start --docker)"; ok_be=1
   else dim "docker    not found (optional - only needed for --docker)"; fi
+
+  hw_assess
+  if [ "$OHMATIC_VRAM_MB" -gt 0 ] 2>/dev/null; then ok "gpu       VRAM ${OHMATIC_VRAM_MB} MB"; else dim "gpu       no NVIDIA GPU detected (nvidia-smi absent)"; fi
+  ok "ram       ${OHMATIC_RAM_GB} GB"
+  ok "model     recommended: ${OHMATIC_TIER} - ${OHMATIC_TIER_WHY}"
 
   local busy="" p
   for p in 8080 8001 8002 8003 "$FRONTEND_PORT"; do port_free "$HOST" "$p" || busy="$busy $p"; done
@@ -246,7 +285,8 @@ ohmatic - local launcher
   ./ohmatic start --docker Backend via docker compose instead of Python stubs
   ./ohmatic stop           Stop everything ohmatic started
   ./ohmatic status         Show what is running
-  ./ohmatic doctor         Diagnose the system (Node, Python, Docker, ports)
+  ./ohmatic doctor         Diagnose the system (Node, Python, ports, RAM/GPU -> model tier)
+  ./ohmatic stats          Adoption stats (HF model downloads, GitHub stars)
 
   Fresh clone -> './ohmatic start' -> open the printed URL.
 EOF
@@ -257,6 +297,7 @@ case "${1:-help}" in
   stop)   cmd_stop ;;
   status) cmd_status ;;
   doctor) cmd_doctor ;;
+  stats) cmd_stats ;;
   help|--help|-h) usage ;;
   *) usage; exit 2 ;;
 esac

@@ -40,8 +40,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from eval.diagnostics import analyze_schematic
 
@@ -135,24 +133,10 @@ def _source_fingerprint(rows: list) -> str:
 
 # ── Build ───────────────────────────────────────────────────────────────────
 
-def build():
-    rng = random.Random(SEED)
-
-    forward = _load_jsonl(FORWARD_SRC)
-    print(f"Loaded {len(forward)} forward rows from {FORWARD_SRC.name}")
-    src_fp = _source_fingerprint(forward)
-
-    present_families = {r.get("_meta", {}).get("family", "?") for r in forward}
-    novel_families = [f for f in NOVEL_FAMILY_CANDIDATES if f in present_families]
-    missing = [f for f in NOVEL_FAMILY_CANDIDATES if f not in present_families]
-    if missing:
-        print(f"[warn] novel-family candidates not in data (skipped): {missing}")
-    novel_set = set(novel_families)
-    print(f"Novel families held out entirely: {len(novel_families)} -> {novel_families}")
-
-    # Group rows by family, keeping only ERC-VALID references (clean ground truth),
-    # deduped by normalized prompt (first valid occurrence wins).
-    by_family: dict[str, dict[str, dict]] = defaultdict(dict)  # family -> {sha1: item}
+def _group_valid_refs_by_family(forward: list) -> dict[str, dict[str, dict]]:
+    """family -> {prompt_sha1: item}, keeping only ERC-VALID references (clean ground
+    truth), deduped by normalized prompt (first valid occurrence wins)."""
+    by_family: dict[str, dict[str, dict]] = defaultdict(dict)
     n_invalid_ref = 0
     for r in forward:
         msgs = r["messages"]
@@ -173,14 +157,15 @@ def build():
                 "difficulty": r.get("_meta", {}).get("difficulty"),
             }
     print(f"Skipped {n_invalid_ref} rows whose reference failed ERC (kept clean refs only)")
+    return by_family
 
-    bench: list[dict] = []
-    exclude_hashes: set[str] = set()
-    chosen: set[str] = set()   # global dedup — a prompt can occur under >1 family
 
-    # --- novel_family partition --------------------------------------------------
-    # Exclude EVERY prompt of each novel family from training; sample a few per
-    # family as benchmark items.
+def _select_novel_family(rng, forward, by_family, novel_families, novel_set,
+                         bench, exclude_hashes, chosen) -> int:
+    """novel_family partition: exclude EVERY prompt of each novel family from training,
+    sample a few per family as benchmark items. Mutates bench/exclude_hashes/chosen.
+    Returns the count of benchmark items added."""
+    before = len(bench)
     for fam in novel_families:
         items = list(by_family.get(fam, {}).values())
         for it in items:
@@ -200,13 +185,13 @@ def build():
     for r in forward:
         if r.get("_meta", {}).get("family", "?") in novel_set:
             exclude_hashes.add(_prompt_sha1(r["messages"][1]["content"]))
+    return len(bench) - before
 
-    n_novel = len(bench)
-    print(f"novel_family benchmark prompts: {n_novel}")
 
-    # --- unseen_variant partition ------------------------------------------------
-    # From NON-novel families, pick up to MAX_PROMPTS_PER_FAMILY distinct prompts each,
-    # round-robin across families for coverage, until we hit the target.
+def _select_unseen_variant(rng, by_family, novel_set, bench, exclude_hashes, chosen) -> int:
+    """unseen_variant partition: from NON-novel families, pick up to
+    MAX_PROMPTS_PER_FAMILY distinct prompts each, round-robin across families for
+    coverage, until the target. Mutates bench/exclude_hashes/chosen; returns count added."""
     pools: dict[str, list[dict]] = {}
     for fam, items in by_family.items():
         if fam in novel_set or fam == "?":
@@ -239,10 +224,11 @@ def build():
                 exclude_hashes.add(it["prompt_sha1"])
                 chosen.add(it["prompt_sha1"])
                 n_unseen += 1
-    print(f"unseen_variant benchmark prompts: {n_unseen} "
-          f"(from {len({b['family'] for b in bench if b['partition']=='unseen_variant'})} families)")
+    return n_unseen
 
-    # --- loopback repair holdout -------------------------------------------------
+
+def _select_loopback_holdout(rng) -> tuple[list, list]:
+    """Hold out N_LOOPBACK_HOLDOUT ERC-repair cases. Returns (bench_rows, exclude_sigs)."""
     loopback = _load_jsonl(LOOPBACK_SRC)
     rng.shuffle(loopback)
     lb_bench, lb_excl = [], []
@@ -256,9 +242,10 @@ def build():
             "input_messages": msgs[:-1],
             "reference_fixed": msgs[-1]["content"],
         })
-    print(f"loopback repair holdout: {len(lb_bench)} cases")
+    return lb_bench, lb_excl
 
-    # --- write -------------------------------------------------------------------
+
+def _write_outputs(bench, exclude_hashes, lb_bench, lb_excl, manifest) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(OUT_BENCH, "w", encoding="utf-8") as fh:
         for i, b in enumerate(bench):
@@ -272,6 +259,41 @@ def build():
     with open(OUT_LB_EXCL, "w", encoding="utf-8") as fh:
         for s in sorted(lb_excl):
             fh.write(s + "\n")
+    with open(OUT_MANIFEST, "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2)
+
+
+def build():
+    rng = random.Random(SEED)
+
+    forward = _load_jsonl(FORWARD_SRC)
+    print(f"Loaded {len(forward)} forward rows from {FORWARD_SRC.name}")
+    src_fp = _source_fingerprint(forward)
+
+    present_families = {r.get("_meta", {}).get("family", "?") for r in forward}
+    novel_families = [f for f in NOVEL_FAMILY_CANDIDATES if f in present_families]
+    missing = [f for f in NOVEL_FAMILY_CANDIDATES if f not in present_families]
+    if missing:
+        print(f"[warn] novel-family candidates not in data (skipped): {missing}")
+    novel_set = set(novel_families)
+    print(f"Novel families held out entirely: {len(novel_families)} -> {novel_families}")
+
+    by_family = _group_valid_refs_by_family(forward)
+
+    bench: list[dict] = []
+    exclude_hashes: set[str] = set()
+    chosen: set[str] = set()   # global dedup — a prompt can occur under >1 family
+
+    n_novel = _select_novel_family(rng, forward, by_family, novel_families, novel_set,
+                                   bench, exclude_hashes, chosen)
+    print(f"novel_family benchmark prompts: {n_novel}")
+
+    n_unseen = _select_unseen_variant(rng, by_family, novel_set, bench, exclude_hashes, chosen)
+    print(f"unseen_variant benchmark prompts: {n_unseen} "
+          f"(from {len({b['family'] for b in bench if b['partition']=='unseen_variant'})} families)")
+
+    lb_bench, lb_excl = _select_loopback_holdout(rng)
+    print(f"loopback repair holdout: {len(lb_bench)} cases")
 
     manifest = {
         "version": "v1",
@@ -290,8 +312,7 @@ def build():
         },
         "all_references_pass_erc": True,  # enforced above (only valid refs kept)
     }
-    with open(OUT_MANIFEST, "w", encoding="utf-8") as fh:
-        json.dump(manifest, fh, indent=2)
+    _write_outputs(bench, exclude_hashes, lb_bench, lb_excl, manifest)
 
     print("\nWrote:")
     for p in (OUT_BENCH, OUT_EXCLUDE, OUT_LB_BENCH, OUT_LB_EXCL, OUT_MANIFEST):

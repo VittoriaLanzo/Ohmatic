@@ -88,7 +88,12 @@ _RULE_MODULES: list[Callable] = [
 
 
 def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
-    """Return (components, nets) from either flat or STAGE_1_TOPOLOGY format."""
+    """Return (components, nets) from either flat or STAGE_1_TOPOLOGY format.
+
+    Deliberately NOT validate.resolve_circuit_topology: that resolver tolerates a
+    non-dict STAGE_1_TOPOLOGY (``... or {}``) and would silently yield empty lists,
+    whereas here a non-dict STAGE_1 must RAISE so _safe_rule turns it into a blocking
+    ERC_RULE/ANALYZER_ERROR — an un-analyzable circuit is not ERC-clean."""
     if "STAGE_1_TOPOLOGY" in circuit:
         topo = circuit["STAGE_1_TOPOLOGY"]
         return topo.get("components", []), topo.get("nets", [])
@@ -193,6 +198,7 @@ class _Context:
 
         # net identity → frozenset of component types (lazily populated)
         self._net_types: dict[int, frozenset[str]] = {}
+        self._net_comps: dict[int, set[str]] = {}
 
     # ── Fast accessors ────────────────────────────────────────────────────────
 
@@ -209,12 +215,16 @@ class _Context:
         return bool(self._types_on_net(net) & type_set)
 
     def comps_on_net(self, net: dict[str, Any]) -> set[str]:
-        """Return the set of component IDs (not pin IDs) whose pins are on *net*."""
-        return {
-            pin.split(".", 1)[0]
-            for pin in net.get("pins", [])
-            if isinstance(pin, str) and "." in pin
-        }
+        """Component IDs (not pin IDs) on *net*. Memoized by id(net) — called
+        32x across rules; same pattern as _net_types."""
+        key = id(net)
+        if key not in self._net_comps:
+            self._net_comps[key] = {
+                pin.split(".", 1)[0]
+                for pin in net.get("pins", [])
+                if isinstance(pin, str) and "." in pin
+            }
+        return self._net_comps[key]
 
     def component_type(self, component_id: str) -> str:
         return str(self.by_id.get(component_id, {}).get("type", ""))

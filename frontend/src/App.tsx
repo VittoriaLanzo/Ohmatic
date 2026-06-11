@@ -1,6 +1,7 @@
 import { AlertCircle, Maximize2, RotateCcw, Send, Server, SlidersHorizontal, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { createGatewayApi } from "./api/gateway";
+import { HardwareBadge } from "./components/HardwareBadge";
 import { OhmaticLogo } from "./components/OhmaticLogo";
 import { ResultPanels } from "./components/ResultPanels";
 import { SchematicSvg } from "./components/SchematicSvg";
@@ -124,6 +125,7 @@ export default function App() {
           <Server size={16} aria-hidden="true" />
           Gateway {health}
         </div>
+        <HardwareBadge />
       </header>
 
       <section className="hero-workbench" aria-label="Circuit generation workspace">

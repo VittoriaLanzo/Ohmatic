@@ -114,6 +114,17 @@ class Handler(BaseHTTPRequestHandler):
                 },
                 "error": None
             })
+        elif path == "/v1/doctor":
+            # Hardware verdict written by `ohmatic doctor` / `ohmatic start` (hw_assess).
+            import os
+            p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "..", ".ohmatic-run", "doctor.json")
+            try:
+                with open(p, encoding="utf-8") as fh:
+                    self.send_json(200, json.load(fh))
+            except Exception:
+                self.send_json(200, {"recommended_model": "stub",
+                                     "reason": "doctor has not run yet - start via ./ohmatic start"})
         elif path == "/health":
             self.send_json(200, {"status": "ok"})
         else:

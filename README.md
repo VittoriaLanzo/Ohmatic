@@ -1,310 +1,126 @@
 <p align="center">
-  <img src="assets/ohmaticanim.gif" alt="Ohmatic animated logo" width="760" />
+  <img src="assets/ohmaticanim.gif" alt="Ohmatic" width="760" />
 </p>
 
 <p align="center">
-  Natural-language circuit generation: describe the intent, get a validated schematic graph,
-  DRC feedback, a BOM path, and a JSON contract the rest of the toolchain can rely on.
+  Describe a circuit in plain language → get a <b>verified</b> schematic, or an honest refusal.<br/>
+  <b>Never a broken design.</b>
 </p>
 
 ---
 
-## Quick Start
+## How it works
 
-A fresh clone runs with a single command. It starts the backend and frontend together and prints a
-local URL.
+```
+user prompt ──► T5 normalizer ──► Qwen3-8B (fine-tuned) ──► ERC verification
+                                        ▲                        │
+                                        └── self-correction ◄────┘  (up to 3 rounds)
+                                                                 │
+                                              pass ──► schematic JSON (topology + layout)
+                                              fail ──► killswitch: ask the user to clarify
+```
+
+Every candidate design is validated by a deterministic **electrical rule checker** before it can
+reach the user. If the model can't produce a passing design within its correction budget, the
+product refuses and asks for clarification — an unverified circuit is never delivered.
+
+## Benchmark
+
+75 novel "real-user" prompts (messy, underspecified, typo-ridden — authored by a model that is
+**not** in the evaluation, overlap-checked against all training data), run end-to-end through the
+full product pipeline. Verified by the same ERC engine that gates production.
+
+<p align="center">
+  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 73.5% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
+</p>
+
+<table>
+  <tr>
+    <th>model</th><th>N</th><th>delivered clean</th><th>95% CI</th>
+    <th>blocked by killswitch</th><th><b>broken circuits delivered</b></th><th>latency</th>
+  </tr>
+  <tr>
+    <td><b>Ohmatic bf16</b> (full pipeline, 8B)</td><td>75</td>
+    <td><b>93.3%</b></td><td>85.3 – 97.1%</td><td>6.7%</td>
+    <td><b>0 — none</b></td><td>122 s</td>
+  </tr>
+  <tr>
+    <td>Claude Fable 5 (frontier, single-shot)</td><td>75</td>
+    <td>76.0%</td><td>65.2 – 84.2%</td><td>— (no killswitch)</td>
+    <td><b>18 (24%)</b></td><td>~40 s</td>
+  </tr>
+  <tr>
+    <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>34</td>
+    <td>73.5%</td><td>56.9 – 85.4%</td><td>26.5%</td>
+    <td><b>0 — none</b></td><td>40 s</td>
+  </tr>
+</table>
+
+<sub>Wilson 95% intervals; identical prompts, identical verifier for every row. <b>The 8B
+fine-tune beats the frontier model it was benchmarked against</b> — paired McNemar on the same 75
+prompts: Ohmatic-only-clean 17 vs Fable-only-clean 4, exact p = 0.007 — <b>while delivering zero
+broken circuits</b>; the frontier model, with no verification loop, handed the user 18.
+Quantization degrades the generator (killswitch fires 4× more) but still ships nothing broken:
+quality loss converts to reduced availability, never to bad output. Fable 5 was evaluated
+zero-context (fresh instance per prompt, no repo or conversation access, default decoding,
+single-shot — the ERC feedback loop is proprietary and end users of a chat model wouldn't have it).
+OpenAI-model leg pending.</sub>
+
+### Reproduce
 
 ```bash
-git clone https://github.com/VittoriaLanzo/Ohmatic.git
-cd Ohmatic
+# stage 1 — generate (per model leg; append-only, crash-resumable)
+python -m eval.benchmark.cross_model.generate --model star-r2-bf16 --suite realuser
+# stage 2 — verify: every output through the identical extract → ERC path (free, rerunnable)
+python -m eval.benchmark.cross_model.verify
+# stage 3 — tables (Wilson CI, precision vs availability, per-category)
+python -m eval.benchmark.cross_model.report --by-category
 ```
 
-Windows (cmd or PowerShell):
+Hosted legs need `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; local legs need a GPU and `HF_TOKEN`.
+All pins, the model matrix, and the fairness contract live in
+[`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md).
 
-```bat
-ohmatic start
-```
-
-Linux or macOS (or Git Bash on Windows):
+## Quick start
 
 ```bash
-bash ohmatic start      # or: chmod +x ohmatic && ./ohmatic start
+git clone https://github.com/VittoriaLanzo/Ohmatic.git && cd Ohmatic
+ohmatic start            # Windows; `bash ohmatic start` on Linux/macOS
 ```
 
-Open the printed `http://127.0.0.1:<port>` URL.
+Boots the local stack — gateway, service stubs, frontend — and prints a URL. No GPU needed: the
+stub inference returns a fixed valid circuit so the whole loop is explorable. `./ohmatic stop`
+shuts it down.
 
-`ohmatic start` boots the four backend stubs (gateway, inference, verifier, enricher) and the
-frontend in server mode, so the browser talks to a real local gateway rather than a mock. It selects
-free ports automatically, installs frontend dependencies on first run, and waits for the gateway to
-report healthy before printing the URL.
+Run the real pipeline (GPU + model weights):
 
-### Requirements
-
-Node.js with npm (frontend) and Python 3 (backend stubs). Docker is optional and only used by the
-`-Docker` mode. Run `ohmatic doctor` to check the environment before starting; it reports missing or
-non-functional tooling — including a Python on `PATH` that cannot load its standard library — and
-whether the machine can run the stack.
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `ohmatic start` | Start the full stack: Python backend stubs plus the frontend in server mode. |
-| `ohmatic start -Mock` / `--mock` | Start the frontend only, with mock data and no backend. |
-| `ohmatic start -Docker` / `--docker` | Start the backend with `docker compose` instead of Python stubs. |
-| `ohmatic stop` | Stop everything the launcher started. |
-| `ohmatic status` | Show which services are running, and on which ports. |
-| `ohmatic doctor` | Diagnose Node, Python, Docker, and ports, and report whether the stack can run. |
-
-The bash launcher (`ohmatic`) targets Linux and macOS; `ohmatic.cmd` / `ohmatic.ps1` target Windows.
-Use the launcher native to the operating system for reliable process management. Run state — process
-IDs, logs, and the selected ports — is written to `.ohmatic-run/`.
-
-## What Ohmatic Is
-
-Ohmatic is an agentic electronics workbench. It takes a prompt such as:
-
-```text
-555 timer astable oscillator, 1 Hz LED blink, 5 V supply
+```bash
+python -m inference.cli "5V to 3.3V LDO with reverse-polarity protection" \
+  --t5-model VittoriaLanzo/ohmatic-t5-normalizer \
+  --qwen-model VittoriaLanzo/Ohmatic-Qwen3-8B
 ```
 
-and turns it into structured circuit artifacts:
-
-- an `OhmaticCircuitV01` graph with components, nets, coordinates, and pin references
-- DRC output from schema, geometry, and electrical checks
-- BOM rows ready for supplier enrichment
-- a frontend workspace that renders the result as a schematic, a parts table, a checks panel, and the JSON contract
-
-Natural language is accepted at the input, but the output is typed, validated, and inspectable before
-it is treated as usable.
-
-## Status
-
-| Layer | Status | Notes |
-|-------|--------|-------|
-| Circuit schema v0.1 | Complete | Canonical JSON schema and Rust types under `shared/`. |
-| Service contracts | Complete | `shared/docs/contracts.md` is the source of truth for HTTP surfaces. |
-| Verifier / DRC | Complete (Stage 0) | Rust verifier implementing the three-tier validation model. |
-| Dataset seeds | Complete (Stage 0) | Example circuits exercise schema and DRC behavior. |
-| Frontend workspace | Complete | React/Vite app: gateway adapter, mock mode, schematic graph, BOM, checks, JSON view. |
-| Local launcher | Complete | `ohmatic start` runs the full stack on Windows, Linux, and macOS with dynamic ports. |
-| Gateway orchestration | In progress | The public API shape is fixed; live orchestration plugs into the existing channels. |
-| Inference and enrichment | In progress | Internal services are contract-defined; production model and supplier paths are next. |
-
-The parser model (Qwen3-8B) is still in training. The stubs return deterministic, schema-valid
-responses, so the toolchain — frontend, gateway shape, verifier, and DRC — is usable today.
+Model weights (bf16 + GGUF Q8_0 / Q4_K_M) live on Hugging Face — private during evaluation.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  prompt["Prompt"]
-  gateway["Gateway"]
-  inference["Inference"]
-  verifier["Verifier"]
-  enricher["Enricher"]
-  ui["Frontend workspace"]
+| Stage | Component | What it does |
+|---|---|---|
+| Normalize | `shared/t5_normalizer.py` + fine-tuned T5 | maps any phrasing onto the model's trained input distribution; a hard faithfulness gate re-attaches any user-given specifics (voltages, parts) the rewrite dropped |
+| Generate | Qwen3-8B fine-tune (`inference/pipeline.py`) | emits a two-stage circuit JSON — `STAGE_1_TOPOLOGY` (components, nets, pins) + `STAGE_2_LAYOUT` (spatial nodes). Trained in two self-improvement rounds: round 1 on a synthetic corpus, round 2 STaR-style on its own ERC-verified generations, each round merge-frozen into the base |
+| Verify | `eval/diagnostics.py` + `eval/rules/` | the ERC engine: connectivity, power integrity, pin legality, schema/structure — one source of truth shared by training, the benchmark, and production |
+| Correct | the pipeline loop | on ERC failure the model receives the findings (`shared/erc_feedback.py`, the exact format it trained on) and repairs its own design, up to 3 rounds |
+| Refuse | the killswitch | retries exhausted → `blocked=True` + a clarification request; the broken candidate stays internal |
+| Serve | `gateway/` + `frontend/` | async job API (`POST /v1/generate` → poll) and the web UI; `ohmatic start` runs it all locally with stubs |
 
-  prompt --> gateway
-  gateway --> inference
-  inference --> verifier
-  verifier --> enricher
-  enricher --> gateway
-  gateway --> ui
-```
+The system prompt the model is served is byte-identical to the one it trained on
+(`shared/prompt_builder.py` — single source of truth).
 
-The browser communicates only with the gateway; it never calls inference, verifier, or enricher
-directly. In local development the Vite dev server proxies `/v1` and `/health` to the gateway, so the
-browser remains same-origin regardless of which port the gateway is running on.
-
-## Frontend
-
-The frontend lives in `frontend/` and opens directly into the generator workspace. It is built with
-Vite, React, and TypeScript. `ohmatic start` runs it as part of the stack; to work on it on its own:
+## Tests
 
 ```bash
-cd frontend
-npm install
-npm run dev    # server mode (expects a gateway on :8080); set VITE_OHMATIC_USE_MOCK=1 for the mock
+pytest tests/ -q
 ```
 
-Current capabilities:
-
-- prompt composer and generation options
-- gateway health check
-- `POST /v1/generate`, polling through the returned `poll_url`, and live pipeline status
-- schematic rendering from `result.circuit`, with ANSI and IEC symbols for every component type
-- DRC warnings from `result.drc_warnings`
-- BOM table from `result.bom`, with a component-derived fallback while enrichment is offline
-- JSON contract view from `result.circuit`
-- a mock adapter for backend-offline UI work
-- reduced-motion support for the animated logo and motion system
-
-Environment variables:
-
-| Variable | Purpose |
-|----------|---------|
-| `VITE_OHMATIC_USE_MOCK=1` | Use the in-browser mock adapter instead of a backend. |
-| `VITE_OHMATIC_API_BASE_URL` | Point the browser client at an absolute gateway URL. |
-| `OHMATIC_GATEWAY_URL` | Point the dev-server proxy at the gateway; set automatically by the launcher for dynamic ports. |
-| `VITE_OHMATIC_API_KEY` | When set, the frontend sends `Authorization: Bearer <token>`. |
-
-## Backend Contract
-
-The public gateway contract:
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/v1/generate` | Submit a natural-language circuit request. |
-| `GET` | `/v1/jobs/{id}/status` | Poll job status and the final result. |
-| `GET` | `/health` | Gateway liveness. |
-
-`POST /v1/generate` returns:
-
-```json
-{
-  "job_id": "01HWABCDE9876543210ABCDE01",
-  "poll_url": "/v1/jobs/01HWABCDE9876543210ABCDE01/status"
-}
-```
-
-A completed job returns:
-
-```json
-{
-  "status": "done",
-  "stage": null,
-  "result": {
-    "circuit": {},
-    "drc_warnings": [],
-    "bom": [],
-    "latency_ms": { "inference": 2708, "drc": 42, "bom": 180 }
-  },
-  "error": null
-}
-```
-
-Full contract: [`shared/docs/contracts.md`](shared/docs/contracts.md).
-
-Each backend stub binds the port given by the `OHMATIC_PORT` environment variable, defaulting to
-`8080` (gateway), `8001` (inference), `8002` (verifier), and `8003` (enricher). The launcher uses
-this to assign free ports; run a stub directly with:
-
-```bash
-OHMATIC_PORT=8080 python gateway/stub/server.py
-```
-
-`ohmatic start -Docker` / `--docker` brings the same services up with `docker compose`.
-
-## Circuit Graph
-
-The schematic renderer expects the gateway to return an `OhmaticCircuitV01` graph:
-
-```json
-{
-  "metadata": {
-    "title": "Blinking LED",
-    "description": "555 timer driving an LED at 1 Hz",
-    "version": "0.1",
-    "tags": ["555", "led", "oscillator"]
-  },
-  "components": [
-    {
-      "id": "R1",
-      "type": "resistor",
-      "value": "330 ohm",
-      "part": "0603",
-      "x": 50,
-      "y": 50,
-      "pins": { "1": "VCC", "2": "LED_A" }
-    }
-  ],
-  "nets": [
-    { "name": "VCC", "pins": ["VCC1.1", "R1.1"] }
-  ]
-}
-```
-
-Graph rules:
-
-- component IDs are stable and unique
-- net pins use `ComponentId.PinName`
-- component coordinates drive schematic placement
-- BOM rows reference component IDs so the parts table aligns with the graph
-
-Schema: [`shared/schema/circuit_v01.json`](shared/schema/circuit_v01.json).
-
-## Development
-
-Frontend:
-
-```bash
-cd frontend
-npm run test     # vitest
-npm run lint     # TypeScript type-check
-npm run build    # type-check and production bundle
-```
-
-Rust verifier and shared crates:
-
-```bash
-cargo test --workspace
-```
-
-Dataset validation:
-
-```bash
-python dataset/validate.py dataset/examples.json
-```
-
-## Repository Layout
-
-```text
-Ohmatic/
-  ohmatic, ohmatic.cmd, ohmatic.ps1   One-command local launcher (POSIX and Windows)
-  frontend/                           Vite + React generator workspace
-  gateway/                            Public API gateway service (stub under gateway/stub)
-  inference/                          Prompt-to-circuit generation service
-  verifier/                           Three-tier DRC verifier
-  enricher/                           BOM and supplier enrichment service
-  shared/
-    schema/circuit_v01.json           Canonical circuit schema
-    docs/contracts.md                 Public and internal HTTP contracts
-    ohmatic-types/                    Rust circuit types and validation
-  dataset/                            Seed circuits and validation helpers
-  assets/                             Brand and README media
-  docker-compose.yml                  Local service stack (used by `ohmatic start -Docker`)
-```
-
-## Contributing
-
-Read [`shared/docs/contracts.md`](shared/docs/contracts.md) before changing any service boundary;
-contract drift is the most common way to break the toolchain. When changing the schema or a contract,
-update the Rust types, the JSON schema, the dataset validation path, and the frontend TypeScript
-types together.
-
-Areas that are open for contribution:
-
-- richer seed circuits in `dataset/examples.json`
-- additional component symbols and routing improvements in the schematic renderer
-- gateway orchestration against live inference, verifier, and enricher services
-- schema-aware inspection in the frontend Contract panel
-- supplier enrichment adapters for production BOM data
-
-## Citation
-
-```bibtex
-@software{ohmatic,
-  title   = {Ohmatic: Natural-Language Circuit Schematic Generator},
-  author  = {Lanzo, Vittoria},
-  year    = {2026},
-  url     = {https://github.com/VittoriaLanzo/Ohmatic}
-}
-```
-
-## License
-
-Functional Source License 1.1 (FSL-1.1), converting to Apache 2.0 on 2036-06-02. You may use, modify,
-and redistribute the software and sell its outputs (schematics, designs, and other generated
-artifacts); a competing-use restriction applies until the change date. See [`LICENSE`](LICENSE) for
-the full terms.
+ERC behavior is pinned by a 182-circuit golden regression (`tests/test_erc_golden.py`); the fixture
+derives from private held-out data and is built locally — the test skips without it.
