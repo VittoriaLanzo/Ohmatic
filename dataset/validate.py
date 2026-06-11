@@ -90,19 +90,6 @@ def load_schema_component_types(path: Path) -> Set[str]:
     return set(component_type["enum"])
 
 
-def check_registry_schema_drift(registry_path: Path, schema_path: Path) -> List[str]:
-    """Return registry/schema component type mismatches."""
-    registry = load_registry_component_types(registry_path)
-    schema = load_schema_component_types(schema_path)
-    errors: List[str] = []
-    missing_from_schema = sorted(registry - schema)
-    missing_from_registry = sorted(schema - registry)
-    if missing_from_schema:
-        errors.append(f"registry types missing from schema enum: {missing_from_schema}")
-    if missing_from_registry:
-        errors.append(f"schema enum types missing from registry: {missing_from_registry}")
-    return errors
-
 
 def check_registry_parts_metadata(path: Path) -> List[str]:
     """Check local parts_list metadata exists and contains no supplier-style fields."""

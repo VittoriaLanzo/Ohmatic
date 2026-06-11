@@ -44,8 +44,6 @@ from typing import Any, Callable, Protocol
 
 # ── ERC checker ───────────────────────────────────────────────────────────────
 _ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
 
 try:
     # Use analyze_schematic — the SAME validity standard as training/the held-out benchmark

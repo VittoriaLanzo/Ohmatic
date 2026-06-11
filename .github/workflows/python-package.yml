@@ -21,4 +21,4 @@ jobs:
           pip install -r requirements.txt
       - name: Run syntax checks
         run: |
-          python -m py_compile dataset/validate.py dataset/generate.py training/prepare_dataset.py inference/model.py inference/cli.py ui/renderer.py ui/app.py
+          python -m py_compile dataset/validate.py dataset/generate.py training/prepare_dataset.py inference/cli.py inference/pipeline.py
