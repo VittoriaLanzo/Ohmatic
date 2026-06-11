@@ -44,6 +44,25 @@ def _load_items(repo: str, token: str | None, n: int) -> list:
     return rows
 
 
+def _init_wandb(args):
+    """Start a wandb run for live pass@k graphs; return the module or None.
+
+    A wandb failure must NEVER take down the eval, so init is best-effort and the
+    caller treats None as 'telemetry disabled'."""
+    try:
+        import wandb
+        wandb.init(project="ohmatic-qwen3", entity="vittoria3103-123-no-company",
+                   name=f"prodeval-{(args.revision or 'main')}-n{args.n}-s{args.max_shots}",
+                   config={"adapter": args.adapter, "revision": args.revision or "main",
+                           "base": args.base, "n": args.n, "max_shots": args.max_shots,
+                           "eval": "prod_loop"})
+        print("[wandb] logging live to ohmatic-qwen3", flush=True)
+        return wandb
+    except Exception as e:
+        print(f"[wandb] disabled ({e})", flush=True)
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--adapter", required=True, help="HF repo id or local dir of the LoRA adapter")
@@ -75,20 +94,9 @@ def main():
     )
     pipeline = OhmaticPipeline.from_config(cfg)
 
-    # wandb — LIVE pass@k graphs (overall + per partition), logged per prompt. Robust: a wandb
-    # failure must never take down the eval. Same project/entity as the training runs.
-    _wb = False
-    try:
-        import wandb
-        wandb.init(project="ohmatic-qwen3", entity="vittoria3103-123-no-company",
-                   name=f"prodeval-{(args.revision or 'main')}-n{args.n}-s{args.max_shots}",
-                   config={"adapter": args.adapter, "revision": args.revision or "main",
-                           "base": args.base, "n": args.n, "max_shots": args.max_shots,
-                           "eval": "prod_loop"})
-        _wb = True
-        print("[wandb] logging live to ohmatic-qwen3", flush=True)
-    except Exception as e:
-        print(f"[wandb] disabled ({e})", flush=True)
+    # wandb — LIVE pass@k graphs (overall + per partition), logged per prompt. Same
+    # project/entity as the training runs; None means telemetry is disabled.
+    wandb = _init_wandb(args)
 
     max_shots = args.max_shots
     by_part = defaultdict(lambda: {"total": 0, **{f"pass@{k}": 0 for k in range(1, max_shots + 1)}})
@@ -152,7 +160,7 @@ def main():
         return summary
 
     def _wandb_log(done):
-        if not _wb:
+        if wandb is None:
             return
         try:
             s = _build_summary(done)
@@ -210,7 +218,7 @@ def main():
     print("\n=== PRODUCTION EVAL (eval == prod pipeline) ===")
     print(json.dumps(summary, indent=2))
     print(f"\nwrote {outp}")
-    if _wb:
+    if wandb is not None:
         try:
             for kk, vv in summary["overall"].items():
                 if vv is not None:
