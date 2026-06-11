@@ -36,9 +36,14 @@ full product pipeline. Verified by the same ERC engine that gates production.
     <th>blocked by killswitch</th><th><b>broken circuits delivered</b></th><th>latency</th>
   </tr>
   <tr>
-    <td><b>Ohmatic bf16</b> (full pipeline)</td><td>75</td>
+    <td><b>Ohmatic bf16</b> (full pipeline, 8B)</td><td>75</td>
     <td><b>93.3%</b></td><td>85.3 – 97.1%</td><td>6.7%</td>
     <td><b>0 — none</b></td><td>122 s</td>
+  </tr>
+  <tr>
+    <td>Claude Fable 5 (frontier, single-shot)</td><td>75</td>
+    <td>76.0%</td><td>65.2 – 84.2%</td><td>— (no killswitch)</td>
+    <td><b>18 (24%)</b></td><td>~40 s</td>
   </tr>
   <tr>
     <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>34</td>
@@ -47,10 +52,15 @@ full product pipeline. Verified by the same ERC engine that gates production.
   </tr>
 </table>
 
-<sub>Wilson 95% intervals. <b>Key finding:</b> quantization degrades the generator — the killswitch
-fires 4× more often — but in 109 requests <b>not one</b> ERC-failing circuit reached the user, in
-either configuration. Quality loss converts to reduced availability, never to bad output.
-Frontier-model comparison legs (hosted APIs, identical prompts + verifier) are in progress.</sub>
+<sub>Wilson 95% intervals; identical prompts, identical verifier for every row. <b>The 8B
+fine-tune beats the frontier model it was benchmarked against</b> — paired McNemar on the same 75
+prompts: Ohmatic-only-clean 17 vs Fable-only-clean 4, exact p = 0.007 — <b>while delivering zero
+broken circuits</b>; the frontier model, with no verification loop, handed the user 18.
+Quantization degrades the generator (killswitch fires 4× more) but still ships nothing broken:
+quality loss converts to reduced availability, never to bad output. Fable 5 was evaluated
+zero-context (fresh instance per prompt, no repo or conversation access, default decoding,
+single-shot — the ERC feedback loop is proprietary and end users of a chat model wouldn't have it).
+OpenAI-model leg pending.</sub>
 
 ### Reproduce
 
