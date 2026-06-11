@@ -2,7 +2,7 @@ module.exports = {
   apps: [{
     name: "ohmatic-frontend",
     script: "node_modules/vite/bin/vite.js",
-    cwd: "C:/Users/Vittoria/Desktop/Ohmatic/frontend",
+    cwd: __dirname,
     args: "--port 5173",
     watch: false,
     autorestart: true,
