@@ -193,6 +193,7 @@ class _Context:
 
         # net identity → frozenset of component types (lazily populated)
         self._net_types: dict[int, frozenset[str]] = {}
+        self._net_comps: dict[int, set[str]] = {}
 
     # ── Fast accessors ────────────────────────────────────────────────────────
 
@@ -209,12 +210,16 @@ class _Context:
         return bool(self._types_on_net(net) & type_set)
 
     def comps_on_net(self, net: dict[str, Any]) -> set[str]:
-        """Return the set of component IDs (not pin IDs) whose pins are on *net*."""
-        return {
-            pin.split(".", 1)[0]
-            for pin in net.get("pins", [])
-            if isinstance(pin, str) and "." in pin
-        }
+        """Component IDs (not pin IDs) on *net*. Memoized by id(net) — called
+        32x across rules; same pattern as _net_types."""
+        key = id(net)
+        if key not in self._net_comps:
+            self._net_comps[key] = {
+                pin.split(".", 1)[0]
+                for pin in net.get("pins", [])
+                if isinstance(pin, str) and "." in pin
+            }
+        return self._net_comps[key]
 
     def component_type(self, component_id: str) -> str:
         return str(self.by_id.get(component_id, {}).get("type", ""))

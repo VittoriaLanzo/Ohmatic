@@ -243,15 +243,17 @@ def _validator_diagnostics(circuit: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dict[str, Any]:
+    # Path roots computed ONCE (this ternary was copy-pasted across the function).
+    comp_root = "$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components"
+    net_root = "$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets"
     # ── Already-handled: unknown component type ──────────────────────────────
     unknown_type = re.match(r"component '([^']+)' invalid type: (.+)", error)
     if unknown_type:
         component_id, component_type = unknown_type.groups()
         index = _component_index(circuit, component_id)
-        _comp_root = "$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components"
         return _base_item(
             code="REGISTRY_UNKNOWN_COMPONENT_TYPE",
-            path=f"{_comp_root}[{index}].type" if index >= 0 else f"{_comp_root}[*].type",
+            path=f"{comp_root}[{index}].type" if index >= 0 else f"{comp_root}[*].type",
             message=error,
             why_it_matters="Unknown component types cannot be constrained by the registry, component cards, grammar, or verifier.",
             expected=sorted(validate.load_registry_component_types(REGISTRY_PATH)),
@@ -268,10 +270,9 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         net_name, pin_name, component_id = unknown_pin.groups()
         net_index, pin_index, pin_ref = _net_pin_location(circuit, net_name, component_id, pin_name)
         component_type = _component_type(circuit, component_id)
-        _net_root = "$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets"
         return _base_item(
             code="PIN_UNKNOWN_FOR_COMPONENT",
-            path=f"{_net_root}[{net_index}].pins[{pin_index}]" if net_index >= 0 and pin_index >= 0 else f"{_net_root}[*].pins[*]",
+            path=f"{net_root}[{net_index}].pins[{pin_index}]" if net_index >= 0 and pin_index >= 0 else f"{net_root}[*].pins[*]",
             message=error,
             why_it_matters="A net pin reference must match a declared component pin exactly or the circuit cannot be mapped to a schematic.",
             expected=sorted(_component_pins(circuit, component_id)),
@@ -292,7 +293,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id = component_id.strip()
         return _base_item(
             code="NET_UNKNOWN_COMPONENT_REF",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="Every pin reference in a net must resolve to a declared component; an unresolved reference makes the netlist unroutable.",
             expected="a component id declared in STAGE_1_TOPOLOGY.components",
@@ -350,7 +351,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
     if error == "Missing required power_vcc component":
         return _base_item(
             code="MISSING_POWER_VCC",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="Every circuit must have a power_vcc component to anchor the positive supply rail; without it ERC cannot verify IC power or voltage rails.",
             expected="at least one component with type 'power_vcc'",
@@ -368,7 +369,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
     if error == "Missing required power_gnd component":
         return _base_item(
             code="MISSING_POWER_GND",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="Every circuit must have a power_gnd component to anchor the ground reference; without it ERC cannot verify return paths.",
             expected="at least one component with type 'power_gnd'",
@@ -438,7 +439,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id = bad_id_pattern.group(1)
         return _base_item(
             code="COMPONENT_ID_PATTERN_VIOLATION",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="Component ids must follow ^[A-Z][A-Za-z0-9_]*$ so net pin refs (e.g. R1.1) parse unambiguously.",
             expected="^[A-Z][A-Za-z0-9_]*$ (start uppercase, then alphanumeric or underscore)",
@@ -458,7 +459,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id = dup_comp_id.group(1).strip()
         return _base_item(
             code="DUPLICATE_COMPONENT_ID",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="Duplicate component ids make net pin references ambiguous and cause netlist validation to fail.",
             expected="unique ids across all components",
@@ -509,7 +510,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         hint = field_hints.get(field_name, f"Add the required '{field_name}' field to component '{component_id}'.")
         return _base_item(
             code="COMPONENT_MISSING_FIELD",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters=f"The '{field_name}' field is required on every component for schema compliance and netlist routing.",
             expected=f"'{field_name}' field present",
@@ -525,7 +526,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id, fields_str = comp_unexpected_fields.groups()
         return _base_item(
             code="COMPONENT_UNEXPECTED_FIELDS",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="Extra fields on components are rejected by the strict schema validator and may carry forbidden supplier/BOM data.",
             expected="only: id, type, value, part, pins (plus x, y in flat format)",
@@ -561,7 +562,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id = comp_pins_dict.group(1)
         return _base_item(
             code="COMPONENT_PINS_NOT_DICT",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="Pins must be a JSON object mapping pin names to net names so nets can reference them.",
             expected="a JSON object like {\"1\": \"VCC\", \"2\": \"GND\"}",
@@ -576,7 +577,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id = comp_pins_empty.group(1)
         return _base_item(
             code="COMPONENT_PINS_EMPTY",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="A component with no pins cannot be connected to any net and is unreachable by the netlist.",
             expected="at least one pin in the pins dict",
@@ -596,7 +597,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id, pin_name = pin_ref.split(".", 1)
         return _base_item(
             code="UNCONNECTED_PIN",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="Every declared component pin must appear in exactly one net; unconnected pins indicate an incomplete netlist.",
             expected=f"pin '{pin_ref}' referenced in at least one net",
@@ -617,7 +618,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         component_id, pin_name = pin_ref.split(".", 1)
         return _base_item(
             code="PIN_SHORT_ACROSS_NETS",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="A pin appearing in two nets creates an electrical short that would destroy components in a real circuit.",
             expected=f"pin '{pin_ref}' referenced in exactly one net",
@@ -637,7 +638,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         net_name = net_missing_pins.group(1)
         return _base_item(
             code="NET_MISSING_PINS",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="A net without a 'pins' list cannot describe any connections; the netlist is incomplete.",
             expected="a 'pins' list with at least 2 pin refs",
@@ -652,7 +653,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         net_name, count = net_too_few_pins.groups()
         return _base_item(
             code="NET_TOO_FEW_PINS",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="A net with fewer than 2 pins connects nothing; every net must join at least 2 component pins.",
             expected="at least 2 pin refs in the net",
@@ -670,7 +671,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         net_name = net_dup_name.group(1).strip()
         return _base_item(
             code="DUPLICATE_NET_NAME",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="Duplicate net names are ambiguous and make the netlist unroutable.",
             expected="unique net names",
@@ -690,7 +691,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         bad_ref = bad_ref.strip()
         return _base_item(
             code="NET_INVALID_PIN_REF",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="Pin refs must match ^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_+\\-]+$ so they can be split into component_id.pin_name.",
             expected="format ComponentId.pin (e.g. 'R1.1', 'U1.VCC')",
@@ -710,7 +711,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         pin_ref = pin_ref.strip()
         return _base_item(
             code="NET_DUPLICATE_PIN_REF",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="A pin appearing twice in the same net is redundant and may indicate a copy-paste error.",
             expected=f"each pin ref appears at most once in net '{net_name}'",
@@ -766,7 +767,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
     if error == "'components' must be a non-empty list":
         return _base_item(
             code="COMPONENTS_EMPTY_OR_MISSING",
-            path="$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components",
+            path=comp_root,
             message=error,
             why_it_matters="A circuit with no components is meaningless; at minimum power_vcc, power_gnd, and one load component are required.",
             expected="a non-empty list of component objects",
@@ -781,7 +782,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
     if error == "'nets' must be a non-empty list":
         return _base_item(
             code="NETS_EMPTY_OR_MISSING",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="A circuit with no nets has no connections; at minimum VCC and GND nets are required.",
             expected="a non-empty list of net objects",
@@ -799,7 +800,7 @@ def _diagnostic_from_validator_error(error: str, circuit: dict[str, Any]) -> dic
         net_name, fields_str = net_unexpected.groups()
         return _base_item(
             code="NET_UNEXPECTED_FIELDS",
-            path="$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets",
+            path=net_root,
             message=error,
             why_it_matters="Extra fields on nets are rejected by the strict schema validator.",
             expected="only: name, pins",
