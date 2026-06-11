@@ -1803,3 +1803,214 @@ th {
 .hw-webgpu-active { color: #3fb950; }
 .hw-webgpu-checking { opacity: 0.6; }
 .hw-webgpu-unavailable { color: #d29922; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COPPER CARTRIDGE — the board bolted to your screen
+   Soldermask + copper + ENIG gold, presented like retro game hardware.
+   Pixel display font: Silkscreen (yes, really). Body mono: Fragment Mono.
+   This section overrides the legacy theme wholesale; class structure intact.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  font-family: "Fragment Mono", ui-monospace, monospace;
+  --board: #0e231d;              /* deep matte soldermask */
+  --board-dark: #081712;
+  --mask-edge: #14302a;
+  --copper: #c47a3d;
+  --copper-bright: #f59e4d;
+  --copper-dim: rgba(196, 122, 61, 0.34);
+  --gold: #ffd072;               /* ENIG pads */
+  --silk: #e9f2e7;               /* silkscreen white */
+  --silk-dim: #9db3a4;
+  --phosphor: #51e88a;           /* the test screen only */
+  --led-red: #ff5c49;
+  --led-amber: #ffb145;
+  --ink: var(--silk);
+  --paper: var(--board);
+  --paper-strong: var(--board-dark);
+  --muted: var(--silk-dim);
+  --line: rgba(196, 122, 61, 0.28);
+  --line-strong: rgba(196, 122, 61, 0.5);
+  --green: var(--phosphor);
+  --green-soft: rgba(81, 232, 138, 0.12);
+  --amber: var(--led-amber);
+  --red: var(--led-red);
+  --steel: var(--gold);
+  --font-mono: "Fragment Mono", ui-monospace, monospace;
+  --font-pixel: "Silkscreen", "Fragment Mono", monospace;
+  color: var(--silk);
+  background: var(--board);
+}
+
+/* The board itself: soldermask, copper pours, via field, board-edge vignette */
+html {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(196, 122, 61, 0.10), transparent 38%),
+    radial-gradient(circle at 88% 92%, rgba(196, 122, 61, 0.08), transparent 42%),
+    radial-gradient(circle at 30px 30px, rgba(255, 208, 114, 0.20) 0 2.2px, rgba(196,122,61,.28) 2.2px 3.4px, transparent 3.8px),
+    linear-gradient(90deg, transparent 0 29px, var(--copper-dim) 29px 31px, transparent 31px 160px),
+    linear-gradient(0deg, transparent 0 89px, rgba(196, 122, 61, 0.16) 89px 91px, transparent 91px 160px),
+    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    var(--board);
+  background-size: 100% 100%, 100% 100%, 160px 160px, 160px 160px, 160px 160px, 4px 4px;
+}
+
+/* Corner screws — the board is BOLTED to the viewport */
+body::before, body::after, #root::before, #root::after {
+  content: "";
+  position: fixed;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  z-index: 90;
+  pointer-events: none;
+  background:
+    linear-gradient(45deg, transparent 44%, #6b7280 44% 56%, transparent 56%),
+    linear-gradient(-45deg, transparent 44%, #4b5563 44% 56%, transparent 56%),
+    radial-gradient(circle at 35% 30%, #d1d5db, #6b7280 55%, #374151 90%);
+  box-shadow: 0 0 0 3px #1f2c27, 0 0 0 5px rgba(196, 122, 61, 0.45), 0 2px 6px rgba(0,0,0,.6);
+}
+body::before { top: 14px; left: 14px; }
+body::after  { top: 14px; right: 14px; }
+#root::before { bottom: 14px; left: 14px; top: auto; }
+#root::after  { bottom: 14px; right: 14px; top: auto; }
+
+/* Header = silkscreen legend row */
+.app-header { border-bottom: 2px solid var(--copper-dim); }
+.top-nav a {
+  font-family: var(--font-pixel);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+}
+.top-nav a:hover { color: var(--gold); }
+
+/* Pills: status LEDs */
+.health-pill, .hw-badge {
+  border: 1.5px solid var(--copper-dim);
+  background: var(--board-dark);
+  font-family: var(--font-pixel);
+  font-size: 0.62rem;
+  border-radius: 6px;            /* chips, not pills — components are rectangular */
+}
+.health-pill.is-ok::before {
+  content: "";
+  width: 7px; height: 7px;
+  background: var(--phosphor);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--phosphor);
+  animation: led-blink 2.4s steps(1) infinite;
+}
+@keyframes led-blink { 0%, 92% { opacity: 1; } 93%, 100% { opacity: 0.4; } }
+
+/* Hero: the cartridge label */
+.version-badge {
+  font-family: var(--font-pixel);
+  color: var(--gold);
+  border: 1.5px solid var(--copper-dim);
+  background: var(--board-dark);
+  padding: 0.2rem 0.6rem;
+}
+.eyebrow, .kicker, .console-label, .panel-heading, .command-heading {
+  font-family: var(--font-pixel);
+  letter-spacing: 0.05em;
+  color: var(--copper-bright);
+}
+
+/* Logo: copper traces, gold pads (overrides the SVG presentation attributes) */
+.ohmatic-logo > rect:first-of-type { fill: var(--board-dark); }
+.ohmatic-logo .logo-base path,
+.ohmatic-logo .logo-base line { stroke: var(--copper); }
+.ohmatic-logo .logo-base .logo-node { fill: var(--gold); }
+.ohmatic-logo .logo-base line[stroke-width="0.5"] { stroke: var(--copper-dim); }
+.ohmatic-logo { filter: drop-shadow(0 0 18px rgba(196, 122, 61, 0.25)); }
+
+/* Panels: board modules with silkscreen frames + part numbers */
+.main-panel, .json-panel, .schematic-frame {
+  background: linear-gradient(160deg, rgba(255,255,255,0.02), transparent 40%), var(--board-dark);
+  border: 2px solid var(--mask-edge);
+  outline: 1px solid var(--copper-dim);
+  outline-offset: -6px;
+  border-radius: 4px;
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.5);
+}
+
+/* The DISPLAY MODULE: the schematic is an e-paper panel mounted on the board
+   (cream e-ink, its native palette) inside a hardware bezel with gold contacts */
+.schematic-viewport {
+  border: 3px solid #23201c;
+  outline: 2px solid var(--copper-dim);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.18),
+    0 10px 34px rgba(0, 0, 0, 0.45);
+  position: relative;
+}
+.schematic-viewport::after {           /* gold contact finger strip, top edge */
+  content: "";
+  position: absolute;
+  top: -3px; left: 14%; right: 14%;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, var(--gold) 0 10px, #23201c 10px 16px);
+  border-radius: 0 0 2px 2px;
+  opacity: 0.8;
+}
+.schematic-diagnostic-marker * { stroke: var(--led-red); fill: var(--led-red); }
+
+/* Buttons: arcade pad + gold contact finger */
+.primary-button {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: linear-gradient(180deg, var(--copper-bright), var(--copper) 60%, #9c5f2e);
+  color: #1c0f04;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 4px 0 #6e4220, 0 6px 14px rgba(0,0,0,.45);
+  transition: transform 80ms, box-shadow 80ms;
+}
+.primary-button:hover:not(:disabled) { filter: brightness(1.08); }
+.primary-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #6e4220, 0 2px 6px rgba(0,0,0,.45);
+}
+.secondary-button, .icon-button {
+  border: 1.5px solid var(--copper-dim);
+  background: var(--board-dark);
+  color: var(--silk);
+  border-radius: 6px;
+}
+.secondary-button:hover, .icon-button:hover { border-color: var(--gold); color: var(--gold); }
+
+/* Stage rail: HUD LED row */
+.stage-icon { color: var(--silk-dim); }
+.stage-bus { stroke: var(--copper-dim); }
+.stage-bus-charge, .stage-bus-packet { stroke: var(--copper-bright); fill: var(--copper-bright); }
+
+/* Killswitch / errors: DNP stamp */
+.error-box {
+  border: 2px solid var(--led-red);
+  background: rgba(255, 92, 73, 0.06);
+  border-radius: 4px;
+  position: relative;
+}
+.error-box::before {
+  content: "DNP — DO NOT POPULATE";
+  display: block;
+  font-family: var(--font-pixel);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--led-red);
+  border: 1.5px solid var(--led-red);
+  width: fit-content;
+  padding: 0.15rem 0.5rem;
+  margin-bottom: 0.5rem;
+  transform: rotate(-1.6deg);
+  opacity: 0.92;
+}
+
+/* JSON panel: keep its scanline, tint phosphor */
+.json-panel, .json-scanline { color: var(--phosphor); }
+
+.muted { color: var(--silk-dim); }
+.latency-strip, .metadata-grid { font-family: var(--font-mono); }
