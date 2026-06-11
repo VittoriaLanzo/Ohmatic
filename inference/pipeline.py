@@ -107,10 +107,6 @@ class PipelineConfig:
     vllm_max_model_len: int = 8192         # context window; must cover system prompt + prompt + max_new_tokens
     vllm_gpu_mem_util: float = 0.90        # fraction of GPU VRAM for KV cache
 
-    # System prompt paths
-    schema_path: Path = _ROOT / "schema.md"
-    registry_path: Path = _ROOT / "verifier" / "config" / "component_registry.toml"
-    erc_rules_path: Path = _ROOT / "dataset" / "generated" / "erc_rules_reference.jsonl"
 
 
 # ── Results ───────────────────────────────────────────────────────────────────
@@ -221,39 +217,6 @@ def _parse_circuit(text: str) -> tuple[dict | None, str]:
 
     return None, f"Model output is not valid JSON: {text[:200]!r}"
 
-
-# ── Default resource loader ───────────────────────────────────────────────────
-
-def _load_system_resources(cfg: PipelineConfig) -> tuple[str, dict | None, list[dict] | None]:
-    """Load schema, registry, and ERC rules. Returns (schema_text, registry, rules)."""
-    schema_text = ""
-    if cfg.schema_path.exists():
-        schema_text = cfg.schema_path.read_text(encoding="utf-8")
-
-    registry = None
-    if cfg.registry_path.exists():
-        try:
-            try:
-                import tomllib
-            except ImportError:
-                import tomli as tomllib  # type: ignore[no-redef]
-            registry = tomllib.loads(cfg.registry_path.read_text(encoding="utf-8"))
-            registry.pop("defaults", None)
-        except Exception:
-            registry = None
-
-    erc_rules = None
-    if cfg.erc_rules_path.exists():
-        try:
-            erc_rules = [
-                json.loads(line)
-                for line in cfg.erc_rules_path.read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
-        except Exception:
-            erc_rules = None
-
-    return schema_text, registry, erc_rules
 
 
 # ── Mock adapters (for testing without loaded models) ─────────────────────────
