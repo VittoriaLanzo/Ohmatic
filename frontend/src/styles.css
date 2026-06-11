@@ -1987,26 +1987,13 @@ body::after  { top: 14px; right: 14px; }
 .stage-bus { stroke: var(--copper-dim); }
 .stage-bus-charge, .stage-bus-packet { stroke: var(--copper-bright); fill: var(--copper-bright); }
 
-/* Killswitch / errors: DNP stamp */
+/* Killswitch ask: a collaborative re-prompt, NOT a rejection. Calm amber,
+   reads as "help me get this right" — matches the pipeline's user_message. */
 .error-box {
-  border: 2px solid var(--led-red);
-  background: rgba(255, 92, 73, 0.06);
+  border: 1.5px solid var(--led-amber);
+  background: rgba(255, 177, 69, 0.05);
+  border-left: 4px solid var(--led-amber);
   border-radius: 4px;
-  position: relative;
-}
-.error-box::before {
-  content: "DNP — DO NOT POPULATE";
-  display: block;
-  font-family: var(--font-pixel);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  color: var(--led-red);
-  border: 1.5px solid var(--led-red);
-  width: fit-content;
-  padding: 0.15rem 0.5rem;
-  margin-bottom: 0.5rem;
-  transform: rotate(-1.6deg);
-  opacity: 0.92;
 }
 
 /* JSON panel: keep its scanline, tint phosphor */
