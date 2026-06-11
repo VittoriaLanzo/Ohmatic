@@ -205,8 +205,8 @@ def main():
     if _traces_fh is not None:
         try:
             _traces_fh.close()
-        except Exception:
-            pass
+        except OSError:
+            pass  # best-effort flush/close of the trace file; eval summary already computed
     print("\n=== PRODUCTION EVAL (eval == prod pipeline) ===")
     print(json.dumps(summary, indent=2))
     print(f"\nwrote {outp}")
@@ -217,7 +217,7 @@ def main():
                     wandb.run.summary[f"final/{kk}"] = vv
             wandb.finish()
         except Exception:
-            pass
+            pass  # wandb finalization is best-effort telemetry; never fail the eval on it
 
 
 if __name__ == "__main__":

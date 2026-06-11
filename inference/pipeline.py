@@ -37,6 +37,7 @@ Mock/test mode:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -202,10 +203,9 @@ def _parse_circuit(text: str) -> tuple[dict | None, str]:
         if isinstance(obj, dict):
             return obj, ""
     except json.JSONDecodeError:
-        pass
+        pass  # not clean JSON — fall through to the prose-stripping regex fallback below
 
     # Try to extract JSON block (in case model leaked prose before/after)
-    import re
     match = re.search(r"\{[\s\S]*\}", text)
     if match:
         try:
@@ -213,7 +213,7 @@ def _parse_circuit(text: str) -> tuple[dict | None, str]:
             if isinstance(obj, dict):
                 return obj, ""
         except json.JSONDecodeError:
-            pass
+            pass  # extracted block still isn't valid JSON — report the explicit error below
 
     return None, f"Model output is not valid JSON: {text[:200]!r}"
 

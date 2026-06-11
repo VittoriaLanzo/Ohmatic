@@ -199,7 +199,7 @@ def _eval_loopback(model, tokenizer, cases: list, use_adapter: bool, label: str)
                 _, erc = _score(resp)
                 fixed += int(erc)
             except Exception:
-                pass
+                pass  # a generation/scoring failure counts as "not repaired"; score the rest
     n = len(cases)
     return {"repaired": fixed, "total": n, "rate": (fixed / n) if n else 0.0}
 
