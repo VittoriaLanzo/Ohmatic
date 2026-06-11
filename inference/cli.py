@@ -62,14 +62,19 @@ def generate_circuit_cli(
     print(f"[ohmatic] Attempts: {result.attempts}  OK: {result.ok}", file=sys.stderr)
 
     if not result.ok:
+        # Internal diagnostics -> stderr only (operator visibility, never the user surface).
         if result.erc_errors:
             print("[ohmatic] Final ERC errors (not fixed after retries):", file=sys.stderr)
             for e in result.erc_errors[:5]:
                 print(f"  [{e.get('severity','?')}] {e.get('code','?')}: {e.get('message','')}", file=sys.stderr)
         if result.parse_error:
             print(f"[ohmatic] Parse error: {result.parse_error}", file=sys.stderr)
-        # Still return the best attempt if available
-        return result.circuit
+        # KILLSWITCH: never hand the user an unverified circuit. The user-facing
+        # output is the clarification message, not the broken design.
+        print(result.user_message or
+              "I couldn't produce a verified circuit for this request — please add "
+              "more detail (supply voltage, key components, intended behavior).")
+        return None
 
     return result.circuit
 

@@ -126,6 +126,13 @@ class PipelineResult:
     attempts: int = 0
     erc_errors: list[dict] = field(default_factory=list)
     parse_error: str = ""
+    # ── Killswitch (product safety layer) ──────────────────────────────────────
+    # When the retry loop exhausts without an ERC-clean circuit, the product must
+    # NOT deliver the broken design. blocked=True marks the refusal; user_message
+    # is the only thing a user-facing surface should show. circuit/erc_errors
+    # remain populated for INTERNAL logging/eval only.
+    blocked: bool = False
+    user_message: str = ""
     # Populated only when run(return_trace=True). Each element is one attempt:
     # {"attempt": int, "circuit": dict|None, "raw": str, "diagnostics": list[dict], "passed": bool}
     trace: list[dict] = field(default_factory=list)
@@ -165,6 +172,27 @@ def _build_system_prompt(
     from shared/prompt_builder. Args are ignored (kept for call-site compatibility) —
     the canonical config drives everything."""
     return _shared_system_prompt()
+
+
+def _killswitch_message(erc_errors: list[dict], parse_error: str) -> str:
+    """User-facing refusal when no attempt passed verification.
+
+    Never exposes the broken circuit or the internal rule taxonomy — just an
+    honest 'not delivering unverified work' plus a concrete ask for clarification.
+    """
+    if parse_error and not erc_errors:
+        return (
+            "I wasn't able to produce a well-formed design for this request. "
+            "Could you rephrase it with a bit more detail about what the circuit "
+            "should do (inputs, outputs, supply voltage)?"
+        )
+    return (
+        "I generated several candidate designs, but none passed my electrical "
+        "verification — and I don't deliver circuits I can't verify. Could you "
+        "clarify the requirements? The most helpful details: supply voltage, the "
+        "key components you expect, and what the circuit should do. I'll try again "
+        "with that."
+    )
 
 
 def _parse_circuit(text: str) -> tuple[dict | None, str]:
@@ -544,6 +572,9 @@ class OhmaticPipeline:
                     normalized_prompt=normalized,
                     attempts=attempt,
                     parse_error=f"Generator error: {exc}",
+                    blocked=True,
+                    user_message=("Something went wrong on my side while generating "
+                                  "your circuit. Please try again in a moment."),
                     trace=trace if return_trace else [],
                 )
 
@@ -621,7 +652,9 @@ class OhmaticPipeline:
                 "content": _format_erc_errors(failures),
             })
 
-        # Exhausted retries — return best (last) circuit with error info
+        # Exhausted retries — KILLSWITCH. The product never delivers an unverified
+        # circuit: blocked=True + a clarification ask is the user-facing surface.
+        # circuit/erc_errors stay populated for internal logging and eval ONLY.
         return PipelineResult(
             ok=False,
             circuit=last_circuit,
@@ -630,5 +663,7 @@ class OhmaticPipeline:
             attempts=self.max_retries + 1,
             erc_errors=last_erc_errors,
             parse_error=last_parse_error,
+            blocked=True,
+            user_message=_killswitch_message(last_erc_errors, last_parse_error),
             trace=trace if return_trace else [],
         )
