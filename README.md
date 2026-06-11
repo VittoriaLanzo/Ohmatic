@@ -31,7 +31,7 @@ product refuses and asks for clarification — an unverified circuit is never de
 full product pipeline. Verified by the same ERC engine that gates production.
 
 <p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean with zero broken deliveries vs Claude Fable 5 76.0% with 24% broken circuits delivered" width="900" />
+  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 73.5% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
 </p>
 
 <table>
