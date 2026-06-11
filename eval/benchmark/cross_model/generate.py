@@ -74,11 +74,16 @@ def main() -> None:
     n_err = 0
     with open(out_path, "a", encoding="utf-8") as fh:
         for i, it in enumerate(pending, 1):
-            user = it["user_prompt"]
-            if it["system_extra"]:                # correction suite repair turn
-                user = f"{user}\n\n{it['system_extra']}"
             try:
-                frag = adapter.run(system_prompt, user)
+                if it.get("messages"):            # correction: verbatim trained convo
+                    if not hasattr(adapter, "chat_messages"):
+                        raise SystemExit("correction suite requires a local leg")
+                    frag = adapter.chat_messages(it["messages"])
+                else:
+                    user = it["user_prompt"]
+                    if it["system_extra"]:
+                        user = f"{user}\n\n{it['system_extra']}"
+                    frag = adapter.run(system_prompt, user)
             except Exception as exc:              # transient API error: skip, resume later
                 n_err += 1
                 print(f"  [{i}/{len(pending)}] {it['prompt_id']} ERROR: {exc}", flush=True)

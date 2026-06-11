@@ -74,28 +74,30 @@ def load_realuser() -> list[dict]:
 
 def load_correction(per_category: int = 0) -> list[dict]:
     """Held-out ERC-repair cases (LOCAL legs only — enforced in config).
-    Item = broken circuit + ERC feedback -> the leg must emit a fixed circuit.
-    The full conversation is reconstructed by the pipeline itself; here the
-    user_prompt carries the original request and system_extra the repair turn."""
+
+    Real holdout_loopback_v1 row schema (validated against the live file):
+        signature        stable row id
+        rule             break category (e.g. POWER_IC_MISSING_BYPASS_CAPACITOR)
+        input_messages   the FULL trained conversation (system + broken circuit
+                         + ERC feedback) — passed to the generator VERBATIM
+        reference_fixed  reference repair (not used for scoring; ERC is the judge)
+
+    Correction is a SINGLE-SHOT repair task (mirrors in-training correction_eval):
+    the item carries `messages` and generate.py routes it straight to the
+    generator's chat() — no T5, no retry loop."""
     rows = _hf_jsonl(C.CORRECTION_HOLDOUT)
     if per_category:
         from collections import defaultdict
         by = defaultdict(list)
         for r in rows:
-            by[r.get("break_type", r.get("category", "?"))].append(r)
+            by[r.get("rule", "?")].append(r)
         rows = [r for cat in sorted(by) for r in by[cat][:per_category]]
-    out = []
-    for r in rows:
-        rid = r.get("id") or _sha1(json.dumps(r, sort_keys=True))
-        # Tolerant field mapping (holdout_loopback rows carry the full convo)
-        msgs = r.get("messages") or []
-        user_turns = [m["content"] for m in msgs if m.get("role") == "user"]
-        out.append({"prompt_id": rid,
-                    "suite": "correction",
-                    "user_prompt": user_turns[0] if user_turns else r.get("prompt", ""),
-                    "category": r.get("break_type", r.get("category", "?")),
-                    "system_extra": user_turns[1] if len(user_turns) > 1 else ""})
-    return out
+    return [{"prompt_id": r["signature"][:16],
+             "suite": "correction",
+             "user_prompt": "",
+             "category": r.get("rule", "?"),
+             "system_extra": "",
+             "messages": r["input_messages"]} for r in rows]
 
 
 def load_suite(suite: str, n: int = 0) -> list[dict]:

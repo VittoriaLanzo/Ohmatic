@@ -146,6 +146,17 @@ class OhmaticAdapter:
             normalizer, generator, _build_system_prompt(),
             max_retries=C.PIPELINE_MAX_RETRIES)
 
+    def chat_messages(self, messages: list[dict]) -> dict:
+        """Correction suite: single-shot repair on the VERBATIM trained
+        conversation (system + broken circuit + ERC feedback). No T5, no retry
+        loop — mirrors in-training correction_eval. Output verified like any
+        raw generation in stage 2."""
+        t0 = time.time()
+        text = self.pipeline.generator.chat(messages)
+        return {"raw_output": text,
+                "latency_s": round(time.time() - t0, 3),
+                "tokens_in": 0, "tokens_out": 0}
+
     def run(self, system_prompt: str, user_prompt: str) -> dict:
         # system_prompt arg ignored on purpose: the pipeline builds its own from
         # the SAME shared single source — byte-identical to what hosted legs get.
