@@ -143,6 +143,15 @@ def build_jameco_preflight_response(*, config: AvantLinkConfig | None = None) ->
 # Verified 2026-06-12: newark/lcsc search URLs fetch HTTP 200 with result pages;
 # digikey 403s PROGRAMMATIC fetches (Akamai bot wall) but opens fine in a real
 # browser - which is the only way these links are ever used (link-OUT).
+#
+# PRICE DISPLAY (phase 2) - ToS rule: NEVER scrape storefront HTML for prices.
+# Prices come ONLY from the official APIs (free tiers, self-serve signup):
+#   DigiKey Product Information V4 (developer.digikey.com, 1k searches/day)
+#     -> env DIGIKEY_CLIENT_ID / DIGIKEY_CLIENT_SECRET
+#   element14 Partner API (partner.element14.com, real-time price+stock)
+#     -> env ELEMENT14_API_KEY
+# API ToS also restrict CACHING: fetch prices live (or cache minutes, not days)
+# and attribute the source. This module stays scrape-free by design.
 LINKOUT_SUPPLIERS: dict[str, dict[str, str]] = {
     "digikey": {
         "search": "https://www.digikey.com/en/products?keywords={query}",
