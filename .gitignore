@@ -61,3 +61,4 @@ eval/benchmark/*.jsonl
 eval/benchmark/*.txt
 eval/benchmark/holdout_manifest.json
 eval/benchmark/reports/
+tests/fixtures/erc_golden.jsonl
