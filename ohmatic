@@ -166,6 +166,8 @@ cmd_start() {
     --docker) backend="docker" ;;
   esac; done
   step "Ohmatic starting"
+  # anaconda MKL and pip torch both ship libiomp; without this the worker dies (OMP #15)
+  export KMP_DUPLICATE_LIB_OK=TRUE
   hw_assess
   ok "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY}) -> $RUN_DIR/doctor.json"
   offer_deps_install
