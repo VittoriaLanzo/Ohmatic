@@ -10,36 +10,18 @@ type Doctor = {
   reason: string;
 };
 
-type WebGpuState = "checking" | "active" | "unavailable";
-
 const TIER_LABEL: Record<string, string> = {
   bf16: "bf16 (full, GPU)",
   q8_0: "Q8_0 GGUF (GPU)",
   q4_k_m: "Q4_K_M GGUF (GPU)",
   q4_k_m_cpu: "Q4_K_M GGUF (CPU)",
-  stub: "stub / cloud"
+  stub: "none installable"
 };
 
-/** Auto-runs on load: verifies WebGPU is actually activatable (adapter request,
- *  not just `navigator.gpu` presence) and fetches the `ohmatic doctor` hardware
- *  verdict so the user sees which model this machine will load. */
+/** Doctor verdict: installed model, RAM/GPU, honest no-model flag.
+ *  The browser only visualizes; all compute is the local gateway. */
 export function HardwareBadge() {
-  const [webgpu, setWebgpu] = useState<WebGpuState>("checking");
   const [doctor, setDoctor] = useState<Doctor | null>(null);
-
-  useEffect(() => {
-    const nav = navigator as Navigator & {
-      gpu?: { requestAdapter(): Promise<unknown | null> };
-    };
-    if (!nav.gpu) {
-      setWebgpu("unavailable");
-      return;
-    }
-    nav.gpu
-      .requestAdapter()
-      .then((adapter) => setWebgpu(adapter ? "active" : "unavailable"))
-      .catch(() => setWebgpu("unavailable"));
-  }, []);
 
   useEffect(() => {
     fetch("/v1/doctor")
@@ -58,9 +40,6 @@ export function HardwareBadge() {
       {doctor?.mode === "stub" && (
         <span className="hw-demo-flag">MODEL NOT INSTALLED - run ./ohmatic fetch</span>
       )}
-      <span className={`hw-webgpu hw-webgpu-${webgpu}`}>
-        WebGPU {webgpu === "active" ? "✓" : webgpu === "checking" ? "…" : "✗"}
-      </span>
       {doctor && (
         <span>
           {doctor.ram_gb ? ` · ${doctor.ram_gb} GB RAM` : ""}

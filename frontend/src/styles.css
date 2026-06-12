@@ -1787,7 +1787,7 @@ th {
   }
 }
 
-/* Hardware/WebGPU badge (auto doctor verdict) */
+/* Hardware badge (doctor verdict) */
 .hw-badge {
   display: inline-flex;
   align-items: center;
@@ -1800,9 +1800,6 @@ th {
   padding: 0.25rem 0.7rem;
   white-space: nowrap;
 }
-.hw-webgpu-active { color: #3fb950; }
-.hw-webgpu-checking { opacity: 0.6; }
-.hw-webgpu-unavailable { color: #d29922; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    COPPER CARTRIDGE - the board bolted to your screen
