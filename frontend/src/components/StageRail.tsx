@@ -59,6 +59,11 @@ export function StageRail({ stage, phase, progress }: StageRailProps) {
           </g>
         ))}
       </svg>
+      {(real !== null || phase === "done") && (
+        <span className="stage-trace-pct" aria-hidden="true">
+          {phase === "done" ? "100%" : `${(real! * 100).toFixed(1)}%`}
+        </span>
+      )}
       <div className="stage-trace-labels" aria-hidden="true">
         {STATIONS.map((s, i) => (
           <span key={s.id} className={i <= index && phase !== "idle" ? "is-lit" : ""} style={{ left: `${s.x / 10}%` }}>

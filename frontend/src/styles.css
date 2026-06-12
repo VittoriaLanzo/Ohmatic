@@ -2308,3 +2308,17 @@ body::after  { top: 14px; right: 14px; }
   padding-right: 0.5rem;
   margin-right: 0.2rem;
 }
+
+/* live percent readout beside the trace */
+.stage-trace { position: relative; }
+.stage-trace-pct {
+  position: absolute;
+  top: -1.5rem;
+  right: 0;
+  font-family: var(--font-pixel);
+  font-size: 0.95rem;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 8px rgba(255, 208, 114, 0.4);
+}
+.stage-trace.is-done .stage-trace-pct { color: var(--phosphor); }
