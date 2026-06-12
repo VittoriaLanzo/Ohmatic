@@ -30,6 +30,7 @@ _MANIFEST = Path(_ROOT) / "models" / "active.json"
 JOBS: dict = {}
 _PIPELINE = None
 _PIPELINE_LOCK = threading.Lock()
+_JOB_LOCK = threading.Lock()  # llama-cpp is not thread-safe: one generation at a time
 
 
 def _real_available() -> bool:
@@ -102,23 +103,26 @@ def _flatten(circuit: dict) -> dict:
 def _run_real_job(job_id: str, prompt: str) -> None:
     t0 = time.time()
     try:
-        JOBS[job_id]["stage"] = "t5"
-        pipe = _get_pipeline()
-        def _stage(stage, attempt, _j=job_id):
-            JOBS[_j]["stage"] = stage
-            JOBS[_j]["loops"] = max(JOBS[_j].get("loops", 0), attempt - 1)
-        pipe.on_stage = _stage
-        gen = getattr(pipe, "generator", None)
-        if gen is not None and hasattr(gen, "progress_cb"):
-            def _cb(frac, _j=job_id):  # monotonic: retries never move the bar backward
-                j = JOBS[_j]
-                j.setdefault("decode_t0", time.time())
-                j["progress"] = max(j.get("progress", 0.0), frac)
-                p = j["progress"]
-                if p > 0.02:  # same-speed extrapolation: remaining = elapsed*(1-p)/p
-                    j["eta_s"] = int((time.time() - j["decode_t0"]) * (1 - p) / p)
-            gen.progress_cb = _cb
-        result = pipe.run(prompt)
+        # stage stays "queued" while another generation holds the model
+        with _JOB_LOCK:
+            JOBS[job_id]["t0"] = time.time()  # ETA clock starts when WE start
+            JOBS[job_id]["stage"] = "t5"
+            pipe = _get_pipeline()
+            def _stage(stage, attempt, _j=job_id):
+                JOBS[_j]["stage"] = stage
+                JOBS[_j]["loops"] = max(JOBS[_j].get("loops", 0), attempt - 1)
+            pipe.on_stage = _stage
+            gen = getattr(pipe, "generator", None)
+            if gen is not None and hasattr(gen, "progress_cb"):
+                def _cb(frac, _j=job_id):  # monotonic: retries never move the bar backward
+                    j = JOBS[_j]
+                    j.setdefault("decode_t0", time.time())
+                    j["progress"] = max(j.get("progress", 0.0), frac)
+                    p = j["progress"]
+                    if p > 0.02:  # same-speed extrapolation: remaining = elapsed*(1-p)/p
+                        j["eta_s"] = int((time.time() - j["decode_t0"]) * (1 - p) / p)
+                gen.progress_cb = _cb
+            result = pipe.run(prompt)
         if result.ok:
             JOBS[job_id].update(status="done", stage=None, result={
                 "circuit": _flatten(result.circuit),
