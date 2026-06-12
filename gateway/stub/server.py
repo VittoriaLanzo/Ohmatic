@@ -196,9 +196,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(202, {"job_id": job_id,
                                      "poll_url": f"/v1/jobs/{job_id}/status"})
             else:
-                self.send_json(202, {
-                    "job_id": "stub-job-01",
-                    "poll_url": "/v1/jobs/stub-job-01/status"
+                self.send_json(503, {
+                    "error": "model_not_installed",
+                    "message": "No model installed. Run ./ohmatic fetch (or ./ohmatic start and accept the pull)."
                 })
         else:
             self.send_json(404, {"error": "not_found"})
@@ -213,20 +213,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"status": j["status"], "stage": j["stage"],
                                      "result": j["result"], "error": j["error"]})
                 return
-            if job_id != "stub-job-01":
-                self.send_json(404, {"error": "job_not_found"})
-                return
-            self.send_json(200, {
-                "status": "done",
-                "stage": None,
-                "result": {
-                    "circuit": HARDCODED_CIRCUIT,
-                    "drc_warnings": [],
-                    "bom": [],
-                    "latency_ms": {"inference": 0, "drc": 0, "bom": 0}
-                },
-                "error": None
-            })
+            self.send_json(404, {"error": "job_not_found"})
         elif path == "/v1/system-prompt":
             if not VERIFY_AVAILABLE:
                 self.send_json(503, {"error": "prompt_unavailable"})

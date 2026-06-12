@@ -55,7 +55,7 @@ export function HardwareBadge() {
   return (
     <div className="hw-badge" title={doctor?.reason ?? "hardware check"}>
       {doctor?.mode === "stub" && (
-        <span className="hw-demo-flag">DEMO CIRCUITS - install the model: ./ohmatic fetch</span>
+        <span className="hw-demo-flag">MODEL NOT INSTALLED - run ./ohmatic fetch</span>
       )}
       <span className={`hw-webgpu hw-webgpu-${webgpu}`}>
         WebGPU {webgpu === "active" ? "✓" : webgpu === "checking" ? "…" : "✗"}

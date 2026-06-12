@@ -35,8 +35,7 @@ jobs:
           sleep 3
           curl -fsS -o /dev/null "$URL"
           curl -fsS http://127.0.0.1:8080/health
-          JOB=$(curl -fsS -X POST http://127.0.0.1:8080/v1/generate -H "Content-Type: application/json" -d '{"prompt":"led blinker"}')
-          POLL=$(echo "$JOB" | grep -oE '/v1/jobs/[^"]+')
-          curl -fsS "http://127.0.0.1:8080$POLL" | grep -q '"status"'
+          # no weights on runners: generate must answer with the install pointer, never a fake circuit
+          curl -sS -X POST http://127.0.0.1:8080/v1/generate -H "Content-Type: application/json" -d '{"prompt":"led"}' | grep -q model_not_installed
           curl -fsS -X POST http://127.0.0.1:8080/v1/verify -H "Content-Type: application/json" -d '{"circuit":{}}' | grep -q diagnostics
           bash ohmatic stop

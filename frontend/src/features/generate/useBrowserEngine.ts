@@ -46,10 +46,15 @@ export function useBrowserEngine() {
       if (!engineRef.current) {
         const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
         const modelId = localStorage.getItem("ohmatic.webllmModel") ?? DEFAULT_MODEL;
-        engineRef.current = await CreateMLCEngine(modelId, {
-          initProgressCallback: (p: { text: string }) =>
-            setState((s) => ({ ...s, loadProgress: p.text }))
-        });
+        engineRef.current = await CreateMLCEngine(
+          modelId,
+          {
+            initProgressCallback: (p: { text: string }) =>
+              setState((s) => ({ ...s, loadProgress: p.text }))
+          },
+          // default ctx is 4096; the system prompt alone is ~6.2K tokens
+          { context_window_size: 16384 }
+        );
       }
       const engine = engineRef.current;
 

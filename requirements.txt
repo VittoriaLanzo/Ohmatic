@@ -1,19 +1,15 @@
-# Core inference
-llama-cpp-python>=0.2.0
+# Ohmatic real-pipeline dependencies. Versions verified working 2026-06-12.
+# ./ohmatic doctor probes these and offers the install.
 
-# Training (Colab / GPU machine only; comment out for CPU-only installs)
-# unsloth>=2024.1
-# bitsandbytes>=0.41.0
+huggingface_hub>=1.17.0      # model fetch (./ohmatic fetch)
+llama-cpp-python>=0.3.28     # GGUF inference; prebuilt wheels:
+                             #   pip install llama-cpp-python --prefer-binary \
+                             #     --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+torch>=2.12.0                # T5 normalizer. CPU-only machines:
+                             #   pip install torch --index-url https://download.pytorch.org/whl/cpu
+transformers>=5.10.1
+accelerate>=1.14.0           # required by transformers device_map
+sentencepiece>=0.2.1         # T5 tokenizer
 
-# HuggingFace ecosystem
-transformers>=4.36.0
-datasets>=2.14.0
-
-# Web UI
-gradio>=4.0.0
-
-# Data validation
-pydantic>=2.0.0
-
-# Dataset generation (calls Anthropic API via HTTP)
-requests>=2.31.0
+# dev/test
+pytest>=8.0
