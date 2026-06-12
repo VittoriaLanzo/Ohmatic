@@ -323,13 +323,25 @@ class LlamaCppChatModel:
             verbose=False,
         )
         self.max_new_tokens = max_new_tokens
+        self.progress_cb = None  # optional fn(frac 0..1), set per job by the caller
         print(f"[LlamaCppChatModel] loaded {gguf_path} (n_ctx={n_ctx}, "
               f"n_gpu_layers={n_gpu_layers})", file=sys.stderr, flush=True)
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        out = self.llm.create_chat_completion(
-            messages=messages, max_tokens=self.max_new_tokens, temperature=0.0)
-        return (out["choices"][0]["message"]["content"] or "").strip()
+        if self.progress_cb is None:
+            out = self.llm.create_chat_completion(
+                messages=messages, max_tokens=self.max_new_tokens, temperature=0.0)
+            return (out["choices"][0]["message"]["content"] or "").strip()
+        parts, n = [], 0
+        for chunk in self.llm.create_chat_completion(
+                messages=messages, max_tokens=self.max_new_tokens,
+                temperature=0.0, stream=True):
+            delta = chunk["choices"][0]["delta"].get("content") or ""
+            if delta:
+                parts.append(delta)
+                n += 1
+                self.progress_cb(min(0.99, n / self.max_new_tokens))
+        return "".join(parts).strip()
 
 
 class HFT5Normalizer:

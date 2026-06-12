@@ -19,6 +19,7 @@ export type GenerateJobState = {
   pollUrl: string | null;
   status: JobStatusResponse | null;
   stage: JobStage | null;
+  progress: number | null;
   result: GenerateResult | null;
   error: NormalizedClientError | null;
 };
@@ -29,6 +30,7 @@ const initialState: GenerateJobState = {
   pollUrl: null,
   status: null,
   stage: null,
+  progress: null,
   result: null,
   error: null
 };
@@ -149,6 +151,7 @@ async function pollUntilTerminal(
       phase: "polling",
       status,
       stage: status.stage,
+      progress: "progress" in status ? ((status as { progress?: number | null }).progress ?? null) : null,
       error: null
     }));
 

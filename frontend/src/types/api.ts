@@ -80,6 +80,7 @@ export type JobPending = {
 
 export type JobRunning = {
   status: "running";
+  progress?: number | null;
   stage: JobStage;
   result: null;
   error: null;

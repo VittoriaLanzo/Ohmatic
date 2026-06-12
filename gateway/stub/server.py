@@ -103,7 +103,13 @@ def _run_real_job(job_id: str, prompt: str) -> None:
     t0 = time.time()
     try:
         JOBS[job_id]["stage"] = "inference"
-        result = _get_pipeline().run(prompt)
+        pipe = _get_pipeline()
+        gen = getattr(pipe, "generator", None)
+        if gen is not None and hasattr(gen, "progress_cb"):
+            def _cb(frac, _j=job_id):  # monotonic: retries never move the bar backward
+                JOBS[_j]["progress"] = max(JOBS[_j].get("progress", 0.0), frac)
+            gen.progress_cb = _cb
+        result = pipe.run(prompt)
         if result.ok:
             JOBS[job_id].update(status="done", stage=None, result={
                 "circuit": _flatten(result.circuit),
@@ -234,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 job_id = uuid.uuid4().hex[:12]
                 JOBS[job_id] = {"status": "running", "stage": "queued",
-                                "result": None, "error": None}
+                                "progress": 0.0, "result": None, "error": None}
                 threading.Thread(target=_run_real_job, args=(job_id, prompt),
                                  daemon=True).start()
                 self.send_json(202, {"job_id": job_id,
@@ -255,6 +261,7 @@ class Handler(BaseHTTPRequestHandler):
             if job_id in JOBS:
                 j = JOBS[job_id]
                 self.send_json(200, {"status": j["status"], "stage": j["stage"],
+                                     "progress": j.get("progress"),
                                      "result": j["result"], "error": j["error"]})
                 return
             self.send_json(404, {"error": "job_not_found"})

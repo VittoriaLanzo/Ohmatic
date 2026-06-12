@@ -4,6 +4,7 @@ import type { JobStage } from "../types/api";
 type StageRailProps = {
   stage: JobStage | null;
   phase: "idle" | "submitting" | "polling" | "done" | "error";
+  progress?: number | null;
 };
 
 // PIPELINE UI ENTRY: maps backend job `stage` values from GET /v1/jobs/{id}/status
@@ -23,12 +24,19 @@ const STATIONS = [
 // to 1 so stroke-dashoffset maps directly to "fraction lit".
 const TRACE = "M36 30 H120 L150 14 H230 L252 30 H384 L414 46 H470 L500 30 H616 L646 14 H702 L732 30 H848 L878 46 H934 L964 30";
 
-export function StageRail({ stage, phase }: StageRailProps) {
+export function StageRail({ stage, phase, progress }: StageRailProps) {
   const index = activeIndex(stage, phase);
   const busy = phase === "submitting" || phase === "polling";
-  const lit = phase === "done" ? 1 : phase === "idle" ? 0 : STATIONS[index].target;
-  // Long creep while working; brisk-but-smooth completion; instant only on reset.
-  const seconds = phase === "done" ? 1.4 : busy ? 9 : 0.4;
+  // Real token progress when the gateway reports it (fine-grained, monotonic);
+  // the stage-target creep is the fallback for phases with no signal yet.
+  const real = typeof progress === "number" && progress > 0 ? progress : null;
+  const lit = phase === "done" ? 1
+    : phase === "idle" ? 0
+    : real !== null ? 0.06 + real * 0.93
+    : STATIONS[index].target;
+  // Short transition between 500ms polls keeps real progress smooth; long creep
+  // covers the signal-less load phase; brisk completion.
+  const seconds = phase === "done" ? 1.4 : real !== null ? 0.55 : busy ? 9 : 0.4;
 
   return (
     <div
