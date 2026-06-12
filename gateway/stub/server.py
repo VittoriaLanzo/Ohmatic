@@ -18,6 +18,67 @@ try:
     VERIFY_AVAILABLE = True
 except Exception:
     VERIFY_AVAILABLE = False
+
+# Real-model mode: when ./ohmatic fetch has installed weights, /v1/generate runs
+# the actual pipeline (T5 -> GGUF via llama.cpp -> ERC -> killswitch) in a
+# worker thread; the stub circuit is only the no-weights fallback.
+import threading
+import time
+import uuid
+
+_MANIFEST = Path(_ROOT) / "models" / "active.json"
+JOBS: dict = {}
+_PIPELINE = None
+_PIPELINE_LOCK = threading.Lock()
+
+
+def _real_available() -> bool:
+    return _MANIFEST.exists()
+
+
+def _get_pipeline():
+    global _PIPELINE
+    with _PIPELINE_LOCK:
+        if _PIPELINE is None:
+            manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+            from inference.pipeline import OhmaticPipeline, PipelineConfig
+            cfg = PipelineConfig(t5_model_id=manifest.get("t5_path") or "",
+                                 qwen_model_id=manifest["model_path"])
+            _PIPELINE = OhmaticPipeline.from_config(cfg)
+        return _PIPELINE
+
+
+def _flatten(circuit: dict) -> dict:
+    """Two-stage circuit JSON -> the flat shape the UI renders."""
+    topo = circuit.get("STAGE_1_TOPOLOGY", circuit)
+    pos = {n.get("id"): n for n in circuit.get("STAGE_2_LAYOUT", {}).get("spatial_nodes", [])}
+    comps = [{**c, "x": pos.get(c.get("id"), {}).get("x", 0),
+              "y": pos.get(c.get("id"), {}).get("y", 0)}
+             for c in topo.get("components", [])]
+    return {"metadata": circuit.get("metadata", {}), "components": comps,
+            "nets": topo.get("nets", [])}
+
+
+def _run_real_job(job_id: str, prompt: str) -> None:
+    t0 = time.time()
+    try:
+        JOBS[job_id]["stage"] = "inference"
+        result = _get_pipeline().run(prompt)
+        if result.ok:
+            JOBS[job_id].update(status="done", stage=None, result={
+                "circuit": _flatten(result.circuit),
+                "drc_warnings": [],
+                "bom": [],
+                "latency_ms": {"inference": int((time.time() - t0) * 1000), "drc": 0, "bom": 0},
+            })
+        else:
+            JOBS[job_id].update(status="error", stage=None, error={
+                "code": "blocked_by_verification",
+                "message": result.user_message or "Verification did not pass.",
+            })
+    except Exception as exc:
+        JOBS[job_id].update(status="error", stage=None,
+                            error={"code": "pipeline_error", "message": str(exc)[:300]})
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 MAX_BODY_BYTES = 1 * 1024 * 1024
@@ -126,10 +187,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not (0.0 <= temperature <= 1.0):
                     self.send_json(400, {"error": "options.temperature must be in [0, 1]"})
                     return
-            self.send_json(202, {
-                "job_id": "stub-job-01",
-                "poll_url": "/v1/jobs/stub-job-01/status"
-            })
+            if _real_available():
+                job_id = uuid.uuid4().hex[:12]
+                JOBS[job_id] = {"status": "running", "stage": "queued",
+                                "result": None, "error": None}
+                threading.Thread(target=_run_real_job, args=(job_id, prompt),
+                                 daemon=True).start()
+                self.send_json(202, {"job_id": job_id,
+                                     "poll_url": f"/v1/jobs/{job_id}/status"})
+            else:
+                self.send_json(202, {
+                    "job_id": "stub-job-01",
+                    "poll_url": "/v1/jobs/stub-job-01/status"
+                })
         else:
             self.send_json(404, {"error": "not_found"})
 
@@ -138,6 +208,11 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/v1/jobs/([^/]+)/status", path)
         if m:
             job_id = m.group(1)
+            if job_id in JOBS:
+                j = JOBS[job_id]
+                self.send_json(200, {"status": j["status"], "stage": j["stage"],
+                                     "result": j["result"], "error": j["error"]})
+                return
             if job_id != "stub-job-01":
                 self.send_json(404, {"error": "job_not_found"})
                 return
