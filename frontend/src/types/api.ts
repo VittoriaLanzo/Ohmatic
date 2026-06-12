@@ -56,7 +56,7 @@ export type GenerateResult = {
   latency_ms: LatencyMs;
 };
 
-export type JobStage = "inference" | "drc" | "bom";
+export type JobStage = "t5" | "generate" | "verify" | "inference" | "drc" | "bom";
 
 export type JobErrorCode =
   | "tier1_validation_failed"
@@ -81,6 +81,7 @@ export type JobPending = {
 export type JobRunning = {
   status: "running";
   progress?: number | null;
+  loops?: number;
   stage: JobStage;
   result: null;
   error: null;

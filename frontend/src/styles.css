@@ -2322,3 +2322,38 @@ body::after  { top: 14px; right: 14px; }
   text-shadow: 0 0 8px rgba(255, 208, 114, 0.4);
 }
 .stage-trace.is-done .stage-trace-pct { color: var(--phosphor); }
+
+/* correction loopback: return bus + counter */
+.stage-loop-base {
+  fill: none;
+  stroke: rgba(196, 122, 61, 0.16);
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+.stage-loop-lit {
+  fill: none;
+  stroke: var(--led-amber);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.06 0.94;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  filter: drop-shadow(0 0 5px rgba(255, 177, 69, 0.6));
+}
+.stage-trace.is-looping .stage-loop-lit {
+  opacity: 1;
+  animation: loop-run 1.6s linear infinite;
+}
+@keyframes loop-run {
+  to { stroke-dashoffset: 0; }
+}
+.stage-loop-count {
+  position: absolute;
+  left: 52%;
+  bottom: 1.05rem;
+  transform: translateX(-50%);
+  font-family: var(--font-pixel);
+  font-size: 0.66rem;
+  color: var(--led-amber);
+  text-shadow: 0 0 6px rgba(255, 177, 69, 0.45);
+}

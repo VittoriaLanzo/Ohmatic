@@ -102,8 +102,12 @@ def _flatten(circuit: dict) -> dict:
 def _run_real_job(job_id: str, prompt: str) -> None:
     t0 = time.time()
     try:
-        JOBS[job_id]["stage"] = "inference"
+        JOBS[job_id]["stage"] = "t5"
         pipe = _get_pipeline()
+        def _stage(stage, attempt, _j=job_id):
+            JOBS[_j]["stage"] = stage
+            JOBS[_j]["loops"] = max(JOBS[_j].get("loops", 0), attempt - 1)
+        pipe.on_stage = _stage
         gen = getattr(pipe, "generator", None)
         if gen is not None and hasattr(gen, "progress_cb"):
             def _cb(frac, _j=job_id):  # monotonic: retries never move the bar backward
@@ -240,7 +244,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 job_id = uuid.uuid4().hex[:12]
                 JOBS[job_id] = {"status": "running", "stage": "queued",
-                                "progress": 0.0, "result": None, "error": None}
+                                "progress": 0.0, "loops": 0, "result": None, "error": None}
                 threading.Thread(target=_run_real_job, args=(job_id, prompt),
                                  daemon=True).start()
                 self.send_json(202, {"job_id": job_id,
@@ -261,7 +265,7 @@ class Handler(BaseHTTPRequestHandler):
             if job_id in JOBS:
                 j = JOBS[job_id]
                 self.send_json(200, {"status": j["status"], "stage": j["stage"],
-                                     "progress": j.get("progress"),
+                                     "progress": j.get("progress"), "loops": j.get("loops", 0),
                                      "result": j["result"], "error": j["error"]})
                 return
             self.send_json(404, {"error": "job_not_found"})
@@ -279,6 +283,13 @@ class Handler(BaseHTTPRequestHandler):
                 with open(p, encoding="utf-8") as fh:
                     doc = json.load(fh)
                 doc["mode"] = "real" if _real_available() else "stub"
+                if doc["mode"] == "real":
+                    try:
+                        m = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+                        doc["installed"] = {"tier": m.get("tier", ""),
+                                            "name": Path(m.get("model_path", "")).stem}
+                    except Exception:
+                        pass
                 self.send_json(200, doc)
             except Exception:
                 self.send_json(200, {"recommended_model": "stub", "mode": "stub",

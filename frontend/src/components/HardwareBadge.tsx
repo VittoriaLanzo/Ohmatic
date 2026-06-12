@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 type Doctor = {
   mode?: "real" | "stub";
+  installed?: { tier: string; name: string };
   ram_gb?: number;
   vram_mb?: number;
   gpu?: string;
@@ -63,7 +64,9 @@ export function HardwareBadge() {
       {doctor && (
         <span>
           {doctor.ram_gb ? ` · ${doctor.ram_gb} GB RAM` : ""}
-          {gpuPart} · model: {TIER_LABEL[doctor.recommended_model] ?? doctor.recommended_model}
+          {gpuPart} · {doctor.installed
+            ? `model: ${doctor.installed.name}`
+            : `recommended: ${TIER_LABEL[doctor.recommended_model] ?? doctor.recommended_model}`}
         </span>
       )}
     </div>

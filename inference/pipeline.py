@@ -322,6 +322,13 @@ class LlamaCppChatModel:
             flash_attn=True,            # no-op on builds without it; big win where supported
             verbose=False,
         )
+        # Prefix KV cache: every request shares the ~6k-token system prompt; caching
+        # its KV skips minutes of CPU prefill on each job after the first.
+        try:
+            from llama_cpp import LlamaRAMCache
+            self.llm.set_cache(LlamaRAMCache(capacity_bytes=2 << 30))
+        except Exception:
+            pass  # speedup, not a requirement
         self.max_new_tokens = max_new_tokens
         self.progress_cb = None  # optional fn(frac 0..1), set per job by the caller
         print(f"[LlamaCppChatModel] loaded {gguf_path} (n_ctx={n_ctx}, "
@@ -426,6 +433,7 @@ class OhmaticPipeline:
         self.generator = generator
         self.system_prompt = system_prompt
         self.max_retries = max_retries
+        self.on_stage = None  # optional fn(stage: str, attempt: int) for live UIs
 
     @classmethod
     def from_config(cls, cfg: PipelineConfig) -> "OhmaticPipeline":
@@ -491,6 +499,8 @@ class OhmaticPipeline:
             return PipelineResult(ok=False, parse_error="Empty prompt")
 
         # ── Step 1: T5 normalization ───────────────────────────────────────────
+        if self.on_stage:
+            self.on_stage("t5", 1)
         try:
             normalized = self.normalizer.normalize(raw_prompt)
         except Exception as exc:
@@ -510,7 +520,8 @@ class OhmaticPipeline:
         trace: list[dict] = []
 
         for attempt in range(1, self.max_retries + 2):  # +1 for the initial attempt
-            # Generate
+            if self.on_stage:
+                self.on_stage("generate", attempt)
             try:
                 response = self.generator.chat(messages)
             except Exception as exc:
@@ -556,6 +567,8 @@ class OhmaticPipeline:
             # ERC check: analyze_schematic's standard is `valid = not diagnostics`, so ANY
             # diagnostic is a failure (matches train/benchmark). Filtering by severity here
             # would pass circuits the benchmark fails.
+            if self.on_stage:
+                self.on_stage("verify", attempt)
             erc_diags = _run_erc(circuit)
             failures = list(erc_diags)
             last_erc_errors = failures
