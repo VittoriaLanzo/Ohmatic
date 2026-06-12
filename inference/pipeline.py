@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -536,6 +537,10 @@ class OhmaticPipeline:
             try:
                 response = self.generator.chat(messages)
             except Exception as exc:
+                # The user gets a friendly refusal; the operator gets the cause
+                # in the gateway log (.ohmatic-run/gateway.log).
+                print(f"[pipeline] generator error on attempt {attempt}:\n"
+                      f"{traceback.format_exc()}", file=sys.stderr, flush=True)
                 return PipelineResult(
                     ok=False,
                     normalized_prompt=normalized,
