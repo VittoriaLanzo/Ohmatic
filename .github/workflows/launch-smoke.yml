@@ -1,0 +1,42 @@
+name: Launch smoke
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  boot:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: doctor
+        run: bash ohmatic doctor
+      - name: start and e2e
+        run: |
+          (bash ohmatic start > start.log 2>&1 &)
+          for i in $(seq 1 90); do
+            grep -qE "Frontend : http|fail" start.log 2>/dev/null && break
+            sleep 4
+          done
+          cat start.log
+          URL=$(grep "Frontend :" start.log | grep -oE "http://[0-9.:]+" | head -1)
+          sleep 3
+          curl -fsS -o /dev/null "$URL"
+          curl -fsS http://127.0.0.1:8080/health
+          JOB=$(curl -fsS -X POST http://127.0.0.1:8080/v1/generate -H "Content-Type: application/json" -d '{"prompt":"led blinker"}')
+          POLL=$(echo "$JOB" | grep -oE '/v1/jobs/[^"]+')
+          curl -fsS "http://127.0.0.1:8080$POLL" | grep -q '"status"'
+          curl -fsS -X POST http://127.0.0.1:8080/v1/verify -H "Content-Type: application/json" -d '{"circuit":{}}' | grep -q diagnostics
+          bash ohmatic stop

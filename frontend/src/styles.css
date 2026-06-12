@@ -2301,3 +2301,10 @@ body::after  { top: 14px; right: 14px; }
   font-size: 0.72rem;
   color: var(--silk-dim);
 }
+
+.hw-demo-flag {
+  color: var(--led-amber);
+  border-right: 1px solid var(--copper-dim);
+  padding-right: 0.5rem;
+  margin-right: 0.2rem;
+}

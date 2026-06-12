@@ -239,9 +239,11 @@ class Handler(BaseHTTPRequestHandler):
                              "..", "..", ".ohmatic-run", "doctor.json")
             try:
                 with open(p, encoding="utf-8") as fh:
-                    self.send_json(200, json.load(fh))
+                    doc = json.load(fh)
+                doc["mode"] = "real" if _real_available() else "stub"
+                self.send_json(200, doc)
             except Exception:
-                self.send_json(200, {"recommended_model": "stub",
+                self.send_json(200, {"recommended_model": "stub", "mode": "stub",
                                      "reason": "doctor has not run yet - start via ./ohmatic start"})
         elif path == "/health":
             self.send_json(200, {"status": "ok"})

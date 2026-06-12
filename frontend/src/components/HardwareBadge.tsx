@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 type Doctor = {
+  mode?: "real" | "stub";
   ram_gb?: number;
   vram_mb?: number;
   gpu?: string;
@@ -53,6 +54,9 @@ export function HardwareBadge() {
 
   return (
     <div className="hw-badge" title={doctor?.reason ?? "hardware check"}>
+      {doctor?.mode === "stub" && (
+        <span className="hw-demo-flag">DEMO CIRCUITS - install the model: ./ohmatic fetch</span>
+      )}
       <span className={`hw-webgpu hw-webgpu-${webgpu}`}>
         WebGPU {webgpu === "active" ? "✓" : webgpu === "checking" ? "…" : "✗"}
       </span>
