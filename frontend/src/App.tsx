@@ -297,7 +297,7 @@ export default function App() {
         >
           <span aria-hidden="true">★</span> Star Ohmatic on GitHub
         </a>
-        <span className="board-footer-note">Open source · every circuit verified before delivery</span>
+        <span className="board-footer-note">Open source · FSL-1.1 licensed</span>
       </footer>
     </main>
   );
