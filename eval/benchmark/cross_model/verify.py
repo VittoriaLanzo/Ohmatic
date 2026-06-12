@@ -1,21 +1,17 @@
-"""
-Stage 2 - VERIFY (local, free, rerunnable forever).
-====================================================
+"""Stage 2 - VERIFY (local, free, rerunnable forever).
+
     python -m eval.benchmark.cross_model.verify
 
-Reads every results/{model}.jsonl row and classifies it through the IDENTICAL
-extraction -> ERC path (eval.diagnostics.analyze_schematic - the single source
-of truth shared with training and prod). Outcomes:
-
-    delivered_clean     a circuit reached the user and passes ERC
-    delivered_broken    a circuit reached the user and FAILS ERC
-                        (hosted legs have no killswitch -> every ERC failure
-                         lands here; for Ohmatic legs this would be a GATE BUG)
+Classifies every results/{model}.jsonl row through the IDENTICAL extraction -> ERC
+path (analyze_schematic, the single source of truth shared with training and prod).
+Outcomes:
+    delivered_clean     circuit reached the user and passes ERC
+    delivered_broken    circuit reached the user and FAILS ERC (hosted legs have no
+                        killswitch so all ERC failures land here; for Ohmatic = GATE BUG)
     blocked_killswitch  Ohmatic refused: no unverified circuit delivered
-    invalid_output      nothing extractable as a circuit at all (hosted legs)
+    invalid_output      nothing extractable as a circuit (hosted legs)
 
-Generation and verification never touch: fix an extraction bug, rerun this for
-free, and nobody re-spends an API dollar.
+Generate and verify never touch, so an extraction-bug fix reruns free, no API dollar respent.
 """
 
 from __future__ import annotations

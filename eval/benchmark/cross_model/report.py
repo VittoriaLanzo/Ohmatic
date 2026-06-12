@@ -1,17 +1,12 @@
-"""
-Stage 3 - REPORT (deterministic tables from verified/).
-========================================================
+"""Stage 3 - REPORT (deterministic tables from verified/).
+
     python -m eval.benchmark.cross_model.report [--suite forward]
 
-Per (model, suite): N, delivered-clean rate + Wilson 95% CI, blocked rate,
-delivered-broken rate, availability, mean latency, total cost. Plus
-per-category breakdown. The two headline columns:
-
-  precision     of what REACHED THE USER, % ERC-clean
-                (killswitch should push Ohmatic legs to ~100; hosted legs
-                 deliver everything, so precision == raw pass rate)
-  availability  % of requests that got a circuit at all
-                (the price the killswitch pays - disclosed, not hidden)
+Per (model, suite): N, delivered-clean rate + Wilson 95% CI, blocked/broken rate,
+availability, mean latency, cost, plus per-category breakdown. Headline columns:
+  precision     of what REACHED THE USER, % ERC-clean (killswitch pushes Ohmatic
+                to ~100; hosted deliver everything, so precision == raw pass rate)
+  availability  % of requests that got a circuit (the price the killswitch pays)
 """
 
 from __future__ import annotations

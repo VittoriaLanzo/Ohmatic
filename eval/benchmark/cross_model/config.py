@@ -1,15 +1,11 @@
-"""
-Cross-model benchmark - configuration & reproducibility pins.
-==============================================================
-EVERYTHING that defines a benchmark run lives here: the model matrix, the
-suites, decoding parameters, and the exact artifact revisions. Reproducing the
-benchmark = same repo commit + the three env keys + `python -m
-eval.benchmark.cross_model.generate --model X --suite Y` per leg.
+"""Cross-model benchmark config and reproducibility pins.
 
-Env (only secrets live in env - never in this file):
-    ANTHROPIC_API_KEY   hosted Fable leg
-    OPENAI_API_KEY      hosted Codex leg   (+ optional OPENAI_BASE_URL / OPENAI_MODEL)
-    HF_TOKEN            held-out sets + Ohmatic weights (private HF repos)
+Everything defining a run lives here: model matrix, suites, decoding params,
+artifact revisions. Reproduce = same commit + the three env keys + one
+`python -m eval.benchmark.cross_model.generate --model X --suite Y` per leg.
+
+Secrets live ONLY in env, never here: ANTHROPIC_API_KEY (Fable), OPENAI_API_KEY
+(Codex, + optional OPENAI_BASE_URL / OPENAI_MODEL), HF_TOKEN (private HF repos).
 """
 
 from __future__ import annotations

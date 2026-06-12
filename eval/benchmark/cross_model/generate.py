@@ -1,13 +1,10 @@
-"""
-Stage 1 - GENERATE (the only stage that costs money).
-======================================================
-    python -m eval.benchmark.cross_model.generate --model star-r2-bf16 --suite forward
-    python -m eval.benchmark.cross_model.generate --model fable-5 --suite realuser --n 20
+"""Stage 1 - GENERATE (the only stage that costs money).
 
-Append-only JSONL per model: results/{model}.jsonl. Rows are keyed
-(model, suite, prompt_id) - reruns SKIP completed keys, so any crash or
-rate-limit resumes without double-paying. Raw outputs are stored verbatim;
-verification happens in stage 2 (verify.py) for free, forever.
+    python -m eval.benchmark.cross_model.generate --model M --suite S [--n N]
+
+Append-only results/{model}.jsonl keyed (model, suite, prompt_id); reruns SKIP
+completed keys, so a crash or rate-limit resumes without double-paying. Raw outputs
+are stored verbatim; verification happens free in stage 2 (verify.py).
 """
 
 from __future__ import annotations

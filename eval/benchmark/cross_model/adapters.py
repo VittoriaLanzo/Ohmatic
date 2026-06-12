@@ -1,23 +1,13 @@
-"""
-Cross-model benchmark - the three client implementations.
-==========================================================
-Every adapter exposes ONE method:
+"""Cross-model benchmark client implementations.
 
-    run(system_prompt: str, user_prompt: str) -> dict
+Every adapter exposes run(system_prompt, user_prompt) -> dict returning a uniform
+row fragment (raw_output, latency_s, tokens_in/out; Ohmatic legs also ok, blocked,
+attempts, delivered_circuit_json, user_message, normalized_prompt).
 
-returning a uniform row fragment:
-    {"raw_output": str, "latency_s": float,
-     "tokens_in": int, "tokens_out": int,
-     # Ohmatic legs additionally:
-     "ok": bool, "blocked": bool, "attempts": int,
-     "delivered_circuit_json": str, "user_message": str,
-     "normalized_prompt": str}
-
-Hosted legs are SINGLE-SHOT (pass@1): they receive the byte-identical system
-prompt + user turn and must answer in one attempt - the ERC feedback loop is
-proprietary and part of the Ohmatic product, not a free service to competitors
-(disclosed in the report). Ohmatic legs run the FULL product pipeline:
-T5 (realuser suite) -> Qwen -> ERC -> up to 3 corrections -> killswitch.
+IP boundary: hosted legs are SINGLE-SHOT (pass@1) on the byte-identical system
+prompt + user turn; the ERC feedback loop is proprietary, never offered to hosted
+competitors (disclosed in the report). Ohmatic legs run the full product pipeline:
+T5 (realuser only) -> Qwen -> ERC -> up to 3 corrections -> killswitch.
 """
 
 from __future__ import annotations
@@ -44,9 +34,9 @@ class AnthropicAdapter:
 
     def run(self, system_prompt: str, user_prompt: str) -> dict:
         t0 = time.time()
-        # cache_control on the (constant ~5.8K-token) system prompt: identical
-        # bytes across the whole suite -> input cost mostly evaporates after
-        # request 1. Adaptive models ignore/reject sampling params -> none sent.
+        # cache_control on the constant system prompt: identical bytes across the
+        # suite, so input cost mostly evaporates after request 1. Adaptive models
+        # reject sampling params, so none sent.
         resp = self.client.messages.create(
             model=self.model,
             max_tokens=C.MAX_TOKENS,
@@ -120,9 +110,8 @@ class _LlamaCppChatModel:
 
 
 class OhmaticAdapter:
-    """End-to-end product: T5 (when enabled) -> Qwen -> ERC -> retries ->
-    killswitch. Wraps inference.pipeline.OhmaticPipeline - the same code prod
-    serves, zero benchmark-special behavior."""
+    """End-to-end product (T5 -> Qwen -> ERC -> retries -> killswitch). Wraps
+    OhmaticPipeline: same code prod serves, zero benchmark-special behavior."""
 
     def __init__(self, cfg: dict, use_t5: bool):
         from inference.pipeline import (OhmaticPipeline, PipelineConfig,
@@ -147,10 +136,9 @@ class OhmaticAdapter:
             max_retries=C.PIPELINE_MAX_RETRIES)
 
     def chat_messages(self, messages: list[dict]) -> dict:
-        """Correction suite: single-shot repair on the VERBATIM trained
-        conversation (system + broken circuit + ERC feedback). No T5, no retry
-        loop - mirrors in-training correction_eval. Output verified like any
-        raw generation in stage 2."""
+        """Correction suite: single-shot repair on the VERBATIM trained conversation.
+        No T5, no retry loop (mirrors in-training correction_eval); output verified
+        like any raw generation in stage 2."""
         t0 = time.time()
         text = self.pipeline.generator.chat(messages)
         return {"raw_output": text,
