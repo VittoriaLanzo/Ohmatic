@@ -13,15 +13,13 @@ type TabId = "warnings" | "bom" | "json";
 
 export function ResultPanels({ result, phase }: ResultPanelsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("warnings");
-  // JSON VISUALIZATION TODO:
-  // The Contract tab currently pretty-prints result.circuit as read-only JSON.
-  // Replace this with a schema-aware JSON tree/editor before production workflows depend on it:
-  // collapsible nodes, schema highlighting, validation state, copy/download, and large-payload safeguards.
+  // JSON VISUALIZATION TODO: Contract tab pretty-prints result.circuit as read-only
+  // JSON. Replace with a schema-aware tree/editor (collapsible nodes, validation,
+  // copy/download, large-payload safeguards) before production depends on it.
   const json = useMemo(() => (result ? JSON.stringify(result.circuit, null, 2) : ""), [result]);
   const displayedParts = useMemo(() => {
-    // BOM ENTRY: prefer backend result.bom from the gateway job result.
-    // If BOM is empty, derive temporary rows from result.circuit.components so the Parts tab
-    // remains data-driven while the backend enricher is still catching up.
+    // BOM ENTRY: prefer backend result.bom; if empty, derive temporary rows from
+    // result.circuit.components so the Parts tab stays data-driven meanwhile.
     if (!result) {
       return [];
     }

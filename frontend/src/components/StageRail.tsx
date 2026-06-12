@@ -9,11 +9,8 @@ type StageRailProps = {
 // PIPELINE UI ENTRY: maps backend job `stage` values from GET /v1/jobs/{id}/status
 // to the trace. Add new backend stages here if the gateway contract grows.
 //
-// The progress indicator is a routed PCB trace connecting five pads. Current
-// flows through it CONTINUOUSLY: while a stage runs, the lit portion keeps
-// creeping toward a target just short of the next pad (long eased transition),
-// so the light never sits still and never jumps - on stage change it simply
-// continues from wherever it is.
+// PCB trace of five pads; the lit portion creeps toward a target just short of the
+// next pad while a stage runs, so it never sits still or jumps.
 const STATIONS = [
   { id: "queued", label: "Queued", x: 36, target: 0.21 },
   { id: "inference", label: "Inference", x: 268, target: 0.45 },

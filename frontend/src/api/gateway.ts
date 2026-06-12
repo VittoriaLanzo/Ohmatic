@@ -16,20 +16,17 @@ export interface GatewayApi {
 export class HttpGatewayApi implements GatewayApi {
   constructor(private readonly client = new GatewayHttpClient()) {}
 
-  // BACKEND ENTRY: prompt -> gateway.
-  // Wire the real backend here. The browser must call only the gateway public API,
-  // never inference/verifier/enricher directly.
-  // Contract: POST /v1/generate returns 202 with { job_id, poll_url }.
-  // Source of truth: shared/docs/contracts.md.
+  // BACKEND ENTRY: prompt -> gateway. The browser must call ONLY the gateway public
+  // API, never inference/verifier/enricher directly. Contract: POST /v1/generate
+  // returns 202 with { job_id, poll_url } (source: shared/docs/contracts.md).
   createGeneration(request: GenerateRequest): Promise<GenerateAcceptedResponse> {
     return this.client.post<GenerateAcceptedResponse>("/v1/generate", request, "submit");
   }
 
   async getJobStatus(jobIdOrPollUrl: string): Promise<JobStatusResponse> {
-    // BACKEND ENTRY: gateway job status.
-    // Pipeline rendering starts from this response: pending/running/done/failed plus stage
-    // values such as "inference", "drc", and "bom".
-    // Prefer backend-provided poll_url so backend routing can evolve without UI rewrites.
+    // BACKEND ENTRY: gateway job status. Pipeline rendering starts here
+    // (pending/running/done/failed + stage). Prefer the backend poll_url so routing
+    // can evolve without UI rewrites.
     const path = jobIdOrPollUrl.startsWith("/")
       ? jobIdOrPollUrl
       : `/v1/jobs/${encodeURIComponent(jobIdOrPollUrl)}/status`;

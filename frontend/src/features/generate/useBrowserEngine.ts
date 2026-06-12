@@ -2,17 +2,15 @@ import { useCallback, useRef, useState } from "react";
 import type { GenerateOptions, GenerateResult, JobStage } from "../../types/api";
 
 /**
- * In-browser generation over WebGPU (WebLLM), same job interface as
- * useGenerateJob so the App swaps engines transparently.
+ * In-browser generation over WebGPU (WebLLM); same job interface as useGenerateJob
+ * so the App swaps engines transparently.
  *
- * THE KILLSWITCH SURVIVES THE BROWSER MOVE: generation runs on the user's GPU,
- * but every candidate is verified by the local gateway's POST /v1/verify -
- * the SAME analyze_schematic + feedback format as training/prod/benchmark.
- * No unverified circuit is ever delivered; retries use the trained feedback.
+ * Killswitch survives the browser move: generation runs on the user's GPU, but every
+ * candidate is verified by the gateway's POST /v1/verify (the SAME analyze_schematic +
+ * feedback as training/prod/benchmark). No unverified circuit is ever delivered.
  *
- * Model: an MLC-compiled build of Ohmatic-Qwen3-8B (q4f16). Until the public
- * MLC artifact ships, the model id is configurable via
- * localStorage["ohmatic.webllmModel"].
+ * Model: MLC-compiled Ohmatic-Qwen3-8B (q4f16); id overridable via
+ * localStorage["ohmatic.webllmModel"] until the public MLC artifact ships.
  */
 
 const DEFAULT_MODEL = "Qwen3-8B-q4f16_1-MLC"; // swap to VittoriaLanzo/Ohmatic-Qwen3-8B-q4f16_1-MLC at launch

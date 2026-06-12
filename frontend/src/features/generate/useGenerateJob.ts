@@ -50,9 +50,8 @@ export function useGenerateJob(api: GatewayApi = createGatewayApi()) {
 
   const submit = useCallback(
     async (prompt: string, options: GenerateOptions) => {
-      // PROMPT OUTPUT ENTRY: user text becomes POST /v1/generate here.
-      // Returned job_id/poll_url drives all downstream surfaces:
-      // StageRail pipeline state, SchematicSvg circuit artifact, ResultPanels checks/BOM/JSON.
+      // PROMPT OUTPUT ENTRY: user text becomes POST /v1/generate here; the returned
+      // job_id/poll_url drives StageRail, SchematicSvg, and ResultPanels.
       const runId = activeRun.current + 1;
       activeRun.current = runId;
 
@@ -109,9 +108,8 @@ async function pollUntilTerminal(
   activeRun: MutableRefObject<number>,
   setState: Dispatch<SetStateAction<GenerateJobState>>
 ) {
-  // PIPELINE ENTRY: every poll response updates the visible pipeline state.
-  // Terminal "done" is where result.circuit, result.drc_warnings, result.bom,
-  // and result.latency_ms enter the UI.
+  // PIPELINE ENTRY: every poll updates the visible pipeline state; terminal "done"
+  // is where result.circuit, drc_warnings, bom, and latency_ms enter the UI.
   while (activeRun.current === runId) {
     const status = await api.getJobStatus(pollUrl);
     if (activeRun.current !== runId) {
