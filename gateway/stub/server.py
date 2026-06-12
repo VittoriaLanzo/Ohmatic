@@ -36,6 +36,46 @@ def _real_available() -> bool:
     return _MANIFEST.exists()
 
 
+def _available_ram_mb() -> int | None:
+    """Best effort; None = unknown (guard skipped)."""
+    try:
+        if sys.platform.startswith("linux"):
+            for line in open("/proc/meminfo", encoding="utf-8"):
+                if line.startswith("MemAvailable"):
+                    return int(line.split()[1]) // 1024
+        if sys.platform == "win32":
+            import ctypes
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            st = MEMORYSTATUSEX(); st.dwLength = ctypes.sizeof(st)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
+            return int(st.ullAvailPhys) // (1024 * 1024)
+    except Exception:
+        pass
+    return None
+
+
+def _ram_guard() -> str | None:
+    """Refusal message when the model + headroom cannot fit in available RAM."""
+    avail = _available_ram_mb()
+    if avail is None or _PIPELINE is not None:  # loaded model needs no new budget
+        return None
+    try:
+        need = json.loads(_MANIFEST.read_text(encoding="utf-8"))["model_path"]
+        need_mb = Path(need).stat().st_size // (1024 * 1024) + 2048  # weights + ctx headroom
+    except Exception:
+        return None
+    if avail < need_mb:
+        return (f"Not enough free RAM to load the model safely: need ~{need_mb} MB, "
+                f"{avail} MB available. Close applications or fetch a smaller tier "
+                f"(./ohmatic fetch --tier q4_k_m_cpu).")
+    return None
+
+
 def _get_pipeline():
     global _PIPELINE
     with _PIPELINE_LOCK:
@@ -188,6 +228,10 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(400, {"error": "options.temperature must be in [0, 1]"})
                     return
             if _real_available():
+                guard = _ram_guard()
+                if guard:
+                    self.send_json(503, {"error": "insufficient_memory", "message": guard})
+                    return
                 job_id = uuid.uuid4().hex[:12]
                 JOBS[job_id] = {"status": "running", "stage": "queued",
                                 "result": None, "error": None}

@@ -39,10 +39,25 @@ export function useBrowserEngine() {
   const reset = useCallback(() => setState(initial), []);
 
   const submit = useCallback(async (prompt: string, _options?: GenerateOptions) => {
-    setState({ ...initial, phase: "submitting", loadProgress: "Loading model…" });
+    setState({ ...initial, phase: "submitting", loadProgress: "Checking hardware…" });
     const t0 = performance.now();
     try {
-      // 1. Engine (cached across runs; WebLLM caches weights in IndexedDB)
+      // Preflight: the q4f16 engine needs ~6 GB of REAL GPU memory. On iGPUs
+      // WebGPU allocates from system RAM and an OOM stalls the whole machine
+      // (no process gets killed), so refuse up front instead of attempting.
+      if (!engineRef.current) {
+        const doctor = await fetch("/v1/doctor").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const vramMb = doctor?.vram_mb ?? 0;
+        const devMemGb = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0;
+        if (vramMb < 6000) {
+          throw new Error(
+            `In-browser inference needs ~6 GB of dedicated GPU memory; this machine reports ` +
+            `${vramMb ? Math.round(vramMb / 1024) + " GB VRAM" : "no dedicated GPU"}` +
+            `${devMemGb ? ` (${devMemGb}+ GB system RAM)` : ""}. ` +
+            `Loading would exhaust system RAM and stall the machine. Use the Gateway engine instead.`
+          );
+        }
+      }
       if (!engineRef.current) {
         const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
         const modelId = localStorage.getItem("ohmatic.webllmModel") ?? DEFAULT_MODEL;
@@ -125,6 +140,9 @@ export function useBrowserEngine() {
         }
       }));
     } catch (err) {
+      // never keep a half-loaded engine pinning memory
+      try { await engineRef.current?.unload?.(); } catch { /* best effort */ }
+      engineRef.current = null;
       setState((s) => ({
         ...s,
         phase: "error",

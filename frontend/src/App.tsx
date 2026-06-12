@@ -29,6 +29,7 @@ export default function App() {
   const gatewayJob = useGenerateJob();
   const browserJob = useBrowserEngine();
   const [engineMode, setEngineMode] = useState<"gateway" | "browser">("gateway");
+  const [browserCapable, setBrowserCapable] = useState(false);
   const job = engineMode === "browser" ? browserJob : gatewayJob;
   const [prompt, setPrompt] = useState(examples[0]);
   const [maxComponents, setMaxComponents] = useState(defaultOptions.max_components);
@@ -36,6 +37,17 @@ export default function App() {
   const [schematicZoom, setSchematicZoom] = useState(1);
   const [health, setHealth] = useState<"checking" | "ok" | "offline">("checking");
   const [completionMotion, setCompletionMotion] = useState<CompletionMotion>("idle");
+
+  useEffect(() => {
+    const nav = navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown | null> } };
+    if (!nav.gpu) return;
+    void Promise.all([
+      nav.gpu.requestAdapter().catch(() => null),
+      fetch("/v1/doctor").then((r) => (r.ok ? r.json() : null)).catch(() => null)
+    ]).then(([adapter, doctor]) => {
+      setBrowserCapable(Boolean(adapter) && (doctor?.vram_mb ?? 0) >= 6000);
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,8 +178,11 @@ export default function App() {
               Gateway
             </button>
             <button type="button" className={engineMode === "browser" ? "is-selected" : ""}
-              aria-pressed={engineMode === "browser"} onClick={() => setEngineMode("browser")} disabled={job.isBusy}
-              title="Runs the model on YOUR GPU via WebGPU; verification stays with the rule checker">
+              aria-pressed={engineMode === "browser"} onClick={() => setEngineMode("browser")}
+              disabled={job.isBusy || !browserCapable}
+              title={browserCapable
+                ? "Runs the model on YOUR GPU via WebGPU; verification stays with the rule checker"
+                : "Needs WebGPU + ~6 GB dedicated GPU memory; not available on this machine"}>
               In-browser
             </button>
           </div>
