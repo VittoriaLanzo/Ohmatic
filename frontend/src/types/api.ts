@@ -31,13 +31,28 @@ export type BomEntry = {
 export type LatencyMs = {
   inference: number;
   drc: number;
-  bom: number;
+  bom?: number;
+  parts_list?: number;
+};
+
+/** Deterministic local parts list row (supplier-free by design). */
+export type PartsListRow = {
+  id: string;
+  type: string;
+  parts_list_part: string;
+  value: string;
+  package: string;
+  description: string;
+  is_physical: boolean;
+  buyable: boolean;
+  match_status: string;
 };
 
 export type GenerateResult = {
   circuit: OhmaticCircuitV01;
   drc_warnings: string[];
-  bom: BomEntry[];
+  bom?: BomEntry[];
+  parts_list?: PartsListRow[];
   latency_ms: LatencyMs;
 };
 

@@ -25,8 +25,8 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
     if (!result) {
       return [];
     }
-    if (result.bom.length > 0) {
-      return result.bom.map((entry) => ({
+    if ((result.bom?.length ?? 0) > 0) {
+      return result.bom!.map((entry) => ({
         id: entry.id,
         mpn: entry.mpn ?? "unresolved",
         description: entry.description,
@@ -47,13 +47,17 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
     <section className={`inspector-panel is-${phase}`} aria-labelledby="inspector-heading">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Artifact package</p>
-          <h2 id="inspector-heading">Review bundle</h2>
+          <p className="eyebrow">Checked, listed, signed</p>
+          <h2 id="inspector-heading">Verification report</h2>
         </div>
         <div className="latency-strip" aria-label="Artifact timing">
           <span>Inference {formatMs(result?.latency_ms.inference)}</span>
           <span>DRC {formatMs(result?.latency_ms.drc)}</span>
-          <span>BOM {formatMs(result?.latency_ms.bom)}</span>
+          {result?.latency_ms.parts_list != null ? (
+            <span>Parts {formatMs(result.latency_ms.parts_list)}</span>
+          ) : (
+            <span>BOM {formatMs(result?.latency_ms.bom)}</span>
+          )}
         </div>
       </div>
 
@@ -110,6 +114,31 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
         <div className="tab-panel" role="tabpanel">
           {!result ? (
             <p className="muted">Parts appear here when the circuit artifact is ready.</p>
+          ) : (result.parts_list?.length ?? 0) > 0 ? (
+            // Deterministic local parts_list: supplier-free by design (no MPN/price —
+            // procurement is a separate, disclosed link-out layer).
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">Description</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.parts_list!.map((row, index) => (
+                  <tr key={row.id} style={{ "--row-order": index } as CSSProperties}>
+                    <th scope="row">{row.id}</th>
+                    <td>{row.description}</td>
+                    <td>
+                      <span className={`source-chip is-${row.buyable ? "buyable" : "symbol"}`}>
+                        {row.buyable ? "buyable" : "not buyable"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table>
               <thead>
