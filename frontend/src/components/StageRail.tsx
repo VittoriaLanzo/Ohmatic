@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { CSSProperties } from "react";
 import type { JobStage } from "../types/api";
 
@@ -37,11 +38,20 @@ export function StageRail({ stage, phase, progress, loops = 0, etaS = null, elap
   const index = phase === "done" ? 3 : STAGE_INDEX[stage ?? "queued"] ?? 0;
   const busy = phase === "submitting" || phase === "polling";
   const real = typeof progress === "number" && progress > 0 ? progress : null;
-  // Token progress fills the Generate span; other stages creep to their pad.
-  const lit = phase === "done" ? 1
+  // Token progress fills the Generate span. Pre-token Generate creeps only to
+  // 0.21 (just past its pad) so the token formula takes over seamlessly; a
+  // high-water guard makes the bar physically unable to move backward within
+  // a run - the old 0.55 creep vs 0.18+real handoff snapped the bar back to
+  // the start and read as a reset to queued.
+  const computed = phase === "done" ? 1
     : phase === "idle" ? 0
     : index === 1 && real !== null ? 0.18 + real * 0.37
+    : index === 1 ? 0.21
     : STATIONS[index].target;
+  const high = useRef(0);
+  if (phase === "idle") high.current = 0;
+  const lit = Math.max(computed, phase === "idle" ? 0 : high.current);
+  high.current = lit;
   const seconds = phase === "done" ? 1.4 : index === 1 && real !== null ? 0.55 : busy ? 9 : 0.4;
   const looping = busy && loops > 0;
 
