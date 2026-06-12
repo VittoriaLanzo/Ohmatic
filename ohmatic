@@ -220,6 +220,26 @@ cmd_stats() {
   if detect_python; then "${PYTHON[@]}" tools/stats.py; else fail "needs Python 3"; fi
 }
 
+cmd_update() {
+  step "Ohmatic update - pulling the latest from GitHub"
+  if ! git -C "$ROOT" diff --quiet 2>/dev/null; then
+    warn "local changes detected - they are preserved (ff-only pull)"
+  fi
+  git -C "$ROOT" fetch origin || { fail "fetch failed - check network/remote"; return 1; }
+  if git -C "$ROOT" pull --ff-only origin "$(git -C "$ROOT" branch --show-current)"; then
+    ok "repo updated to $(git -C "$ROOT" rev-parse --short HEAD)"
+  else
+    fail "non-fast-forward (local commits or rewritten history) - resolve manually: git status"
+    return 1
+  fi
+  if git -C "$ROOT" diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -q "frontend/package.json"; then
+    step "frontend dependencies changed - reinstalling"
+    local npm; npm="$(npm_bin)"
+    [ -n "$npm" ] && (cd "$ROOT/frontend" && "$npm" install)
+  fi
+  ok "done. Restart with: ./ohmatic stop && ./ohmatic start"
+}
+
 cmd_fetch() {
   step "Ohmatic fetch - downloading the doctor-recommended weights"
   hw_assess
@@ -246,7 +266,10 @@ hw_assess() {
   fi
   # Strip CR/space (powershell, csv padding) with unambiguous ANSI-C quoting,
   # then digits-or-zero (some GPUs report "[N/A]").
-  ram_gb="${ram_gb//[$'' ]/}"; vram_mb="${vram_mb//[$'' ]/}"; gpu="${gpu//$''/}"
+  ram_gb="${ram_gb//[$'
+' ]/}"; vram_mb="${vram_mb//[$'
+' ]/}"; gpu="${gpu//$'
+'/}"
   case "$ram_gb"  in (*[!0-9]*|"") ram_gb=0  ;; esac
   case "$vram_mb" in (*[!0-9]*|"") vram_mb=0 ;; esac
   local tier="stub" why="not enough RAM/VRAM for local inference - stub/cloud mode"
@@ -307,6 +330,7 @@ ohmatic - local launcher
   ./ohmatic doctor         Diagnose the system (Node, Python, ports, RAM/GPU -> model tier)
   ./ohmatic stats          Adoption stats (HF model downloads, GitHub stars)
   ./ohmatic fetch          Download the doctor-recommended model weights (resumable)
+  ./ohmatic update         Update this clone to the latest GitHub commit (ff-only, safe)
 
   Fresh clone -> './ohmatic start' -> open the printed URL.
 EOF
@@ -319,6 +343,7 @@ case "${1:-help}" in
   doctor) cmd_doctor ;;
   stats) cmd_stats ;;
   fetch) shift; cmd_fetch "$@" ;;
+  update) cmd_update ;;
   help|--help|-h) usage ;;
   *) usage; exit 2 ;;
 esac
