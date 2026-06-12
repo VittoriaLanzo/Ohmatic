@@ -168,6 +168,7 @@ cmd_start() {
   step "Ohmatic starting"
   hw_assess
   ok "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY}) -> $RUN_DIR/doctor.json"
+  offer_model_pull
   if [ "$mode" = "mock" ]; then
     warn "mock mode: backend not started"
   else
@@ -238,6 +239,37 @@ cmd_update() {
     [ -n "$npm" ] && (cd "$ROOT/frontend" && "$npm" install)
   fi
   ok "done. Restart with: ./ohmatic stop && ./ohmatic start"
+}
+
+# First-run model onboarding: no weights installed -> offer the doctor-matched
+# pull right in the terminal. One keypress, zero extra steps. Non-interactive
+# shells (CI, scripts) skip silently.
+offer_model_pull() {
+  [ -f "$ROOT/models/active.json" ] && return 0
+  [ -t 0 ] || return 0
+  [ "$OHMATIC_TIER" = "stub" ] && return 0
+  printf "
+  %sNo local model installed. Recommended for this machine:%s
+" "$C_DIM" "$C_OFF"
+  printf "    %s[1] %s%s  <- recommended (%s)
+" "$C_GREEN" "$OHMATIC_TIER" "$C_OFF" "$OHMATIC_TIER_WHY"
+  printf "    [2] q4_k_m   4-bit GGUF, ~5 GB
+"
+  printf "    [3] q8_0     8-bit GGUF, ~9 GB
+"
+  printf "    [4] bf16     full weights, ~17 GB (GPU)
+"
+  printf "    [s] skip     explore with the stub for now
+"
+  printf "  Pull now? [1/2/3/4/s] (default 1): "
+  local choice; read -r choice || choice="s"
+  case "$choice" in
+    ""|1) cmd_fetch --tier "$OHMATIC_TIER" ;;
+    2) cmd_fetch --tier q4_k_m ;;
+    3) cmd_fetch --tier q8_0 ;;
+    4) cmd_fetch --tier bf16 ;;
+    *) dim "skipped - run './ohmatic fetch' anytime" ;;
+  esac
 }
 
 cmd_fetch() {
