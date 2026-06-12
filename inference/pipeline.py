@@ -314,12 +314,23 @@ class LlamaCppChatModel:
                 "Install llama-cpp-python for GGUF inference: pip install llama-cpp-python "
                 "(prebuilt CUDA wheels: --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124)")
         import multiprocessing
+        # Prompt-lookup speculative decoding: drafts tokens by copying snippets
+        # already in the prompt. Our correction loop regenerates a circuit that is
+        # ~90% identical to the broken one in the prompt, so this is a large
+        # decode speedup with no extra model and no extra memory.
+        draft = None
+        try:
+            from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
+            draft = LlamaPromptLookupDecoding(num_pred_tokens=10)
+        except Exception:
+            pass
         self.llm = Llama(
             model_path=gguf_path,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
             n_threads=max(1, multiprocessing.cpu_count() - 1),
             flash_attn=True,            # no-op on builds without it; big win where supported
+            draft_model=draft,
             verbose=False,
         )
         # Prefix KV cache: every request shares the ~6k-token system prompt; caching
