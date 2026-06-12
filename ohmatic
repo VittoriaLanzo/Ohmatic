@@ -139,8 +139,9 @@ ensure_frontend_deps() {
   [ -f "$FRONTEND/package.json" ] || { echo "frontend/package.json not found under $ROOT" >&2; exit 1; }
   local npm; npm="$(npm_bin)"
   [ -n "$npm" ] || { echo "npm not found. Install Node.js (https://nodejs.org)." >&2; exit 1; }
-  if [ ! -d "$FRONTEND/node_modules" ]; then
-    step "Installing frontend dependencies (first run)"
+  # install when missing OR stale (package.json newer than the last install)
+  if [ ! -d "$FRONTEND/node_modules" ] || [ "$FRONTEND/package.json" -nt "$FRONTEND/node_modules/.package-lock.json" ]; then
+    step "Installing frontend dependencies"
     ( cd "$FRONTEND" && "$npm" install )
   fi
 }
