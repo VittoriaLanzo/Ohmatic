@@ -36,3 +36,6 @@ target/
 
 # Runtime logs (any service)
 *.log
+
+# Local model weights (fetched by ./ohmatic fetch)
+models/

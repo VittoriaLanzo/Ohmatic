@@ -214,38 +214,54 @@ cmd_status() {
 }
 
 
-# Hardware assessment: RAM + NVIDIA VRAM -> which Ohmatic model this machine can run.
-# Writes $RUN_DIR/doctor.json (served by the gateway at /v1/doctor for the frontend).
+
+cmd_stats() {
+  step "Ohmatic stats"
+  if detect_python; then "${PYTHON[@]}" tools/stats.py; else fail "needs Python 3"; fi
+}
+
+cmd_fetch() {
+  step "Ohmatic fetch — downloading the doctor-recommended weights"
+  hw_assess
+  ok "tier: ${OHMATIC_TIER} (${OHMATIC_TIER_WHY})"
+  if detect_python; then "${PYTHON[@]}" tools/fetch_model.py "$@"; else fail "needs Python 3"; fi
+}
+
+# Hardware assessment: RAM + NVIDIA VRAM -> which Ohmatic model this machine
+# can run. Writes $RUN_DIR/doctor.json (served by the gateway at /v1/doctor).
+# Probes are || true-guarded: under set -euo pipefail a failing probe (broken
+# nvidia driver, locked-down powershell) degrades the verdict, never the launcher.
 hw_assess() {
   mkdir -p "$RUN_DIR"
-  local ram_gb=0 vram_mb=0 gpu=""
-  case "$(uname -s)" in
-    Linux)  ram_gb=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null) ;;
+  local ram_gb=0 vram_mb=0 gpu="" os arch
+  os="$(uname -s 2>/dev/null || echo unknown)"; arch="$(uname -m 2>/dev/null || echo unknown)"
+  case "$os" in
+    Linux)  ram_gb=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null || true) ;;
     Darwin) ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 )) ;;
-    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null | tr -d '
- ') ;;
+    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null || true) ;;
   esac
   if command -v nvidia-smi >/dev/null 2>&1; then
-    vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' 
-')
-    gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 | tr -d '
-')
+    vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 || true)
+    gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)
   fi
-  ram_gb=${ram_gb:-0}; vram_mb=${vram_mb:-0}
+  # Strip CR/space (powershell, csv padding) with unambiguous ANSI-C quoting,
+  # then digits-or-zero (some GPUs report "[N/A]").
+  ram_gb="${ram_gb//[$'' ]/}"; vram_mb="${vram_mb//[$'' ]/}"; gpu="${gpu//$''/}"
+  case "$ram_gb"  in (*[!0-9]*|"") ram_gb=0  ;; esac
+  case "$vram_mb" in (*[!0-9]*|"") vram_mb=0 ;; esac
   local tier="stub" why="not enough RAM/VRAM for local inference - stub/cloud mode"
   if   [ "$vram_mb" -ge 20000 ]; then tier="bf16";       why="${gpu} (${vram_mb} MB VRAM) fits the full bf16 model"
   elif [ "$vram_mb" -ge 10000 ]; then tier="q8_0";       why="${gpu} (${vram_mb} MB VRAM) fits the Q8_0 GGUF"
   elif [ "$vram_mb" -ge  6000 ]; then tier="q4_k_m";     why="${gpu} (${vram_mb} MB VRAM) fits the Q4_K_M GGUF"
+  elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 24 ]; then
+    tier="q8_0";   why="Apple Silicon, ${ram_gb} GB unified memory - Q8_0 GGUF on Metal"
+  elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 12 ]; then
+    tier="q4_k_m"; why="Apple Silicon, ${ram_gb} GB unified memory - Q4_K_M GGUF on Metal"
   elif [ "$ram_gb" -ge 12 ];     then tier="q4_k_m_cpu"; why="${ram_gb} GB RAM runs Q4_K_M on CPU (slow)"
   fi
   printf '{"ram_gb": %s, "vram_mb": %s, "gpu": "%s", "recommended_model": "%s", "reason": "%s", "checked_at": "%s"}
 '     "$ram_gb" "$vram_mb" "$gpu" "$tier" "$why" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RUN_DIR/doctor.json"
   OHMATIC_TIER="$tier"; OHMATIC_TIER_WHY="$why"; OHMATIC_RAM_GB="$ram_gb"; OHMATIC_VRAM_MB="$vram_mb"
-}
-
-cmd_stats() {
-  step "Ohmatic stats"
-  if detect_python; then "${PYTHON[@]}" tools/stats.py; else fail "needs Python 3"; fi
 }
 
 cmd_doctor() {
@@ -290,6 +306,7 @@ ohmatic - local launcher
   ./ohmatic status         Show what is running
   ./ohmatic doctor         Diagnose the system (Node, Python, ports, RAM/GPU -> model tier)
   ./ohmatic stats          Adoption stats (HF model downloads, GitHub stars)
+  ./ohmatic fetch          Download the doctor-recommended model weights (resumable)
 
   Fresh clone -> './ohmatic start' -> open the printed URL.
 EOF
@@ -301,6 +318,7 @@ case "${1:-help}" in
   status) cmd_status ;;
   doctor) cmd_doctor ;;
   stats) cmd_stats ;;
+  fetch) shift; cmd_fetch "$@" ;;
   help|--help|-h) usage ;;
   *) usage; exit 2 ;;
 esac
