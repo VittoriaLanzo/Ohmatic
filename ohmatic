@@ -249,8 +249,8 @@ cmd_update() {
 deps_missing() {
   local tier="$1"
   [ "$tier" = "stub" ] && return 0
-  local mods="huggingface_hub torch transformers sentencepiece" m
-  case "$tier" in q4_k_m|q4_k_m_cpu|q8_0) mods="$mods llama_cpp" ;; bf16) mods="$mods accelerate" ;; esac
+  local mods="huggingface_hub torch transformers sentencepiece accelerate" m
+  case "$tier" in q4_k_m|q4_k_m_cpu|q8_0) mods="$mods llama_cpp" ;; esac
   for m in $mods; do
     "${PYTHON[@]}" -c "import $m" >/dev/null 2>&1 || printf "%s " "$m"
   done
