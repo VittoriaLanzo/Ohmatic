@@ -2134,16 +2134,18 @@ body::after  { top: 14px; right: 14px; }
 }
 .options-body input { width: 100%; }
 
-/* Workbench: the artifact owns the stage; inspector rides beside it */
+/* Workbench v2: schematic full-width and TALL (the artifact is the star);
+   verification report stretches below it at a comfortable reading measure */
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 28vw, 400px);
+  grid-template-columns: 1fr;
   gap: 1.1rem;
-  align-items: start;
 }
-@media (max-width: 1100px) {
-  .workspace { grid-template-columns: 1fr; }
-}
+.schematic-frame { min-height: clamp(380px, 52vh, 640px); display: flex; }
+.schematic-frame > * { flex: 1; }
+.inspector-panel .tab-panel { max-width: 100%; }
+.inspector-panel table { width: 100%; max-width: 980px; }
+.inspector-panel .json-panel pre { max-height: 420px; }
 
 /* ── Stage HUD: transform-only, GPU-composited (no layout thrash) ────────── */
 .stage-rail {
@@ -2241,3 +2243,38 @@ body::after  { top: 14px; right: 14px; }
 }
 .stage-rail.is-done .stage-step { color: var(--gold); }
 .stage-rail.is-done .stage-step .stage-icon { border-color: var(--gold); color: var(--gold); animation: none; }
+
+
+/* Footer: the star pad */
+.board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 2.2rem 0 2.8rem;
+}
+.star-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-pixel);
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #221302;
+  background: linear-gradient(180deg, #ffe2a0, var(--gold) 55%, #d9a84e);
+  padding: 0.62rem 1.15rem;
+  border-radius: 6px;
+  box-shadow: 0 4px 0 #8a6a2c, 0 6px 16px rgba(0, 0, 0, 0.45);
+  transition: transform 80ms, box-shadow 80ms, filter 0.15s;
+}
+.star-button:hover { filter: brightness(1.06); }
+.star-button:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a6a2c, 0 2px 6px rgba(0,0,0,.45); }
+.star-button span { font-size: 0.9rem; line-height: 1; }
+.board-footer-note {
+  font-size: 0.74rem;
+  color: var(--silk-dim);
+  font-family: var(--font-mono);
+}

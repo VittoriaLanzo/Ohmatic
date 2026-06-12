@@ -47,8 +47,8 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
     <section className={`inspector-panel is-${phase}`} aria-labelledby="inspector-heading">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Artifact package</p>
-          <h2 id="inspector-heading">Review bundle</h2>
+          <p className="eyebrow">Checked, listed, signed</p>
+          <h2 id="inspector-heading">Verification report</h2>
         </div>
         <div className="latency-strip" aria-label="Artifact timing">
           <span>Inference {formatMs(result?.latency_ms.inference)}</span>

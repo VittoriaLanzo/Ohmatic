@@ -191,7 +191,7 @@ export default function App() {
         <section className="main-panel" aria-labelledby="schematic-heading">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Circuit artifact</p>
+              <p className="eyebrow">Workbench</p>
               <h2 id="schematic-heading">{job.result?.circuit.metadata.title ?? "No circuit generated yet"}</h2>
             </div>
             <output className={`status-output is-${job.phase}`} aria-live="polite">
@@ -287,6 +287,18 @@ export default function App() {
 
         <ResultPanels result={job.result} phase={visualPhase} />
       </section>
+
+      <footer className="board-footer">
+        <a
+          className="star-button"
+          href="https://github.com/VittoriaLanzo/Ohmatic"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span aria-hidden="true">★</span> Star Ohmatic on GitHub
+        </a>
+        <span className="board-footer-note">Open source · every circuit verified before delivery</span>
+      </footer>
     </main>
   );
 }
