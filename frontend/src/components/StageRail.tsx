@@ -7,50 +7,63 @@ type StageRailProps = {
 };
 
 // PIPELINE UI ENTRY: maps backend job `stage` values from GET /v1/jobs/{id}/status
-// to the progress bar. Add new backend stages here if the gateway contract grows.
-const STAGES: { id: string; label: string; progress: number }[] = [
-  { id: "queued", label: "Queued", progress: 0.08 },
-  { id: "inference", label: "Generating circuit", progress: 0.38 },
-  { id: "drc", label: "Running rule checks", progress: 0.66 },
-  { id: "bom", label: "Building parts list", progress: 0.88 },
-  { id: "done", label: "Done", progress: 1 }
-];
+// to the trace. Add new backend stages here if the gateway contract grows.
+//
+// The progress indicator is a routed PCB trace connecting five pads. Current
+// flows through it CONTINUOUSLY: while a stage runs, the lit portion keeps
+// creeping toward a target just short of the next pad (long eased transition),
+// so the light never sits still and never jumps — on stage change it simply
+// continues from wherever it is.
+const STATIONS = [
+  { id: "queued", label: "Queued", x: 36, target: 0.21 },
+  { id: "inference", label: "Inference", x: 268, target: 0.45 },
+  { id: "drc", label: "DRC", x: 500, target: 0.69 },
+  { id: "bom", label: "BOM", x: 732, target: 0.93 },
+  { id: "done", label: "Done", x: 964, target: 1 }
+] as const;
+
+// One routed trace with 45-degree jogs, pad to pad. pathLength is normalized
+// to 1 so stroke-dashoffset maps directly to "fraction lit".
+const TRACE = "M36 30 H120 L150 14 H230 L252 30 H384 L414 46 H470 L500 30 H616 L646 14 H702 L732 30 H848 L878 46 H934 L964 30";
 
 export function StageRail({ stage, phase }: StageRailProps) {
   const index = activeIndex(stage, phase);
-  const current = STAGES[index];
   const busy = phase === "submitting" || phase === "polling";
-  const progress = phase === "done" ? 1 : phase === "idle" ? 0 : current.progress;
+  const lit = phase === "done" ? 1 : phase === "idle" ? 0 : STATIONS[index].target;
+  // Long creep while working; brisk-but-smooth completion; instant only on reset.
+  const seconds = phase === "done" ? 1.4 : busy ? 9 : 0.4;
 
   return (
     <div
-      className={`stage-progress is-${phase}`}
-      style={{ "--progress": progress } as CSSProperties}
+      className={`stage-trace is-${phase}`}
+      style={{ "--lit": lit, "--creep": `${seconds}s` } as CSSProperties}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={Math.round(progress * 100)}
+      aria-valuenow={Math.round(lit * 100)}
       aria-label="Generation pipeline"
     >
-      <div className="stage-progress-track">
-        <span className="stage-progress-fill" />
-        <span className="stage-progress-flow" aria-hidden="true" />
-        {STAGES.slice(1, 4).map((s) => (
-          <span
-            key={s.id}
-            className={`stage-progress-tick ${progress >= s.progress ? "is-passed" : ""}`}
-            style={{ left: `${s.progress * 100}%` }}
-            aria-hidden="true"
-          />
+      <svg viewBox="0 0 1000 64" preserveAspectRatio="none" aria-hidden="true">
+        <path className="stage-trace-base" d={TRACE} pathLength={1} />
+        <path className="stage-trace-lit" d={TRACE} pathLength={1} />
+        <path className="stage-trace-glowhead" d={TRACE} pathLength={1} />
+        {STATIONS.map((s, i) => (
+          <g key={s.id} className={`stage-pad ${i <= index && phase !== "idle" ? "is-lit" : ""} ${i === index && busy ? "is-active" : ""}`}>
+            <circle cx={s.x} cy={30} r={7} className="stage-pad-ring" />
+            <circle cx={s.x} cy={30} r={3} className="stage-pad-core" />
+          </g>
         ))}
-        <span className="stage-progress-head" aria-hidden="true" />
+      </svg>
+      <div className="stage-trace-labels" aria-hidden="true">
+        {STATIONS.map((s, i) => (
+          <span key={s.id} className={i <= index && phase !== "idle" ? "is-lit" : ""} style={{ left: `${s.x / 10}%` }}>
+            {s.label}
+          </span>
+        ))}
       </div>
-      <div className="stage-progress-meta" aria-live="polite">
-        <span className="stage-progress-label" key={busy || phase === "done" ? current.label : "idle"}>
-          {phase === "idle" ? "Ready" : phase === "error" ? "Stopped — see message above" : current.label}
-        </span>
-        {busy && <span className="stage-progress-pct">{Math.round(progress * 100)}%</span>}
-      </div>
+      <span className="sr-only" aria-live="polite">
+        {phase === "idle" ? "Ready" : phase === "error" ? "Stopped" : STATIONS[index].label}
+      </span>
     </div>
   );
 }

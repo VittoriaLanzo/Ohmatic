@@ -2184,115 +2184,96 @@ body::after  { top: 14px; right: 14px; }
 }
 
 
-/* ── Stage progress: one bar, done properly ──────────────────────────────────
-   Determinate eased fill + flowing light inside the filled region + breathing
-   head at the fill edge + micro-ticks at stage boundaries. transform/opacity
-   only; label crossfades via key remount. */
-.stage-progress { margin: 0.65rem 0 0.9rem; }
-.stage-progress-track {
-  position: relative;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(196, 122, 61, 0.18);
-  overflow: hidden;
+/* ── Stage trace: current lighting a routed PCB path, layer by layer ─────────
+   The lit path reveals via stroke-dashoffset easing toward --lit over --creep
+   seconds (9s while working -> perpetual slow motion, no jumps; stage changes
+   just continue from the current position). Glowhead = same path, a short
+   bright dash whose END rides at the lit frontier. */
+.stage-trace { margin: 0.7rem 0 1rem; position: relative; }
+.stage-trace svg { width: 100%; height: 52px; display: block; overflow: visible; }
+
+.stage-trace-base {
+  fill: none;
+  stroke: rgba(196, 122, 61, 0.22);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.stage-progress-fill {
-  position: absolute;
-  inset: 0;
-  border-radius: 3px;
-  background: linear-gradient(90deg, var(--copper-bright) 0%, var(--gold) 70%, #ffe9b8 100%);
-  transform-origin: left center;
-  transform: scaleX(var(--progress, 0));
-  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+.stage-trace-lit {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - var(--lit, 0));
+  transition: stroke-dashoffset var(--creep, 9s) cubic-bezier(0.25, 0.6, 0.35, 1);
+  will-change: stroke-dashoffset;
+  filter: drop-shadow(0 0 4px rgba(255, 208, 114, 0.55));
 }
-.stage-progress-flow {
-  position: absolute;
-  inset: 0;
-  border-radius: 3px;
-  background: linear-gradient(90deg, transparent 30%, rgba(255, 250, 235, 0.85) 50%, transparent 70%);
-  transform: translateX(-100%);
+.stage-trace-glowhead {
+  fill: none;
+  stroke: #fff6e0;
+  stroke-width: 4;
+  stroke-linecap: round;
+  /* a 2.5%-long bright segment whose end sits exactly at the lit frontier */
+  stroke-dasharray: 0.025 0.975;
+  stroke-dashoffset: calc(1.025 - var(--lit, 0));
+  transition: stroke-dashoffset var(--creep, 9s) cubic-bezier(0.25, 0.6, 0.35, 1);
+  will-change: stroke-dashoffset;
+  filter: drop-shadow(0 0 7px rgba(255, 224, 160, 0.9));
   opacity: 0;
-  will-change: transform;
-  /* clip the sweep to the filled region */
-  clip-path: inset(0 calc((1 - var(--progress, 0)) * 100%) 0 0);
-  transition: clip-path 0.85s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.stage-progress.is-submitting .stage-progress-flow,
-.stage-progress.is-polling .stage-progress-flow {
-  opacity: 1;
-  animation: progress-flow 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+.stage-trace.is-submitting .stage-trace-glowhead,
+.stage-trace.is-polling .stage-trace-glowhead { opacity: 1; }
+.stage-trace.is-done .stage-trace-lit {
+  stroke: var(--phosphor);
+  filter: drop-shadow(0 0 6px rgba(81, 232, 138, 0.7));
+  animation: trace-settle 1.1s ease-out 1;
 }
-@keyframes progress-flow {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+@keyframes trace-settle {
+  0%   { filter: drop-shadow(0 0 14px rgba(81, 232, 138, 1)); }
+  100% { filter: drop-shadow(0 0 6px rgba(81, 232, 138, 0.7)); }
 }
-.stage-progress-head {
+.stage-trace.is-error .stage-trace-lit { stroke: var(--led-amber); filter: none; }
+
+.stage-pad-ring {
+  fill: var(--board-dark);
+  stroke: rgba(196, 122, 61, 0.4);
+  stroke-width: 2;
+  transition: stroke 0.6s ease;
+}
+.stage-pad-core { fill: rgba(196, 122, 61, 0.4); transition: fill 0.6s ease; }
+.stage-pad.is-lit .stage-pad-ring { stroke: var(--gold); }
+.stage-pad.is-lit .stage-pad-core { fill: var(--gold); }
+.stage-pad.is-active .stage-pad-core {
+  fill: #fff6e0;
+  animation: pad-pulse 1.3s ease-in-out infinite;
+}
+@keyframes pad-pulse {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+.stage-trace.is-done .stage-pad-ring { stroke: var(--phosphor); }
+.stage-trace.is-done .stage-pad-core { fill: var(--phosphor); }
+
+.stage-trace-labels { position: relative; height: 1rem; margin-top: 0.1rem; }
+.stage-trace-labels span {
   position: absolute;
-  top: 50%;
-  left: calc(var(--progress, 0) * 100%);
-  width: 10px;
-  height: 10px;
-  margin: -5px 0 0 -5px;
-  border-radius: 50%;
-  background: #fff3da;
-  box-shadow: 0 0 10px 2px rgba(255, 208, 114, 0.65);
-  opacity: 0;
-  transition: left 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.stage-progress.is-submitting .stage-progress-head,
-.stage-progress.is-polling .stage-progress-head {
-  opacity: 1;
-  animation: head-breathe 1.4s ease-in-out infinite;
-}
-@keyframes head-breathe {
-  0%, 100% { box-shadow: 0 0 6px 1px rgba(255, 208, 114, 0.4); }
-  50%      { box-shadow: 0 0 14px 4px rgba(255, 208, 114, 0.8); }
-}
-.stage-progress.is-done .stage-progress-fill {
-  background: linear-gradient(90deg, var(--gold), var(--phosphor));
-  animation: progress-done 0.8s ease-out 1;
-}
-@keyframes progress-done {
-  0%   { filter: brightness(1); }
-  30%  { filter: brightness(1.8); }
-  100% { filter: brightness(1); }
-}
-.stage-progress.is-error .stage-progress-fill { background: var(--led-amber); }
-.stage-progress-tick {
-  position: absolute;
-  top: 1px;
-  bottom: 1px;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 1px;
-  background: rgba(14, 35, 29, 0.85);
-  transition: opacity 0.4s;
-}
-.stage-progress-tick.is-passed { opacity: 0.35; }
-.stage-progress-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-top: 0.45rem;
-}
-.stage-progress-label {
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  color: var(--silk-dim);
-  animation: label-in 0.35s ease both;
-}
-@keyframes label-in {
-  from { opacity: 0; transform: translateY(3px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.stage-progress.is-done .stage-progress-label { color: var(--phosphor); }
-.stage-progress-pct {
+  transform: translateX(-50%);
   font-family: var(--font-pixel);
-  font-size: 0.6rem;
-  color: var(--gold);
-  letter-spacing: 0.08em;
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+  opacity: 0.55;
+  transition: color 0.6s ease, opacity 0.6s ease;
+  white-space: nowrap;
 }
+.stage-trace-labels span.is-lit { color: var(--gold); opacity: 1; }
+.stage-trace.is-done .stage-trace-labels span.is-lit { color: var(--phosphor); }
+
 @media (prefers-reduced-motion: reduce) {
-  .stage-progress-flow, .stage-progress-head { animation: none !important; opacity: 0 !important; }
+  .stage-trace-lit, .stage-trace-glowhead { transition-duration: 0.2s; }
+  .stage-pad.is-active .stage-pad-core { animation: none; }
 }
