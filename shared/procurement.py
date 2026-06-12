@@ -1,8 +1,8 @@
 """Post-parts-list procurement helpers.
 
-This module is intentionally separate from Step 2 generation. It may return
-supplier/referral data only from approved procurement endpoints and must not be
-used to add supplier fields to circuit JSON or deterministic parts_list rows.
+Separate from Step 2 generation by design: returns supplier/referral data only
+from approved endpoints, and must never add supplier fields to circuit JSON or
+deterministic parts_list rows.
 """
 
 from __future__ import annotations
@@ -129,29 +129,22 @@ def build_jameco_preflight_response(*, config: AvantLinkConfig | None = None) ->
 
 
 
-# ── Zero-credential link-out suppliers ─────────────────────────────────────────
-# Search deep-links that need NO credentials or approval (research 2026-06: the
-# param names are the load-bearing detail). Affiliate tracking is optional and
-# env-gated: set OHMATIC_LINKOUT_WRAP_<SUPPLIER> to a template containing {url}
-# (e.g. an Impact/CJ deep-link wrapper) once the program approves you - links
-# then carry the disclosure. Without it, plain disclosed-free search links.
+# Zero-credential link-out suppliers: search deep-links needing no credentials
+# or approval (the param names are the load-bearing detail). Affiliate tracking
+# is optional and env-gated via OHMATIC_LINKOUT_WRAP_<SUPPLIER> ({url} template,
+# e.g. an Impact/CJ wrapper); when set, links carry the disclosure, else plain.
 #
 # TODO(vittoria): after affiliate approvals, set in .env (NEVER commit values):
-#   OHMATIC_LINKOUT_WRAP_DIGIKEY  - Impact (impact.com) deep-link template, {url} placeholder
-#   OHMATIC_LINKOUT_WRAP_NEWARK   - CJ Affiliate deep-link template, {url} placeholder
+#   OHMATIC_LINKOUT_WRAP_DIGIKEY  - Impact deep-link template, {url} placeholder
+#   OHMATIC_LINKOUT_WRAP_NEWARK   - CJ Affiliate deep-link template, {url}
 #   (LCSC has no self-serve affiliate program - links stay plain)
-# Verified 2026-06-12: newark/lcsc search URLs fetch HTTP 200 with result pages;
-# digikey 403s PROGRAMMATIC fetches (Akamai bot wall) but opens fine in a real
-# browser - which is the only way these links are ever used (link-OUT).
+# digikey 403s programmatic fetches (Akamai bot wall) but opens in a real
+# browser, which is the only way these links are used (link-OUT).
 #
-# PRICE DISPLAY (phase 2) - ToS rule: NEVER scrape storefront HTML for prices.
-# Prices come ONLY from the official APIs (free tiers, self-serve signup):
-#   DigiKey Product Information V4 (developer.digikey.com, 1k searches/day)
-#     -> env DIGIKEY_CLIENT_ID / DIGIKEY_CLIENT_SECRET
-#   element14 Partner API (partner.element14.com, real-time price+stock)
-#     -> env ELEMENT14_API_KEY
-# API ToS also restrict CACHING: fetch prices live (or cache minutes, not days)
-# and attribute the source. This module stays scrape-free by design.
+# ToS rule: NEVER scrape storefront HTML for prices. Phase-2 prices come ONLY
+# from official APIs (DigiKey Product Information V4 -> DIGIKEY_CLIENT_ID/SECRET;
+# element14 Partner API -> ELEMENT14_API_KEY). ToS also limits CACHING: fetch
+# live (or cache minutes, not days) and attribute the source. Scrape-free by design.
 LINKOUT_SUPPLIERS: dict[str, dict[str, str]] = {
     "digikey": {
         "search": "https://www.digikey.com/en/products?keywords={query}",
