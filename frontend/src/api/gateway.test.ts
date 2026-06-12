@@ -90,6 +90,27 @@ describe("GatewayHttpClient", () => {
     });
   });
 
+  it("treats legacy error statuses as terminal failures", async () => {
+    // A pre-fix gateway reports terminal failure as "error"; polling it as
+    // still-running showed "queued" forever.
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(
+        {
+          status: "error",
+          stage: null,
+          result: null,
+          error: { code: "pipeline_error", message: "boom" }
+        },
+        { status: 200 }
+      )
+    ) as unknown as typeof fetch;
+    const api = new HttpGatewayApi(new GatewayHttpClient({ fetchImpl }));
+
+    await expect(api.getJobStatus("job-1")).rejects.toMatchObject({
+      detail: { code: "pipeline_error", message: "boom", source: "job" }
+    });
+  });
+
   it("maps flat 503 failures to inference_unavailable", () => {
     expect(normalizeHttpError(503, { error: "inference service unavailable" }, "submit")).toEqual({
       code: "inference_unavailable",

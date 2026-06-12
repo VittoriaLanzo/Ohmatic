@@ -97,6 +97,21 @@ kill_port() {
   fi
 }
 
+# A live instance on the port serves STALE code (it predates any git pull):
+# kill it and start fresh. This is what made `ohmatic update` look like a no-op.
+stop_stale_service() { # $1 name $2 port
+  local name="$1" port="$2" pid i
+  pid="$(cat "$RUN_DIR/$name.pid" 2>/dev/null || true)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then kill_tree "$pid"; fi
+  if ! port_free "$HOST" "$port"; then kill_port "$port"; fi
+  for i in $(seq 1 10); do
+    if port_free "$HOST" "$port"; then return 0; fi
+    sleep 0.3
+  done
+  warn "$name: :$port is still busy after the stop attempt"
+  return 0
+}
+
 # --- backend ---------------------------------------------------------------
 
 start_backend_stubs() {
@@ -109,7 +124,10 @@ start_backend_stubs() {
   for svc in "${SERVICES[@]}"; do
     name="${svc%%:*}"; dir="$(echo "$svc" | cut -d: -f2)"; port="${svc##*:}"
     if [ ! -f "$dir/server.py" ]; then warn "$name: server.py missing, skipped"; continue; fi
-    if ! port_free "$HOST" "$port"; then ok "$name already listening on :$port"; continue; fi
+    if ! port_free "$HOST" "$port"; then
+      warn "$name: replacing the running instance on :$port (it serves pre-update code)"
+      stop_stale_service "$name" "$port"
+    fi
     ( cd "$dir" && nohup "${PYTHON[@]}" server.py >"$RUN_DIR/$name.log" 2>&1 & echo $! > "$RUN_DIR/$name.pid" )
     ok "$name -> http://$HOST:$port  (pid $(cat "$RUN_DIR/$name.pid"))"
   done
@@ -148,6 +166,12 @@ ensure_frontend_deps() {
 start_frontend() {
   ensure_frontend_deps
   local npm; npm="$(npm_bin)"
+  # An old vite on the port keeps serving the old bundle to the open tab while a
+  # new one lands on port+1: replace it so the URL is stable and always current.
+  if ! port_free "$HOST" "$FRONTEND_PORT"; then
+    warn "frontend: replacing the running instance on :$FRONTEND_PORT"
+    stop_stale_service "frontend" "$FRONTEND_PORT"
+  fi
   local port; port="$(find_port "$HOST" "$FRONTEND_PORT")"
   step "Frontend: server mode (proxying /v1 + /health -> gateway :8080)"
   mkdir -p "$RUN_DIR"
@@ -192,9 +216,10 @@ cmd_stop() {
       rm -f "$f"
     done
   fi
-  # Fallback sweep: ensure the known backend ports are actually free.
+  # Fallback sweep: ensure the known backend ports and the frontend port are free.
   local svc port
   for svc in "${SERVICES[@]}"; do port="${svc##*:}"; if ! port_free "$HOST" "$port"; then kill_port "$port"; fi; done
+  if ! port_free "$HOST" "$FRONTEND_PORT"; then kill_port "$FRONTEND_PORT"; fi
   if command -v docker >/dev/null 2>&1; then ( cd "$ROOT" && docker compose down >/dev/null 2>&1 || true ); fi
   ok "done"
 }

@@ -31,8 +31,12 @@ export class HttpGatewayApi implements GatewayApi {
       : `/v1/jobs/${encodeURIComponent(jobIdOrPollUrl)}/status`;
     const status = await this.client.get<JobStatusResponse>(path, "poll");
 
-    if (status.status === "failed") {
-      throw new GatewayClientError(normalizeJobError(status.error));
+    // "failed" is the contract; "error" is what a pre-fix gateway emits. Both are
+    // terminal - treating either as still-running polls a finished job forever.
+    const raw = (status as { status: string }).status;
+    if (raw === "failed" || raw === "error") {
+      const failed = status as { error?: { code?: unknown; message?: unknown } | null };
+      throw new GatewayClientError(normalizeJobError(failed.error ?? {}));
     }
 
     return status;

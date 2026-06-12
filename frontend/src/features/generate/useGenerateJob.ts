@@ -12,6 +12,12 @@ import type {
 } from "../../types/api";
 
 const POLL_INTERVAL_MS = 500;
+// A CPU generation runs for many minutes; one dropped poll must not orphan it.
+// ~10 consecutive failures with backoff is ~20s of gateway outage tolerated.
+const MAX_TRANSIENT_POLL_FAILURES = 10;
+// Survives a page reload (same tab) so an in-flight generation is re-attached
+// instead of orphaned behind the gateway's job lock.
+const ACTIVE_JOB_KEY = "ohmatic.active-job";
 
 export type GenerateJobState = {
   phase: "idle" | "submitting" | "polling" | "done" | "error";
@@ -41,6 +47,39 @@ const initialState: GenerateJobState = {
   error: null
 };
 
+type StoredJob = { jobId: string; pollUrl: string };
+
+function readActiveJob(): StoredJob | null {
+  try {
+    const raw = window.sessionStorage.getItem(ACTIVE_JOB_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<StoredJob>;
+    return typeof parsed.jobId === "string" && typeof parsed.pollUrl === "string"
+      ? { jobId: parsed.jobId, pollUrl: parsed.pollUrl }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveJob(job: StoredJob) {
+  try {
+    window.sessionStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify(job));
+  } catch {
+    // storage unavailable: reload re-attach is best-effort
+  }
+}
+
+function clearActiveJob() {
+  try {
+    window.sessionStorage.removeItem(ACTIVE_JOB_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function useGenerateJob(api: GatewayApi = createGatewayApi()) {
   const [state, setState] = useState<GenerateJobState>(initialState);
   const activeRun = useRef(0);
@@ -51,8 +90,36 @@ export function useGenerateJob(api: GatewayApi = createGatewayApi()) {
     };
   }, []);
 
+  // Re-attach after a reload: the gateway still owns the job (and its result),
+  // so the page picks the run back up instead of looking idle while the model
+  // keeps the job lock for minutes.
+  useEffect(() => {
+    const stored = readActiveJob();
+    if (!stored) {
+      return;
+    }
+    const runId = activeRun.current + 1;
+    activeRun.current = runId;
+    setState({
+      ...initialState,
+      phase: "polling",
+      jobId: stored.jobId,
+      pollUrl: stored.pollUrl
+    });
+    void pollUntilTerminal(api, stored.pollUrl, runId, activeRun, setState, {
+      silentlyDropLostJob: true
+    }).catch(() => {
+      if (activeRun.current === runId) {
+        setState(initialState);
+      }
+    });
+    // mount-only by design; api is stable for the app's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const reset = useCallback(() => {
     activeRun.current += 1;
+    clearActiveJob();
     setState(initialState);
   }, []);
 
@@ -79,6 +146,7 @@ export function useGenerateJob(api: GatewayApi = createGatewayApi()) {
           return;
         }
 
+        saveActiveJob({ jobId: accepted.job_id, pollUrl: accepted.poll_url });
         setState({
           ...initialState,
           phase: "polling",
@@ -91,6 +159,7 @@ export function useGenerateJob(api: GatewayApi = createGatewayApi()) {
         if (activeRun.current !== runId) {
           return;
         }
+        clearActiveJob();
         setState((current) => ({
           ...current,
           phase: "error",
@@ -114,17 +183,76 @@ async function pollUntilTerminal(
   pollUrl: string,
   runId: number,
   activeRun: MutableRefObject<number>,
-  setState: Dispatch<SetStateAction<GenerateJobState>>
+  setState: Dispatch<SetStateAction<GenerateJobState>>,
+  opts: { silentlyDropLostJob?: boolean } = {}
 ) {
   // PIPELINE ENTRY: every poll updates the visible pipeline state; terminal "done"
   // is where result.circuit, drc_warnings, bom, and latency_ms enter the UI.
+  let transientFailures = 0;
   while (activeRun.current === runId) {
-    const status = await api.getJobStatus(pollUrl);
+    let status: JobStatusResponse;
+    try {
+      status = await api.getJobStatus(pollUrl);
+      transientFailures = 0;
+    } catch (error) {
+      if (activeRun.current !== runId) {
+        return;
+      }
+      const detail = error instanceof GatewayClientError ? error.detail : null;
+
+      if (detail?.source === "job") {
+        // The job itself ended in failure (killswitch refusal, pipeline error).
+        clearActiveJob();
+        setState((current) => ({
+          ...current,
+          phase: "error",
+          result: null,
+          error: detail
+        }));
+        return;
+      }
+
+      if (detail?.httpStatus === 404) {
+        // The gateway no longer knows the job: it restarted and lost its store.
+        clearActiveJob();
+        if (opts.silentlyDropLostJob) {
+          setState(initialState);
+          return;
+        }
+        setState((current) => ({
+          ...current,
+          phase: "error",
+          error: {
+            code: "job_lost",
+            message: "The gateway restarted and lost this generation. Generate again.",
+            source: "poll"
+          }
+        }));
+        return;
+      }
+
+      // Transient transport failure (proxy hiccup, busy gateway): keep the run
+      // alive instead of orphaning a generation that is still computing.
+      transientFailures += 1;
+      if (transientFailures >= MAX_TRANSIENT_POLL_FAILURES) {
+        clearActiveJob();
+        setState((current) => ({
+          ...current,
+          phase: "error",
+          error: normalizeThrownError(error)
+        }));
+        return;
+      }
+      await delay(POLL_INTERVAL_MS * Math.min(transientFailures, 6));
+      continue;
+    }
+
     if (activeRun.current !== runId) {
       return;
     }
 
     if (status.status === "done") {
+      clearActiveJob();
       setState((current) => ({
         ...current,
         phase: "done",
@@ -137,6 +265,7 @@ async function pollUntilTerminal(
     }
 
     if (status.status === "failed") {
+      clearActiveJob();
       setState((current) => ({
         ...current,
         phase: "error",

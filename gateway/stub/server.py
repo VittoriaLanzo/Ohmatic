@@ -109,18 +109,20 @@ def _run_real_job(job_id: str, prompt: str) -> None:
             JOBS[job_id]["stage"] = "t5"
             pipe = _get_pipeline()
             def _stage(stage, attempt, _j=job_id):
-                JOBS[_j]["stage"] = stage
-                JOBS[_j]["loops"] = max(JOBS[_j].get("loops", 0), attempt - 1)
+                j = JOBS[_j]
+                j["stage"] = stage
+                j["loops"] = max(j.get("loops", 0), attempt - 1)
+                if stage == "generate":  # rate clock restarts per attempt: retries are
+                    j.pop("decode_t0", None)  # ~90% prompt-lookup hits, much faster
             pipe.on_stage = _stage
             gen = getattr(pipe, "generator", None)
             if gen is not None and hasattr(gen, "progress_cb"):
-                def _cb(frac, _j=job_id):  # monotonic: retries never move the bar backward
+                def _cb(frac, _j=job_id):  # display is monotonic: retries never move the bar backward
                     j = JOBS[_j]
                     j.setdefault("decode_t0", time.time())
                     j["progress"] = max(j.get("progress", 0.0), frac)
-                    p = j["progress"]
-                    if p > 0.02:  # same-speed extrapolation: remaining = elapsed*(1-p)/p
-                        j["eta_s"] = int((time.time() - j["decode_t0"]) * (1 - p) / p)
+                    if frac > 0.02:  # same-speed extrapolation on THIS attempt's rate
+                        j["eta_s"] = int((time.time() - j["decode_t0"]) * (1 - frac) / frac)
                 gen.progress_cb = _cb
             result = pipe.run(prompt)
         if result.ok:
@@ -131,14 +133,17 @@ def _run_real_job(job_id: str, prompt: str) -> None:
                 "latency_ms": {"inference": int((time.time() - t0) * 1000), "drc": 0, "bom": 0},
             })
         else:
-            JOBS[job_id].update(status="error", stage=None, error={
+            # Contract (shared/docs/contracts.md): terminal failure is "failed".
+            # Anything else keeps the frontend polling forever on a finished job.
+            JOBS[job_id].update(status="failed", stage=None, error={
                 "code": "blocked_by_verification",
                 "message": result.user_message or "Verification did not pass.",
             })
     except Exception as exc:
-        JOBS[job_id].update(status="error", stage=None,
+        JOBS[job_id].update(status="failed", stage=None,
                             error={"code": "pipeline_error", "message": str(exc)[:300]})
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import socket
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 MAX_BODY_BYTES = 1 * 1024 * 1024
 
@@ -311,8 +316,29 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "not_found"})
 
 
+class GatewayServer(ThreadingHTTPServer):
+    """One thread per request so a slow client can never block the poll loop.
+    Generation itself stays serialized by _JOB_LOCK."""
+    daemon_threads = True
+    # Windows SO_REUSEADDR lets a SECOND gateway silently double-bind the port,
+    # splitting jobs across two processes (poll sees "queued"/404 forever).
+    # Exclusive bind turns that into a loud startup failure instead.
+    allow_reuse_address = sys.platform != "win32"
+
+    def server_bind(self):
+        if sys.platform == "win32":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("OHMATIC_PORT", "8080"))
-    print(f"Gateway stub listening on :{port}")
-    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    try:
+        srv = GatewayServer(("0.0.0.0", port), Handler)
+    except OSError:
+        print(f"Port {port} is already in use - another gateway is running. "
+              f"Run ./ohmatic stop, then start again.", file=sys.stderr)
+        sys.exit(1)
+    print(f"Gateway listening on :{port}")
+    srv.serve_forever()
