@@ -340,7 +340,8 @@ class LlamaCppChatModel:
             if delta:
                 parts.append(delta)
                 n += 1
-                self.progress_cb(min(0.99, n / self.max_new_tokens))
+                if n % 5 == 0:  # per-token callbacks are pointless churn at a 500ms poll
+                    self.progress_cb(min(0.99, n / self.max_new_tokens))
         return "".join(parts).strip()
 
 
