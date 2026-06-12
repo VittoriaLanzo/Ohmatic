@@ -1,50 +1,13 @@
-"""
-inference/vllm_backend.py
-=========================
-vLLM-backed generation backend for Ohmatic.
+"""vLLM-backed generation backend for Ohmatic.
 
-DESIGN
-------
-Replaces _Gen (train/online_correction.py) and HFChatModel (inference/pipeline.py)
-with a vLLM LLM engine that performs CONTINUOUS BATCHING - all prompts are submitted
-in a single vllm.LLM.generate() call, which fills GPU memory with concurrent
-sequences and saturates CUDA compute.  The HF loop submits prompts one-at-a-time
-(or at best num_return_sequences × one prompt at a time), leaving the GPU idle
-between sequences.  Expected throughput gain: 8-12x for the STaR harvest; 5-8x for
-prod_eval (depending on circuit length distribution and A40 VRAM headroom).
+CONTINUOUS BATCHING is the point: all prompts go in one LLM.generate() call, filling
+the GPU with concurrent sequences instead of the HF one-at-a-time loop (8-12x on the
+STaR harvest, 5-8x on prod_eval).
 
-IMPORT SAFETY
--------------
-vllm is NOT installed locally (no GPU).  The import is fully lazy - the top-level
-module import never touches vllm.  py_compile passes without vllm present.
+vllm is NOT installed locally; the import is fully lazy so py_compile/CI pass without it.
 
-USAGE
------
-# Production (pod):
-from inference.vllm_backend import VLLMChatModel
-
-model = VLLMChatModel(
-    model_dir="/workspace/merged-corr",    # fully-merged Qwen3-8B + best-erc + correction
-    max_model_len=16384,
-)
-
-# Batched (harvest hot path):
-results = model.generate(
-    list_of_message_lists,          # list[list[dict]]
-    temperature=0.7,
-    top_p=0.95,
-    n=4,
-    max_tokens=2560,
-)
-# -> list[list[str]], one inner list per input prompt, length n
-
-# Single-prompt drop-in for _Gen.__call__:
-completions = model(messages, do_sample=True, temperature=0.7, top_p=0.95, n=4)
-# -> list[str], length n
-
-# Single-prompt drop-in for HFChatModel.chat:
-text = model.chat(messages)
-# -> str (first completion, greedy)
+API: generate(batch, ...) -> list[list[str]]; __call__(messages, ...) -> list[str]
+(drop-in for _Gen.__call__); chat(messages) -> str (drop-in for HFChatModel.chat).
 """
 from __future__ import annotations
 
@@ -53,31 +16,14 @@ from typing import Any
 
 
 class VLLMChatModel:
-    """vLLM-backed chat model for Ohmatic.  Serves a FULLY-MERGED model on disk.
+    """vLLM-backed chat model serving a FULLY-MERGED model on disk.
 
-    The model_dir must contain a complete, plain HF model (no LoRA layers):
-        Qwen/Qwen3-8B + best-erc adapter + correction adapter
-    merged via train/merge_adapter.py (called upstream before this class is
-    instantiated).  vLLM does NOT support PEFT LoRA at serve time in this
-    integration; the merge-first approach avoids that constraint and is the
-    same technique used by the prod eval path.
+    model_dir must be a complete plain HF model (no LoRA layers), merged via
+    train/merge_adapter.py upstream: vLLM does NOT support PEFT LoRA at serve time
+    here, so merge-first is required (same as the prod eval path).
 
-    Args:
-        model_dir       : Local path to the fully-merged HF model directory.
-        max_model_len   : Maximum total context (prompt + generation) tokens.
-                          Must cover the Ohmatic system prompt (~6 200 tok) +
-                          the longest user prompt (~2 200 tok) + max_new_tokens (2 560).
-                          Default: 16 384 (fits on A40 48 GB with gpu_mem_util=0.90;
-                          Qwen3-8B supports up to 32 768).
-        gpu_mem_util    : Fraction of GPU VRAM to allocate for the KV cache.
-                          0.90 is the sweet spot for A40 48 GB: leaves ~4.8 GB for
-                          activations while giving the scheduler maximum KV cache.
-        dtype           : Weight dtype.  'bfloat16' matches HF training and avoids
-                          the fp16 overflow risk on long circuits.
-        tensor_parallel : Number of GPUs.  1 for single-A40 pod.
-        trust_remote_code: Required by Qwen3 (custom modelling code).
-        enforce_eager   : Disable CUDA graph capture.  False (default) is faster
-                          for large batches; set True only for debugging.
+    max_model_len must cover system prompt + user prompt + max_new_tokens.
+    dtype='bfloat16' matches HF training (avoids fp16 overflow on long circuits).
     """
 
     def __init__(
@@ -105,9 +51,7 @@ class VLLMChatModel:
         self._max_tokens_default = 2560  # matches pipeline.py / _Gen default
         self._max_model_len = max_model_len
 
-        # Load tokenizer separately - we need apply_chat_template for prompt building.
-        # vLLM has its own tokenizer internally but does not expose apply_chat_template
-        # in a stable public API, so we keep a HF tokenizer for that step only.
+        # Keep a HF tokenizer for apply_chat_template (vLLM does not expose it stably).
         self._tok = AutoTokenizer.from_pretrained(
             model_dir, trust_remote_code=trust_remote_code
         )
@@ -135,9 +79,9 @@ class VLLMChatModel:
     # ── Internal prompt formatter ─────────────────────────────────────────────
 
     def _format_prompt(self, messages: list[dict[str, str]]) -> str:
-        """Apply chat template - identical logic to HFChatModel.chat and _Gen.__call__."""
-        # enable_thinking=False matches pipeline.py + _Gen exactly.
-        # TypeError guard covers tokenizers that don't know enable_thinking.
+        """Apply chat template - identical to HFChatModel.chat and _Gen.__call__."""
+        # enable_thinking=False matches pipeline.py + _Gen; TypeError guard covers
+        # tokenizers that don't know enable_thinking.
         try:
             return self._tok.apply_chat_template(
                 messages,
@@ -167,28 +111,11 @@ class VLLMChatModel:
         max_tokens: int | None = None,
         greedy: bool = False,
     ) -> list[list[str]]:
-        """Batched generation over a list of conversations.
+        """Batched generation over conversations: ONE LLM.generate() over all prompts
+        so vLLM's continuous-batching scheduler saturates the GPU.
 
-        THE BATCHING IS THE WHOLE POINT: all prompts are submitted to vLLM in a
-        single LLM.generate() call.  vLLM's continuous-batching scheduler fills
-        the GPU with concurrent sequences from different prompts, saturating CUDA
-        compute and avoiding the HF per-sequence overhead.
-
-        Args:
-            list_of_message_lists : Batch of conversations.  Each element is a
-                                    list[dict] like [{"role":"system","content":...},
-                                    {"role":"user","content":...}].
-            temperature           : Sampling temperature.  Ignored when greedy=True.
-            top_p                 : Nucleus sampling p.  Ignored when greedy=True.
-            n                     : Number of completions per prompt.
-            max_tokens            : Max new tokens per completion.  Defaults to
-                                    self._max_tokens_default (2560).
-            greedy                : When True, use temperature=0 (argmax decoding),
-                                    matching HFChatModel.chat's do_sample=False.
-
-        Returns:
-            list[list[str]] - outer index = prompt index, inner index = sample index
-            (length n).  Ordered to match the input order.
+        greedy=True forces temperature=0 (matches HFChatModel.chat's do_sample=False).
+        Returns list[list[str]] (outer=prompt, inner=sample of length n), input order.
         """
         from vllm import SamplingParams  # type: ignore[import]
 
@@ -217,10 +144,8 @@ class VLLMChatModel:
             self._format_prompt(msgs) for msgs in list_of_message_lists
         ]
 
-        # ── Over-length pre-filter ────────────────────────────────────────────
-        # Any prompt whose token count leaves no room for generation is skipped
-        # here so a single long prompt can NEVER crash the entire batch.
-        # Budget: max_model_len - max_tok tokens reserved for generation output.
+        # Over-length pre-filter: skip any prompt with no room left for generation
+        # (budget = max_model_len - max_tok) so one long prompt can NEVER crash the batch.
         input_budget = self._max_model_len - max_tok
         valid_indices: list[int] = []
         skipped_count = 0
@@ -254,10 +179,8 @@ class VLLMChatModel:
 
         prompts: list[str] = [raw_prompts[i] for i in valid_indices]
 
-        # ONE vLLM call over ALL valid prompts - continuous batching happens here.
-        # vLLM returns one RequestOutput per prompt, preserving input order.
-        # Belt-and-suspenders: catch per-request ValueError so one bad prompt
-        # cannot crash the whole batch even after the pre-filter.
+        # ONE vLLM call over all valid prompts (continuous batching), one RequestOutput
+        # per prompt in input order. Catch ValueError so one bad prompt cannot crash the batch.
         try:
             outputs = self._llm.generate(prompts, sampling_params)
         except ValueError as exc:
@@ -288,19 +211,11 @@ class VLLMChatModel:
         top_p: float = 0.95,
         n: int = 1,
     ) -> list[str]:
-        """Single-prompt wrapper matching _Gen.__call__'s signature exactly.
+        """Single-prompt drop-in matching _Gen.__call__ (returns list[str]).
 
-        harvest() calls gen(messages, do_sample=..., temperature=..., top_p=..., n=...)
-        and expects list[str].  This wrapper makes VLLMChatModel a drop-in.
-
-        NOTE: In normal harvest use (--backend vllm) the harvest loop is replaced
-        by a batched variant that calls generate() directly on a whole-prompt batch.
-        This method is kept for compatibility / fallback / testing only.
-
-        The over-length pre-filter inside generate() applies here too: if the
-        single prompt exceeds the input budget, generate() returns [[]] and this
-        method returns [] - the harvest correction loop interprets an empty list
-        as no valid candidates and skips the prompt gracefully.
+        Kept for compatibility/fallback; the vllm harvest path uses batched generate()
+        directly. The over-length pre-filter applies: an oversize prompt returns [],
+        which the harvest loop treats as no candidates and skips gracefully.
         """
         results = self.generate(
             [messages],
@@ -314,9 +229,7 @@ class VLLMChatModel:
     # ── Drop-in for HFChatModel.chat (pipeline) ───────────────────────────────
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        """Single-prompt, greedy, single completion - matches HFChatModel.chat.
-
-        Used by OhmaticPipeline when backend='vllm'.
-        """
+        """Single-prompt greedy single completion - drop-in for HFChatModel.chat
+        (used by OhmaticPipeline when backend='vllm')."""
         completions = self(messages, do_sample=False, n=1)
         return completions[0] if completions else ""

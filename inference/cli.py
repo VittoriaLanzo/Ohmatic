@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
-"""
-Command-line interface for circuit generation.
+"""CLI for circuit generation (T5 -> Qwen -> ERC -> retry).
 
-Pipeline: User prompt → T5 normalizer → Qwen generator → ERC checker → [retry]
-
-Usage:
-    ohmatic "describe your circuit"
-    ohmatic "solar panel boost converter" --t5-model path/to/t5 --qwen-model path/to/qwen
-    ohmatic "LED blinker" --mock       # test without loaded models
+    ohmatic "describe your circuit" [--t5-model M --qwen-model M] [--mock]
 """
 import argparse
 import json
@@ -27,19 +21,7 @@ def generate_circuit_cli(
     max_retries: int = 3,
     use_mock: bool = False,
 ) -> Dict[str, Any] | None:
-    """
-    Run the T5 → Qwen → ERC pipeline and return the circuit dict.
-
-    Args:
-        prompt:        Raw user prompt (any NL style)
-        t5_model_id:   HF model ID or local path for T5 normalizer
-        qwen_model_id: HF model ID or local path for Qwen generator
-        max_retries:   Max ERC correction attempts
-        use_mock:      Use mock models (no loading) - for tests/demos
-
-    Returns:
-        Circuit dict or None on failure
-    """
+    """Run the T5 -> Qwen -> ERC pipeline; return the circuit dict or None on failure."""
     if use_mock:
         pipeline = OhmaticPipeline.mock()
     else:
@@ -64,8 +46,8 @@ def generate_circuit_cli(
                 print(f"  [{e.get('severity','?')}] {e.get('code','?')}: {e.get('message','')}", file=sys.stderr)
         if result.parse_error:
             print(f"[ohmatic] Parse error: {result.parse_error}", file=sys.stderr)
-        # KILLSWITCH: never hand the user an unverified circuit. The user-facing
-        # output is the clarification message, not the broken design.
+        # KILLSWITCH: never hand the user an unverified circuit; output the
+        # clarification message, not the broken design.
         print(result.user_message or
               "I couldn't produce a verified circuit for this request - please add "
               "more detail (supply voltage, key components, intended behavior).")
