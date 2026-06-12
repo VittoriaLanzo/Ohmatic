@@ -1,13 +1,9 @@
 """ERC golden regression - the refactor safety net.
 
-Asserts eval.diagnostics.analyze_schematic produces IDENTICAL diagnostic codes
-on a frozen 182-circuit fixture (91 known-clean + 91 known-broken, derived from
-the private holdout). Any behavioral drift in the ERC engine - the verifier
-behind training, prod, and the cross-model benchmark - fails loudly here.
-
-The fixture contains PRIVATE holdout circuits, so it is gitignored and built
-locally: `python /tmp/build_golden.py` equivalent lives in the refactor notes.
-Without the fixture the test SKIPS (CI-safe for the public repo).
+Asserts analyze_schematic produces IDENTICAL diagnostic codes on a frozen
+182-circuit fixture, so any drift in the ERC engine (the verifier behind training,
+prod, and the benchmark) fails loudly. The fixture holds PRIVATE holdout circuits,
+so it is gitignored and built locally; without it the test SKIPS (CI-safe).
 """
 
 import json
