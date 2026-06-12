@@ -26,7 +26,8 @@ export class GatewayHttpClient {
   constructor(config: GatewayClientConfig = {}) {
     this.baseUrl = normalizeBaseUrl(config.baseUrl ?? import.meta.env.VITE_OHMATIC_API_BASE_URL ?? "");
     this.apiKey = config.apiKey ?? import.meta.env.VITE_OHMATIC_API_KEY;
-    this.fetchImpl = config.fetchImpl ?? fetch;
+    // Bind: a bare fetch stored on the instance is invoked with this=client -> Illegal invocation.
+    this.fetchImpl = config.fetchImpl ?? fetch.bind(globalThis);
   }
 
   async get<T>(path: string, source: ClientErrorSource): Promise<T> {
