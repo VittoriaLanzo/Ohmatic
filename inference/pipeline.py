@@ -97,12 +97,19 @@ class PipelineConfig:
     max_retries: int = 3                   # 4 total attempts (1 generate + 3 corrections); pass@k plateaus at 4.
 
     # ── Generation backend ────────────────────────────────────────────────────
+    # 'llamacpp': qwen_model_id points to a .gguf file (what `ohmatic fetch`
+    #             downloads). CPU, CUDA and Apple Metal from the same package
+    #             (llama-cpp-python); greedy decoding to match training.
     # 'hf'   : use HFChatModel (default, works everywhere, no GPU constraint)
     # 'vllm' : use VLLMChatModel (requires vllm installed + GPU; qwen_model_id must
     #          point to a FULLY-MERGED model dir — no LoRA at serve time).
     #          When backend='vllm', qwen_adapter_id and qwen_adapter_revision are
     #          ignored (merging happens upstream via train/merge_adapter.py).
     backend: str = "hf"
+
+    # llama.cpp tuning (only used when backend='llamacpp')
+    llamacpp_n_ctx: int = 16384            # covers the ~6k-token system prompt + retries
+    llamacpp_n_gpu_layers: int = -1        # offload all layers when a GPU/Metal build is present
 
     # vLLM-specific tuning knobs (only used when backend='vllm')
     vllm_max_model_len: int = 8192         # context window; must cover system prompt + prompt + max_new_tokens
@@ -339,6 +346,37 @@ class HFChatModel:
         return self.tokenizer.decode(output[0][n_input:], skip_special_tokens=True).strip()
 
 
+class LlamaCppChatModel:
+    """GGUF inference via llama-cpp-python — one package for CPU (AVX), CUDA and
+    Apple Metal. Greedy (temperature=0) to match training, like every backend."""
+
+    def __init__(self, gguf_path: str, n_ctx: int = 16384, n_gpu_layers: int = -1,
+                 max_new_tokens: int = 2560) -> None:
+        try:
+            from llama_cpp import Llama
+        except ImportError:
+            raise RuntimeError(
+                "Install llama-cpp-python for GGUF inference: pip install llama-cpp-python "
+                "(prebuilt CUDA wheels: --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124)")
+        import multiprocessing
+        self.llm = Llama(
+            model_path=gguf_path,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            n_threads=max(1, multiprocessing.cpu_count() - 1),
+            flash_attn=True,            # no-op on builds without it; big win where supported
+            verbose=False,
+        )
+        self.max_new_tokens = max_new_tokens
+        print(f"[LlamaCppChatModel] loaded {gguf_path} (n_ctx={n_ctx}, "
+              f"n_gpu_layers={n_gpu_layers})", file=sys.stderr, flush=True)
+
+    def chat(self, messages: list[dict[str, str]]) -> str:
+        out = self.llm.create_chat_completion(
+            messages=messages, max_tokens=self.max_new_tokens, temperature=0.0)
+        return (out["choices"][0]["message"]["content"] or "").strip()
+
+
 class HFT5Normalizer:
     """Wrap a HuggingFace Seq2SeqLM checkpoint as the T5 normalizer.
 
@@ -455,7 +493,14 @@ class OhmaticPipeline:
             normalizer = _MockNormalizer()
 
         generator: ChatModel
-        if cfg.backend == "vllm":
+        if cfg.backend == "llamacpp" or (cfg.qwen_model_id or "").endswith(".gguf"):
+            generator = LlamaCppChatModel(
+                cfg.qwen_model_id,
+                n_ctx=cfg.llamacpp_n_ctx,
+                n_gpu_layers=cfg.llamacpp_n_gpu_layers,
+                max_new_tokens=cfg.qwen_max_new_tokens,
+            )
+        elif cfg.backend == "vllm":
             # vLLM path — qwen_model_id must be a fully-merged local dir.
             from inference.vllm_backend import VLLMChatModel  # lazy: vllm not on dev machines
             generator = VLLMChatModel(

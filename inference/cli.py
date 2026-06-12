@@ -90,11 +90,25 @@ Examples:
     parser.add_argument("--qwen-model", default="", help="HF model ID or path for Qwen generator")
     parser.add_argument("--max-retries", type=int, default=3,
                         help="Max ERC correction attempts (default: 3)")
+    parser.add_argument("--local", action="store_true",
+                        help="Use the weights installed by './ohmatic fetch' (models/active.json)")
     parser.add_argument("--mock", action="store_true",
                         help="Use mock models — no loading, instant output for testing")
     parser.add_argument("--compact", action="store_true", help="Compact JSON output")
 
     args = parser.parse_args()
+
+    if args.local:
+        import json as _json
+        from pathlib import Path as _Path
+        manifest = _Path(__file__).resolve().parent.parent / "models" / "active.json"
+        if not manifest.exists():
+            print("No local weights installed - run './ohmatic fetch' first.", file=sys.stderr)
+            sys.exit(1)
+        active = _json.loads(manifest.read_text(encoding="utf-8"))
+        args.qwen_model = active["model_path"]
+        args.t5_model = active.get("t5_path") or args.t5_model
+        print(f"[ohmatic] local tier '{active['tier']}': {args.qwen_model}", file=sys.stderr)
 
     circuit = generate_circuit_cli(
         prompt=args.prompt,
