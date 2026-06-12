@@ -222,11 +222,14 @@ hw_assess() {
   case "$(uname -s)" in
     Linux)  ram_gb=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null) ;;
     Darwin) ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 )) ;;
-    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null | tr -d ' ') ;;
+    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null | tr -d '
+ ') ;;
   esac
   if command -v nvidia-smi >/dev/null 2>&1; then
-    vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
-    gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 | tr -d '')
+    vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' 
+')
+    gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 | tr -d '
+')
   fi
   ram_gb=${ram_gb:-0}; vram_mb=${vram_mb:-0}
   local tier="stub" why="not enough RAM/VRAM for local inference - stub/cloud mode"
