@@ -22,16 +22,11 @@ REGISTRY_PATH = ROOT / "verifier/config/component_registry.toml"
 DEFAULT_TAXONOMY_PATH = ROOT / "eval/error_taxonomy.json"
 
 
-# ── Component-type normalization ──────────────────────────────────────────────
-# The corpus uses a few synonym type names for components that already have a
-# canonical registry type with identical electrical treatment. We fold synonyms to
-# canonical BEFORE any check so every rule sees the battle-tested canonical type and
-# stays fully strict (a broken `ic_eeprom` becomes `ic_memory` and still fails its
-# bypass-cap rule). This recognizes valid parts WITHOUT weakening any safety rule.
-#
-# Only exact-equivalent synonyms are folded here. Genuinely distinct types
-# (ic_battery_charger, ic_protection) are added to the registry/schema instead, so
-# they keep their own identity and the correct IC_TYPES_WITH_VCC treatment.
+# Component-type normalization: fold synonym types to their canonical registry
+# type BEFORE any check, so every rule sees the strict canonical type (a broken
+# ic_eeprom becomes ic_memory and still fails its bypass-cap rule). Recognizes
+# valid parts WITHOUT weakening any safety rule. Only exact-equivalent synonyms
+# are folded; genuinely distinct types go in the registry/schema instead.
 TYPE_ALIASES: dict[str, str] = {
     "voltage_ref":       "ic_voltage_ref",   # shunt reference (T3-37), not a VCC IC
     "polyfuse":          "fuse",             # resettable PPTC = a fuse for ERC
@@ -75,10 +70,9 @@ def _analyzer_error_item(group_name: str, exc: Exception) -> dict[str, Any]:
 def analyze_schematic(circuit: dict[str, Any]) -> dict[str, Any]:
     """Return structured static diagnostics for one circuit-like object.
 
-    Robust to arbitrary / malformed input: callers (the STaR harvest and the prod
-    correction loop) feed model-generated JSON through here, so NO analysis group may
-    raise. A group that fails on a malformed circuit yields a blocking diagnostic
-    instead, keeping the circuit (correctly) invalid without crashing the caller.
+    Robust to arbitrary/malformed input (callers feed model JSON), so NO analysis
+    group may raise: a failing group yields a blocking diagnostic instead, keeping
+    the circuit correctly invalid without crashing the caller.
     """
     try:
         circuit = _normalize_component_types(circuit)
@@ -240,21 +234,16 @@ def _validator_diagnostics(circuit: dict[str, Any]) -> list[dict[str, Any]]:
     return [_diagnostic_from_validator_error(error, circuit) for error in errors]
 
 
-# ── Validator-error → diagnostic dispatch ─────────────────────────────────────
-# A flat, scannable table of (matcher, handler) pairs. _diagnostic_from_validator_error
-# walks it top-to-bottom and the FIRST matching entry wins - match order is load-bearing
-# (earlier patterns shadow later ones), so the order here MUST mirror the original ladder.
-#
-# matcher is either:
-#   • a compiled regex   → handler runs on the first one whose .match(error) is truthy
-#   • a literal str       → handler runs on exact equality (match passed as None)
-# Regexes are compiled ONCE here, not per call. Each handler takes a small _Ctx and
-# returns the kwargs for _base_item(); the WHY of each rule lives on its handler.
+# Validator-error -> diagnostic dispatch: a flat (matcher, handler) table walked
+# top-to-bottom, FIRST match wins. Match order is load-bearing (earlier patterns
+# shadow later ones), so it MUST mirror the original ladder. A matcher is a compiled
+# regex (.match) or a literal str (exact equality). Each handler returns _base_item
+# kwargs; the WHY of each rule lives on its handler comment.
 
 
 class _Ctx:
-    """Per-error dispatch context: the raw error, the circuit, and the two path roots
-    (computed once instead of re-deriving the STAGE_1_TOPOLOGY ternary per handler)."""
+    """Per-error dispatch context: raw error, circuit, and the two path roots
+    (computed once, not re-deriving the STAGE_1_TOPOLOGY ternary per handler)."""
 
     __slots__ = ("error", "circuit", "comp_root", "net_root")
 
@@ -1019,10 +1008,9 @@ def _fixture_ic_without_vcc_bypass() -> dict[str, Any]:
 
 
 def _fixture_ic_not_on_literal_vcc() -> dict[str, Any]:
-    # A genuinely UNPOWERED IC: its supply pin connects to a plain net ("PWR") that
-    # carries no power-rail symbol (power_vcc/3v3/5v/12v). T3-06 now recognizes any
-    # positive supply rail (not just a net literally named "VCC"), so the only way to
-    # trip it is a supply pin with no rail at all - which is what this fixture exercises.
+    # A genuinely UNPOWERED IC: supply pin on a plain net (PWR) with no power-rail
+    # symbol. T3-06 recognizes any positive supply rail, so the only way to trip it
+    # is a supply pin with no rail at all, which this fixture exercises.
     return {
         "metadata": {"title": "Bad IC No Supply Rail", "description": "IC supply pin not on any power rail.", "version": "0.1", "tags": ["fixture"]},
         "components": [

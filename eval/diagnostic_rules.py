@@ -1,17 +1,8 @@
 """Electrical and interaction diagnostic rules for Ohmatic circuits.
 
-Architecture
-------------
-All rule checks share a single ``_Context`` object that precomputes O(1)
-lookup indices (pin→net, type→components, net→types, net→index) on
-construction.  Individual rule modules live in ``eval/rules/`` and receive
-the shared context; they never re-scan the full component or net list.
-
-To add new rule modules:
-  1.  Create ``eval/rules/your_rules.py`` with a ``your_diagnostics(ctx)``
-      entry-point function.
-  2.  Import it here and append it to ``_RULE_MODULES``.
-  3.  Add the new error codes to ``eval/error_taxonomy.json``.
+All rule checks share one `_Context` that precomputes O(1) lookup indices.
+Rule modules live in `eval/rules/`. To add one: write a `your_diagnostics(ctx)`
+entry point, append it to `_RULE_MODULES`, and add codes to error_taxonomy.json.
 """
 
 from __future__ import annotations
@@ -88,12 +79,11 @@ _RULE_MODULES: list[Callable] = [
 
 
 def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
-    """Return (components, nets) from either flat or STAGE_1_TOPOLOGY format.
+    """Return (components, nets) from flat or STAGE_1_TOPOLOGY format.
 
-    Deliberately NOT validate.resolve_circuit_topology: that resolver tolerates a
-    non-dict STAGE_1_TOPOLOGY (``... or {}``) and would silently yield empty lists,
-    whereas here a non-dict STAGE_1 must RAISE so _safe_rule turns it into a blocking
-    ERC_RULE/ANALYZER_ERROR - an un-analyzable circuit is not ERC-clean."""
+    NOT validate.resolve_circuit_topology: that resolver tolerates a non-dict
+    STAGE_1 and yields empty lists, but here a non-dict STAGE_1 must RAISE so
+    _safe_rule flags it blocking - an un-analyzable circuit is not ERC-clean."""
     if "STAGE_1_TOPOLOGY" in circuit:
         topo = circuit["STAGE_1_TOPOLOGY"]
         return topo.get("components", []), topo.get("nets", [])
@@ -102,14 +92,12 @@ def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
 
 def _safe_rule(rule: Callable[..., Any], ctx: "_Context",
                make_item: DiagnosticFactory) -> list[dict[str, Any]]:
-    """Run one diagnostic rule, converting any exception into a blocking diagnostic.
+    """Run one rule, converting any exception into a blocking diagnostic.
 
-    The diagnostic rules were written for well-formed circuits. The STaR harvest and
-    the prod correction loop feed ARBITRARY model-generated JSON through here, which
-    can be malformed (missing 'type'/'id', wrong shapes). A single rule raising must
-    never abort the whole analysis (that crashes the caller). Instead we flag the
-    circuit invalid - a circuit that cannot be analyzed is, by definition, not
-    ERC-clean - and continue with the remaining rules.
+    Rules assume well-formed circuits, but the STaR harvest and prod correction
+    loop feed ARBITRARY model JSON (missing type/id, wrong shapes). A raising rule
+    must not abort the whole analysis; flag the circuit invalid (un-analyzable is
+    not ERC-clean) and continue with the rest.
     """
     try:
         return list(rule(ctx))
@@ -158,15 +146,9 @@ def electrical_diagnostics(circuit: dict[str, Any], make_item: DiagnosticFactory
 class _Context:
     """Shared diagnostic context.
 
-    Precomputes four O(1) lookup indices on construction so that every rule
-    function runs in O(components_of_that_type) rather than O(all_nets ×
-    all_pins):
-
-    * ``pin_to_net``  - direct pin-ref → net dict lookup
-    * ``by_type``     - component type → list of component dicts
-    * ``by_id``       - component id  → component dict
-    * ``_net_idx``    - net identity  → position in self.nets list
-    * ``_net_types``  - net identity  → set of component types (lazily cached)
+    Precomputes O(1) lookup indices so each rule runs in
+    O(components_of_that_type), not O(all_nets x all_pins): pin_to_net, by_type,
+    by_id, _net_idx (net identity -> list index), _net_types (lazily cached).
     """
 
     def __init__(self, components: list[Any], nets: list[Any], make_item: DiagnosticFactory) -> None:
@@ -330,15 +312,12 @@ def _net_has_cap_to_gnd(ctx: _Context, net: dict) -> bool:
 
 
 def _net_has_resistor_to_vcc(ctx: _Context, net: dict) -> bool:
-    """True iff *net* contains a resistor whose OTHER pin lands on a positive supply
-    rail.
+    """True iff *net* has a resistor whose OTHER pin lands on a positive supply rail.
 
-    This is the correct "pull-up / current-limit" check.  A resistor whose
-    other end goes to GND, IN+, or any other non-supply net does NOT count.
-    Supply recognition uses _is_positive_supply_net so a pull-up to a 3V3 / named /
-    regulator-output rail counts, not only a literal power_vcc symbol - otherwise the
-    check false-positives ("no pull-up") on the many corpus rails that aren't a
-    power_vcc symbol.
+    The pull-up / current-limit check. A resistor to GND, IN+, or other non-supply
+    net does NOT count. Uses _is_positive_supply_net so a pull-up to a 3V3 / named /
+    regulator-output rail counts, not only a literal power_vcc symbol (else this
+    false-positives on the many corpus rails that aren't a power_vcc symbol).
     """
     for cid in ctx.comps_on_net(net):
         if ctx.component_type(cid) != "resistor":
@@ -363,16 +342,12 @@ def _led_missing_current_limit(ctx: _Context) -> list[dict[str, Any]]:
         net = ctx.net_for_pin(f"{component_id}.A")
         if not net:
             continue
-        # Fire if:
-        #   (a) anode net has no resistor at all - no current limiter anywhere, or
-        #   (b) anode net IS a power rail (power_vcc present) - even if unrelated
-        #       resistors exist on that rail, the LED is wired directly to the supply.
-        # Do NOT fire if the anode is on an intermediate net that has a series R
-        # (the R may connect upstream to a transistor output, IC pin, etc. - not
-        # necessarily to VCC directly).
+        # Fire if anode net has no resistor, OR anode net IS a power rail (wired
+        # straight to supply even if unrelated resistors sit on that rail). Do NOT
+        # fire on an intermediate net with a series R (it may go upstream, not to VCC).
         anode_on_power_rail = ctx.net_has_type(net, "power_vcc")
         if ctx.net_has_type(net, "resistor") and not anode_on_power_rail:
-            continue  # intermediate net with series R → correctly wired
+            continue  # intermediate net with series R -> correctly wired
         pin_ref = f"{component_id}.A"
         items.append(ctx.make_item(
             code="INTERACTION_LED_MISSING_CURRENT_LIMIT",
@@ -421,12 +396,10 @@ def _floating_mosfet_gate(ctx: _Context) -> list[dict[str, Any]]:
     return items
 
 
-# Net-name patterns that denote a positive supply rail even when no power symbol is
-# explicitly placed on the net (corpus convention varies: some rails are a power_vcc
-# symbol, some are just a net named VCC / 3V3 / VCC_IN / PLL_3V3 / a regulator output).
-# Matches: VCC*, VDD*, VBUS, AVDD/DVDD/VDDA/VDDIO, VIN, VOUT, and voltage tokens like
-# 3V3, 5V, 12V, 1V8, 3.3V (as a whole token, optionally with a +/_/- delimiter).
-# Deliberately does NOT match VEE/negative rails or bare signal names.
+# Net-name patterns for a positive supply rail with no explicit power symbol
+# (corpus rails vary: power_vcc symbol, or just a net named VCC / 3V3 / regulator out).
+# Matches VCC*, VDD*, VBUS, AVDD/DVDD/VDDA/VDDIO, VIN, VOUT, and voltage tokens
+# (3V3, 5V, 1V8, optional +/_/- delimiter). Deliberately NOT VEE/negative or bare signals.
 _SUPPLY_NAME_RE = re.compile(
     r"(?:^|[_\-+/])(?:VCC|VDD|VBUS|VDDA|AVDD|DVDD|VDDIO|VIN|VOUT|\+?\d+V\d*|\+?\d+\.\d+V)(?:$|[_\-/])",
     re.IGNORECASE,
@@ -440,9 +413,8 @@ def _name_is_supply(name: str) -> bool:
 
 
 def _is_positive_supply_net(ctx: _Context, net: dict) -> bool:
-    """True if *net* is a positive supply rail by ANY of three signals:
-    (1) carries a positive power symbol, (2) is a regulator/converter output,
-    (3) its name matches a supply-rail pattern. Covers the corpus's mixed
+    """True if *net* is a positive supply rail by ANY signal: positive power symbol,
+    regulator/converter output, or supply-rail name pattern. Covers mixed corpus
     conventions so T3-04/T3-06 neither false-positive on PLL_3V3-style rails nor
     miss name-only or regulator-fed rails."""
     if ctx.net_has_any_type(net, POSITIVE_SUPPLY_SYMBOLS):
@@ -468,19 +440,17 @@ _GROUND_NAME_RE = re.compile(r"^(?:GND|GROUND|VSS|AGND|DGND|PGND|EARTH|0V)(?:$|[
 
 
 def _is_ground_net(ctx: _Context, net: dict) -> bool:
-    """True if *net* is a ground reference: has a power_gnd symbol OR its name matches a
-    ground pattern (GND/VSS/AGND/DGND/PGND/0V). Mirrors the supply-net robustness so
-    ground checks don't false-positive on the corpus's name-only ground rails."""
+    """True if *net* is a ground reference: power_gnd symbol OR ground name pattern
+    (GND/VSS/AGND/DGND/PGND/0V). Mirrors supply-net robustness so ground checks
+    don't false-positive on name-only ground rails."""
     if ctx.net_has_type(net, "power_gnd"):
         return True
     return bool(_GROUND_NAME_RE.match(str(net.get("name", ""))))
 
 
 def _ic_missing_bypass(ctx: _Context) -> list[dict[str, Any]]:
-    # Compliance-first: every supply rail an IC connects to must have a local bypass
-    # capacitor to GND - not only a rail literally named "VCC". This both removes the
-    # old false negative (non-VCC rails were skipped entirely) and keeps the strict
-    # catch (an IC on a bypass-less rail still fails).
+    # Every supply rail an IC connects to needs a local bypass cap to GND, not only
+    # a rail named "VCC" (otherwise non-VCC rails were skipped: a false negative).
     supply_nets = _positive_supply_nets(ctx)
     if not supply_nets:
         return []
@@ -548,9 +518,8 @@ def _cap_polarity_item(ctx: _Context, component_id: str, pin_ref: str, net_name:
 
 
 def _ic_missing_literal_vcc(ctx: _Context) -> list[dict[str, Any]]:
-    # An IC is powered if any of its pins sits on a positive supply rail (VCC, 3V3,
-    # 5V, 12V) - not only a net literally named "VCC". This still fires for a genuinely
-    # unpowered IC (no pin on any supply rail), so the floating-supply catch is intact.
+    # An IC is powered if any pin sits on a positive supply rail (VCC/3V3/5V/12V),
+    # not only a net named "VCC". Still fires for a genuinely unpowered IC.
     supply_nets = _positive_supply_nets(ctx)
     powered_ids: set[str] = set()
     for net in supply_nets:
