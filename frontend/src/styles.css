@@ -2277,3 +2277,27 @@ body::after  { top: 14px; right: 14px; }
   .stage-trace-lit, .stage-trace-glowhead { transition-duration: 0.2s; }
   .stage-pad.is-active .stage-pad-core { animation: none; }
 }
+
+
+/* In-browser engine */
+.engine-toggle { display: inline-flex; }
+.engine-toggle button {
+  font-family: var(--font-pixel);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid var(--copper-dim);
+  background: transparent;
+  color: var(--silk-dim);
+}
+.engine-toggle button:first-child { border-radius: 6px 0 0 6px; }
+.engine-toggle button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.engine-toggle button.is-selected { color: var(--gold); border-color: var(--gold); background: rgba(255, 208, 114, 0.07); }
+.engine-toggle button.is-selected + button { border-left: 0; }
+.engine-progress {
+  margin: 0.55rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--silk-dim);
+}

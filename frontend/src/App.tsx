@@ -6,6 +6,7 @@ import { OhmaticLogo } from "./components/OhmaticLogo";
 import { ResultPanels } from "./components/ResultPanels";
 import { SchematicSvg } from "./components/SchematicSvg";
 import { StageRail } from "./components/StageRail";
+import { useBrowserEngine } from "./features/generate/useBrowserEngine";
 import { useGenerateJob } from "./features/generate/useGenerateJob";
 import { humanizeStage } from "./lib/format";
 import type { GenerateOptions } from "./types/api";
@@ -25,7 +26,10 @@ const defaultOptions: Required<Pick<GenerateOptions, "max_retries" | "max_compon
 type CompletionMotion = "idle" | "burst" | "returning" | "settled";
 
 export default function App() {
-  const job = useGenerateJob();
+  const gatewayJob = useGenerateJob();
+  const browserJob = useBrowserEngine();
+  const [engineMode, setEngineMode] = useState<"gateway" | "browser">("gateway");
+  const job = engineMode === "browser" ? browserJob : gatewayJob;
   const [prompt, setPrompt] = useState(examples[0]);
   const [maxComponents, setMaxComponents] = useState(defaultOptions.max_components);
   const [symbolStyle, setSymbolStyle] = useState<SymbolStyle>("ansi");
@@ -156,6 +160,17 @@ export default function App() {
         </div>
 
         <div className="form-actions">
+          <div className="segmented-control engine-toggle" role="group" aria-label="Inference engine">
+            <button type="button" className={engineMode === "gateway" ? "is-selected" : ""}
+              aria-pressed={engineMode === "gateway"} onClick={() => setEngineMode("gateway")} disabled={job.isBusy}>
+              Gateway
+            </button>
+            <button type="button" className={engineMode === "browser" ? "is-selected" : ""}
+              aria-pressed={engineMode === "browser"} onClick={() => setEngineMode("browser")} disabled={job.isBusy}
+              title="Runs the model on YOUR GPU via WebGPU; verification stays with the rule checker">
+              In-browser
+            </button>
+          </div>
           <details className="options-disclosure">
             <summary>
               <SlidersHorizontal size={14} aria-hidden="true" />
@@ -185,6 +200,9 @@ export default function App() {
             Reset
           </button>
         </div>
+        {engineMode === "browser" && browserJob.loadProgress && browserJob.isBusy && (
+          <p className="engine-progress" aria-live="polite">{browserJob.loadProgress}</p>
+        )}
       </form>
 
       <section className="workspace" aria-label="Circuit result workspace">

@@ -2,6 +2,22 @@
 """Stub server for gateway. Returns hardcoded valid responses. Replace with production implementation in Stage 1. See shared/docs/contracts.md for the contract."""
 import json
 import re
+import sys
+from pathlib import Path
+
+# Runtime entry point: the launcher runs this with cwd=gateway/stub, so the
+# repo root must be importable for the ERC/prompt single sources of truth.
+_ROOT = str(Path(__file__).resolve().parents[2])
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+try:
+    from eval.diagnostics import analyze_schematic as _analyze_schematic
+    from shared.erc_feedback import format_erc_errors as _format_erc_errors
+    from shared.prompt_builder import build_system_prompt as _build_system_prompt
+    VERIFY_AVAILABLE = True
+except Exception:
+    VERIFY_AVAILABLE = False
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 MAX_BODY_BYTES = 1 * 1024 * 1024
@@ -44,6 +60,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path == "/v1/verify":
+            # ERC-as-a-service for browser-mode generation: the SAME
+            # analyze_schematic + feedback format as training/prod/benchmark.
+            if not VERIFY_AVAILABLE:
+                self.send_json(503, {"error": "erc_unavailable"})
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+                circuit = body.get("circuit")
+                assert isinstance(circuit, dict)
+            except Exception:
+                self.send_json(400, {"error": "bad_request",
+                                     "detail": "POST {\"circuit\": {...}}"})
+                return
+            diags = _analyze_schematic(circuit).get("diagnostics", [])
+            self.send_json(200, {
+                "passed": not diags,
+                "diagnostics": diags,
+                "feedback": _format_erc_errors(diags) if diags else ""
+            })
+            return
         if path == "/v1/generate":
             try:
                 content_length = int(self.headers.get("Content-Length", 0))
@@ -114,6 +152,11 @@ class Handler(BaseHTTPRequestHandler):
                 },
                 "error": None
             })
+        elif path == "/v1/system-prompt":
+            if not VERIFY_AVAILABLE:
+                self.send_json(503, {"error": "prompt_unavailable"})
+                return
+            self.send_json(200, {"system_prompt": _build_system_prompt()})
         elif path == "/v1/doctor":
             # Hardware verdict written by `ohmatic doctor` / `ohmatic start` (hw_assess).
             import os
