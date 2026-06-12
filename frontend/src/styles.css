@@ -1220,9 +1220,6 @@ th {
   animation: logo-board-glow 1.7s ease-in-out infinite;
 }
 
-.logo-current {
-  filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.82));
-}
 .spark {
   fill: none;
   stroke: var(--signal-color, #22c55e);
@@ -1231,10 +1228,9 @@ th {
   stroke-linejoin: round;
   stroke-dasharray: 0.08 0.92;
   stroke-dashoffset: 1;
-  will-change: stroke-dashoffset;
+  filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.82));
   animation: current-run var(--signal-speed, 2.8s) linear infinite;
 }
-.ohmatic-logo { transform: translateZ(0); }
 
 .ohmatic-logo.is-idle .spark {
   stroke-dasharray: 0.025 0.975;
