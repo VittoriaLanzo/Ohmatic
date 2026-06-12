@@ -168,6 +168,7 @@ cmd_start() {
   step "Ohmatic starting"
   hw_assess
   ok "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY}) -> $RUN_DIR/doctor.json"
+  offer_deps_install
   offer_model_pull
   if [ "$mode" = "mock" ]; then
     warn "mock mode: backend not started"
@@ -239,6 +240,43 @@ cmd_update() {
     [ -n "$npm" ] && (cd "$ROOT/frontend" && "$npm" install)
   fi
   ok "done. Restart with: ./ohmatic stop && ./ohmatic start"
+}
+
+# Python packages the real pipeline needs, probed per tier. Module -> pip spec
+# differs for torch (CPU vs CUDA index) and llama.cpp (prebuilt wheels).
+deps_missing() {
+  local tier="$1"
+  [ "$tier" = "stub" ] && return 0
+  local mods="huggingface_hub torch transformers sentencepiece" m
+  case "$tier" in q4_k_m|q4_k_m_cpu|q8_0) mods="$mods llama_cpp" ;; bf16) mods="$mods accelerate" ;; esac
+  for m in $mods; do
+    "${PYTHON[@]}" -c "import $m" >/dev/null 2>&1 || printf "%s " "$m"
+  done
+}
+
+pip_install_dep() {
+  case "$1" in
+    torch)
+      if [ "${OHMATIC_VRAM_MB:-0}" -gt 0 ]; then "${PYTHON[@]}" -m pip install torch
+      else "${PYTHON[@]}" -m pip install torch --index-url https://download.pytorch.org/whl/cpu; fi ;;
+    llama_cpp)
+      "${PYTHON[@]}" -m pip install llama-cpp-python --prefer-binary         --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu ;;
+    *) "${PYTHON[@]}" -m pip install "$1" ;;
+  esac
+}
+
+offer_deps_install() {
+  detect_python || return 0
+  local missing; missing="$(deps_missing "$OHMATIC_TIER")"
+  [ -z "${missing// /}" ] && return 0
+  warn "packages missing for the real pipeline: $missing"
+  if [ ! -t 0 ]; then dim "install later: ./ohmatic doctor"; return 0; fi
+  printf "  Install via pip now? [Y/n]: "
+  local a; read -r a || a="n"
+  case "$a" in
+    n|N) dim "skipped - run './ohmatic doctor' anytime" ;;
+    *) local m; for m in $missing; do pip_install_dep "$m"; done; ok "packages installed" ;;
+  esac
 }
 
 # First-run model onboarding: no weights installed -> offer the doctor-matched
@@ -338,6 +376,7 @@ cmd_doctor() {
   if [ "$OHMATIC_VRAM_MB" -gt 0 ] 2>/dev/null; then ok "gpu       VRAM ${OHMATIC_VRAM_MB} MB"; else dim "gpu       no NVIDIA GPU detected (nvidia-smi absent)"; fi
   ok "ram       ${OHMATIC_RAM_GB} GB"
   ok "model     recommended: ${OHMATIC_TIER} - ${OHMATIC_TIER_WHY}"
+  offer_deps_install
 
   local busy="" p
   for p in 8080 8001 8002 8003 "$FRONTEND_PORT"; do port_free "$HOST" "$p" || busy="$busy $p"; done
