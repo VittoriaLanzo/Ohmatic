@@ -1,4 +1,4 @@
-//! Pairwise collision corrector — pushes two overlapping components apart
+//! Pairwise collision corrector - pushes two overlapping components apart
 //! using an iterative half-depth strategy (up to [`MAX_ITERATIONS`] steps).
 
 use crate::config::BboxConfig;
@@ -110,7 +110,7 @@ mod tests {
     fn correct_collision_zero_delta_fallback() {
         let _ = tracing_subscriber::fmt::try_init();
         let bboxes = load_bboxes();
-        // Centres are identical — exercises the zero-delta fallback path (len < 1e-9).
+        // Centres are identical - exercises the zero-delta fallback path (len < 1e-9).
         let mut a = make_component("R1", 0.0, 0.0);
         let mut b = make_component("R2", 0.0, 0.0);
         // Must not panic, must resolve via fallback (1.0, 0.0) direction.
@@ -128,7 +128,7 @@ mod tests {
         //
         // The false-return path is exercised only in the multi-component scenario inside
         // `run_tier2`, where correcting one pair can re-introduce overlap with a third
-        // component that was NOT in the original pair list — the re-scan in Step 4 of
+        // component that was NOT in the original pair list - the re-scan in Step 4 of
         // run_tier2 then emits the T2-02 warning. That path is covered by the corrector's
         // `seed_circuits_run_tier2_no_panic_and_t2_warnings_for_unresolvable` test and
         // the `t2_02_unresolvable_collision_200` integration test.

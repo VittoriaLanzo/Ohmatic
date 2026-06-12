@@ -1,4 +1,4 @@
-"""Transistor, IGBT, SCR, and TRIAC gate/base ERC rules — T3-13 through T3-16."""
+"""Transistor, IGBT, SCR, and TRIAC gate/base ERC rules - T3-13 through T3-16."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -41,7 +41,7 @@ def _bjt_base_missing_resistor(ctx: "_Context") -> list[dict[str, Any]]:
             why_it_matters="A BJT base driven directly from a logic output without a series resistor can draw excessive base current and damage the driving IC or the transistor.",
             expected="a resistor in series between the driver and the BJT base",
             actual=f"{pin_ref} on {net.get('name', '')}",
-            repair_hint="Insert a base resistor (typically 1k–10kΩ) in series between the driver and the BJT base.",
+            repair_hint="Insert a base resistor (typically 1k-10kΩ) in series between the driver and the BJT base.",
             component_id=component_id,
             component_type=str(component.get("type", "")),
             pin_ref=pin_ref,
@@ -105,7 +105,7 @@ def _scr_gate_missing_resistor(ctx: "_Context") -> list[dict[str, Any]]:
             why_it_matters="An SCR gate without a resistor is susceptible to noise-triggered false firing and has no current limit, which can damage the gate junction.",
             expected="a resistor in series on the SCR gate net",
             actual=f"{pin_ref} on {net.get('name', '')}",
-            repair_hint="Add a series gate resistor (typically 47Ω–1kΩ) and optionally a pull-down to cathode.",
+            repair_hint="Add a series gate resistor (typically 47Ω-1kΩ) and optionally a pull-down to cathode.",
             component_id=component_id,
             component_type="thyristor_scr",
             pin_ref=pin_ref,
@@ -135,7 +135,7 @@ def _triac_gate_missing_resistor(ctx: "_Context") -> list[dict[str, Any]]:
             why_it_matters="A TRIAC gate without a series resistor can be noise-triggered or have unlimited gate surge current.",
             expected="a resistor in series on the TRIAC gate net",
             actual=f"{pin_ref} on {net.get('name', '')}",
-            repair_hint="Add a series gate resistor (typically 100Ω–1kΩ).",
+            repair_hint="Add a series gate resistor (typically 100Ω-1kΩ).",
             component_id=component_id,
             component_type="triac",
             pin_ref=pin_ref,
@@ -149,7 +149,7 @@ def _triac_gate_missing_resistor(ctx: "_Context") -> list[dict[str, Any]]:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def fixture_bjt_base_no_resistor() -> dict[str, Any]:
-    """NPN with base driven directly from MCU — triggers T3-13."""
+    """NPN with base driven directly from MCU - triggers T3-13."""
     return {
         "metadata": {"title": "Bad BJT Base No Resistor", "description": "NPN base driven directly from MCU output with no series resistor.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -167,9 +167,9 @@ def fixture_bjt_base_no_resistor() -> dict[str, Any]:
 
 
 def fixture_igbt_gate_no_driver() -> dict[str, Any]:
-    """IGBT with gate connected only to a capacitor — triggers T3-14."""
+    """IGBT with gate connected only to a capacitor - triggers T3-14."""
     return {
-        "metadata": {"title": "Bad IGBT Gate No Driver", "description": "IGBT gate on a net with only a capacitor — no driver or bias.", "version": "0.1", "tags": ["fixture"]},
+        "metadata": {"title": "Bad IGBT Gate No Driver", "description": "IGBT gate on a net with only a capacitor - no driver or bias.", "version": "0.1", "tags": ["fixture"]},
         "components": [
             {"id": "VCC1", "type": "power_vcc", "part": "VCC", "value": "15V", "pins": {"1": "VCC"}, "x": 0, "y": 0},
             {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "0V", "pins": {"1": "GND"}, "x": 0, "y": 140},
@@ -185,7 +185,7 @@ def fixture_igbt_gate_no_driver() -> dict[str, Any]:
 
 
 def fixture_scr_gate_no_resistor() -> dict[str, Any]:
-    """SCR with gate driven directly from logic — triggers T3-15."""
+    """SCR with gate driven directly from logic - triggers T3-15."""
     return {
         "metadata": {"title": "Bad SCR Gate No Resistor", "description": "SCR gate connected directly to MCU output with no series resistor.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -203,7 +203,7 @@ def fixture_scr_gate_no_resistor() -> dict[str, Any]:
 
 
 def fixture_triac_gate_no_resistor() -> dict[str, Any]:
-    """TRIAC with gate driven directly from logic — triggers T3-16."""
+    """TRIAC with gate driven directly from logic - triggers T3-16."""
     return {
         "metadata": {"title": "Bad TRIAC Gate No Resistor", "description": "TRIAC gate connected directly to MCU output with no series resistor.", "version": "0.1", "tags": ["fixture"]},
         "components": [

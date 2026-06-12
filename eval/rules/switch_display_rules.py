@@ -1,4 +1,4 @@
-"""Switch, display, stepper, servo, and SSR ERC rules — T3-24 through T3-28, T3-36."""
+"""Switch, display, stepper, servo, and SSR ERC rules - T3-24 through T3-28, T3-36."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -89,7 +89,7 @@ def _seven_segment_missing_current_limit(ctx: "_Context") -> list[dict[str, Any]
                 why_it_matters="Seven-segment LED segments require individual current-limiting resistors; direct connection to a logic rail will overcurrent the segment and may destroy the display or driving IC.",
                 expected=f"a current-limiting resistor on the net for segment pin {seg_pin}",
                 actual=f"{pin_ref} on net '{net.get('name', '')}' with no resistor",
-                repair_hint="Add a current-limiting resistor (typically 100Ω–470Ω depending on VCC and desired brightness) in series with each segment pin.",
+                repair_hint="Add a current-limiting resistor (typically 100Ω-470Ω depending on VCC and desired brightness) in series with each segment pin.",
                 component_id=comp_id,
                 component_type="seven_segment",
                 pin_ref=pin_ref,
@@ -150,7 +150,7 @@ def _ssr_input_missing_current_limit(ctx: "_Context") -> list[dict[str, Any]]:
             why_it_matters="SSR input circuitry contains an internal LED; driving it without a current-limiting resistor will burn out the input optocoupler and disable the relay permanently.",
             expected="a current-limiting resistor in series with the SSR IN+ pin",
             actual=f"{pin_ref} on net '{net.get('name', '')}' with no resistor",
-            repair_hint="Add a current-limiting resistor between the driving signal and IN+, sized for the SSR input current specification (typically 5–20mA).",
+            repair_hint="Add a current-limiting resistor between the driving signal and IN+, sized for the SSR input current specification (typically 5-20mA).",
             component_id=comp_id,
             component_type="relay_solid_state",
             pin_ref=pin_ref,
@@ -199,7 +199,7 @@ def _servo_missing_control_signal(ctx: "_Context") -> list[dict[str, Any]]:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def fixture_stepper_direct_mcu() -> dict[str, Any]:
-    """Stepper motor driven directly from MCU — triggers T3-24."""
+    """Stepper motor driven directly from MCU - triggers T3-24."""
     return {
         "metadata": {"title": "Bad Stepper Direct MCU", "description": "Stepper coils wired directly to MCU GPIO.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -220,7 +220,7 @@ def fixture_stepper_direct_mcu() -> dict[str, Any]:
 
 
 def fixture_seven_segment_no_resistors() -> dict[str, Any]:
-    """Seven-segment display with segment pins directly on MCU — triggers T3-25."""
+    """Seven-segment display with segment pins directly on MCU - triggers T3-25."""
     return {
         "metadata": {"title": "Bad 7-Seg No Resistors", "description": "7-segment driven without current-limiting resistors.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -241,7 +241,7 @@ def fixture_seven_segment_no_resistors() -> dict[str, Any]:
 
 
 def fixture_switch_no_pull() -> dict[str, Any]:
-    """Switch output floating (no pull resistor) — triggers T3-27."""
+    """Switch output floating (no pull resistor) - triggers T3-27."""
     return {
         "metadata": {"title": "Bad Switch No Pull", "description": "Switch output with no pull resistor.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -259,7 +259,7 @@ def fixture_switch_no_pull() -> dict[str, Any]:
 
 
 def fixture_ssr_no_current_limit() -> dict[str, Any]:
-    """SSR input driven directly without resistor — triggers T3-28."""
+    """SSR input driven directly without resistor - triggers T3-28."""
     return {
         "metadata": {"title": "Bad SSR No Input R", "description": "SSR input with no current-limiting resistor.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -280,7 +280,7 @@ def fixture_ssr_no_current_limit() -> dict[str, Any]:
 
 
 def fixture_servo_no_signal() -> dict[str, Any]:
-    """Servo SIG pin connected to nothing useful — triggers T3-36."""
+    """Servo SIG pin connected to nothing useful - triggers T3-36."""
     return {
         "metadata": {"title": "Bad Servo No Signal", "description": "Servo SIG floating with no MCU or driver.", "version": "0.1", "tags": ["fixture"]},
         "components": [

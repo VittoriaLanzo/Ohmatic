@@ -1,5 +1,5 @@
 """
-build_holdout.py — Freeze a marketing-grade held-out benchmark for Ohmatic
+build_holdout.py - Freeze a marketing-grade held-out benchmark for Ohmatic
 ===========================================================================
 Produces a FROZEN evaluation set that the model never trains on, so post-training
 ERC pass-rates are honest, verifiable, and reproducible by a third party.
@@ -219,7 +219,7 @@ def _select_unseen_variant(rng, by_family, novel_set, bench, exclude_hashes, cho
                 taken_per_family[fam] += 1
                 progressed = True
                 if it["prompt_sha1"] in chosen:
-                    continue   # already used (collision across families) — skip
+                    continue   # already used (collision across families) - skip
                 bench.append({**it, "partition": "unseen_variant"})
                 exclude_hashes.add(it["prompt_sha1"])
                 chosen.add(it["prompt_sha1"])
@@ -282,7 +282,7 @@ def build():
 
     bench: list[dict] = []
     exclude_hashes: set[str] = set()
-    chosen: set[str] = set()   # global dedup — a prompt can occur under >1 family
+    chosen: set[str] = set()   # global dedup - a prompt can occur under >1 family
 
     n_novel = _select_novel_family(rng, forward, by_family, novel_families, novel_set,
                                    bench, exclude_hashes, chosen)

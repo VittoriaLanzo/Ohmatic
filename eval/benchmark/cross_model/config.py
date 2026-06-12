@@ -1,12 +1,12 @@
 """
-Cross-model benchmark — configuration & reproducibility pins.
+Cross-model benchmark - configuration & reproducibility pins.
 ==============================================================
 EVERYTHING that defines a benchmark run lives here: the model matrix, the
 suites, decoding parameters, and the exact artifact revisions. Reproducing the
 benchmark = same repo commit + the three env keys + `python -m
 eval.benchmark.cross_model.generate --model X --suite Y` per leg.
 
-Env (only secrets live in env — never in this file):
+Env (only secrets live in env - never in this file):
     ANTHROPIC_API_KEY   hosted Fable leg
     OPENAI_API_KEY      hosted Codex leg   (+ optional OPENAI_BASE_URL / OPENAI_MODEL)
     HF_TOKEN            held-out sets + Ohmatic weights (private HF repos)
@@ -32,14 +32,14 @@ OHMATIC_GGUF_Q4    = "Ohmatic-Qwen3-8B-Q4_K_M.gguf"
 T5_NORMALIZER      = "VittoriaLanzo/ohmatic-t5-normalizer"
 QWEN_BASE          = "Qwen/Qwen3-8B"
 
-# Decoding — identical budget for every model. Local legs are GREEDY
+# Decoding - identical budget for every model. Local legs are GREEDY
 # (deterministic); hosted legs are temperature-pinned where the API allows
-# (adaptive models that reject sampling params run at their default — disclosed).
+# (adaptive models that reject sampling params run at their default - disclosed).
 MAX_TOKENS    = 4096
 TEMPERATURE   = 0.0
 PIPELINE_MAX_RETRIES = 3          # Ohmatic product setting: 1 generate + 3 corrections
 
-# Hosted-API price table, USD per MTok (input, output) — for the cost column.
+# Hosted-API price table, USD per MTok (input, output) - for the cost column.
 PRICES = {
     "fable-5":   (10.0, 50.0),
     "codex-5.5": (1.25, 10.0),    # adjust to the configured OpenAI model's sheet
@@ -47,11 +47,11 @@ PRICES = {
 
 # ── Model matrix ──────────────────────────────────────────────────────────────
 # adapter: which client implementation runs the leg
-#   "anthropic" — Anthropic SDK (hosted)
-#   "openai"    — OpenAI-compatible client (hosted Codex OR any base_url)
-#   "ohmatic"   — the FULL product pipeline (T5 -> Qwen -> ERC -> retries ->
+#   "anthropic" - Anthropic SDK (hosted)
+#   "openai"    - OpenAI-compatible client (hosted Codex OR any base_url)
+#   "ohmatic"   - the FULL product pipeline (T5 -> Qwen -> ERC -> retries ->
 #                 killswitch), via inference.pipeline.OhmaticPipeline. Needs GPU.
-# t5: realuser suite only — forward/correction holdout prompts are already
+# t5: realuser suite only - forward/correction holdout prompts are already
 #     normalized, so the pipeline runs with a pass-through normalizer there
 #     (same convention as eval/benchmark/prod_eval.py).
 MODELS: dict[str, dict] = {
@@ -65,7 +65,7 @@ MODELS: dict[str, dict] = {
         suites=["forward", "realuser"],
     ),
 
-    # Ohmatic product legs — full end-to-end pipeline incl. killswitch
+    # Ohmatic product legs - full end-to-end pipeline incl. killswitch
     "qwen3-base": dict(                      # untrained base in the SAME shell
         adapter="ohmatic", qwen_model=QWEN_BASE, backend="hf",
         suites=["forward", "realuser", "correction"],
@@ -80,7 +80,7 @@ MODELS: dict[str, dict] = {
         suites=["forward", "realuser", "correction"],
     ),
 
-    # Ablation: trained model WITHOUT the T5 front-end (realuser only) —
+    # Ablation: trained model WITHOUT the T5 front-end (realuser only) -
     # isolates exactly what T5 contributes on messy input.
     "star-r2-noT5": dict(
         adapter="ohmatic", qwen_model=OHMATIC_FINAL_REPO, backend="hf",
@@ -107,5 +107,5 @@ def check_suite_allowed(model: str, suite: str) -> None:
         raise SystemExit(f"Suite '{suite}' not enabled for '{model}' "
                          f"(enabled: {cfg['suites']})")
     if suite in LOCAL_ONLY_SUITES and cfg["adapter"] in ("anthropic", "openai"):
-        raise SystemExit(f"Suite '{suite}' is LOCAL-ONLY (proprietary) — "
+        raise SystemExit(f"Suite '{suite}' is LOCAL-ONLY (proprietary) - "
                          f"refusing to send it to a hosted API.")

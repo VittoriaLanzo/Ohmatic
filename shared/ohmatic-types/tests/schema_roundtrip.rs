@@ -103,7 +103,7 @@ fn test_net_has_at_least_two_pins() {
 
 #[test]
 fn test_component_type_all_known_names_roundtrip() {
-    // ComponentType is now a transparent string newtype — any string deserialises.
+    // ComponentType is now a transparent string newtype - any string deserialises.
     // Verify that all well-known type names survive a serde round-trip unchanged.
     let types = [
         "resistor", "capacitor", "led", "diode", "transistor_npn", "transistor_pnp",
@@ -128,7 +128,7 @@ fn test_component_type_all_known_names_roundtrip() {
 
 #[test]
 fn test_unknown_component_type_deserializes_as_string() {
-    // ComponentType is a transparent string wrapper — any string is accepted at the
+    // ComponentType is a transparent string wrapper - any string is accepted at the
     // serde level.  Unknown types are rejected at the verifier (T1-PARSE) level by
     // checking against the component registry, NOT at deserialisation time.
     let json = "\"unknown_widget\"";
@@ -174,14 +174,14 @@ fn test_coordinate_out_of_300_range_is_valid() {
     };
     let json = serde_json::to_string(&component).expect("serialization failed");
     let _restored: Component =
-        serde_json::from_str(&json).expect("should deserialize — no coordinate bounds");
+        serde_json::from_str(&json).expect("should deserialize - no coordinate bounds");
 }
 
 // ---------------------------------------------------------------------------
-// Regression tests — Stage 0 acceptance criteria (AC1, AC3, AC5, AC6, AC7)
+// Regression tests - Stage 0 acceptance criteria (AC1, AC3, AC5, AC6, AC7)
 // ---------------------------------------------------------------------------
 
-/// AC1 — `shared/schema/circuit_v01.json` is valid JSON and contains all
+/// AC1 - `shared/schema/circuit_v01.json` is valid JSON and contains all
 /// required JSON Schema draft-07 structural fields.
 /// Fails pre-fix: `include_str!` compile error if the file is absent.
 #[test]
@@ -219,7 +219,7 @@ fn test_schema_json_has_required_structure() {
     );
 }
 
-/// AC3 — Deserialization must fail when a required field is absent.
+/// AC3 - Deserialization must fail when a required field is absent.
 /// Sub-case A: top-level `nets` field missing → OhmaticCircuitV01 must return Err.
 /// Sub-case B: a component object missing `type` field → Component must return Err.
 /// Fails pre-fix: OhmaticCircuitV01 / Component types absent.
@@ -267,9 +267,9 @@ fn test_schema_rejects_missing_required_field() {
     );
 }
 
-/// AC3 — A full circuit whose component has an unrecognised type string must
+/// AC3 - A full circuit whose component has an unrecognised type string must
 /// be rejected at the schema-validation layer (circuit_v01.json enum).
-/// ComponentType is now a transparent string newtype — serde accepts any string;
+/// ComponentType is now a transparent string newtype - serde accepts any string;
 /// rejection happens via JSON Schema and the verifier registry check (T1-PARSE).
 #[test]
 fn test_schema_rejects_unknown_component_type_json() {
@@ -298,7 +298,7 @@ fn test_schema_rejects_unknown_component_type_json() {
         ]
     }"#).unwrap();
 
-    // Serde now accepts any string for ComponentType — rejection is at schema/registry level.
+    // Serde now accepts any string for ComponentType - rejection is at schema/registry level.
     let serde_result: Result<OhmaticCircuitV01, _> =
         serde_json::from_value(bad_circuit_value.clone());
     assert!(serde_result.is_ok(), "ComponentType(String) accepts any string at serde level");
@@ -313,7 +313,7 @@ fn test_schema_rejects_unknown_component_type_json() {
     );
 }
 
-/// AC5 — Every element in `dataset/examples.json` must have `tier3_reviewed: true`
+/// AC5 - Every element in `dataset/examples.json` must have `tier3_reviewed: true`
 /// at root level.
 /// Fails pre-fix: `include_str!` compile error if file absent; assertion fails if
 /// the field is missing on any circuit.
@@ -343,7 +343,7 @@ fn test_examples_json_all_tier3_annotated() {
     }
 }
 
-/// AC7 — `shared/docs/contracts.md` must contain all five endpoint strings and
+/// AC7 - `shared/docs/contracts.md` must contain all five endpoint strings and
 /// the versioning dispatch sentinel `unsupported_schema_version`.
 /// Fails pre-fix: `include_str!` compile error if file absent.
 #[test]
@@ -367,7 +367,7 @@ fn test_contracts_md_contains_all_endpoints() {
     }
 }
 
-/// AC6 — `shared/docs/log_schema.md` must document all five required log fields.
+/// AC6 - `shared/docs/log_schema.md` must document all five required log fields.
 /// Fails pre-fix: `include_str!` compile error if file absent.
 #[test]
 fn test_log_schema_md_has_required_fields() {
@@ -383,7 +383,7 @@ fn test_log_schema_md_has_required_fields() {
     }
 }
 
-/// AC7 — The done-state circuit shape referenced in contracts.md must deserialize
+/// AC7 - The done-state circuit shape referenced in contracts.md must deserialize
 /// successfully as OhmaticCircuitV01.  This uses a hardcoded JSON literal that
 /// matches the circuit shape shown in the contracts.md `/infer` response example.
 /// Fails pre-fix: OhmaticCircuitV01 type absent.
@@ -526,15 +526,15 @@ fn test_contracts_done_state_circuit_validates_against_json_schema() {
 }
 
 // ---------------------------------------------------------------------------
-// Round 1 triage tests — VALID findings (findings 1–7)
+// Round 1 triage tests - VALID findings (findings 1-7)
 // ---------------------------------------------------------------------------
 
-/// Finding 2 — Component pins values are typed as string in the schema and in
+/// Finding 2 - Component pins values are typed as string in the schema and in
 /// the Rust type (`HashMap<String, String>`). Deserializing a component whose
 /// pin value is an integer (not a string) must fail at the serde layer.
 #[test]
 fn test_component_pin_integer_value_rejected_by_serde() {
-    // Pin "1" has value 42 (integer) instead of a string — must be rejected.
+    // Pin "1" has value 42 (integer) instead of a string - must be rejected.
     let bad_component = r#"{
         "id": "R1",
         "type": "resistor",
@@ -551,7 +551,7 @@ fn test_component_pin_integer_value_rejected_by_serde() {
     );
 }
 
-/// Finding 3 — `nets[].pins` items must match `^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_]+$`.
+/// Finding 3 - `nets[].pins` items must match `^[A-Z][A-Za-z0-9_]*\\.[A-Za-z0-9_]+$`.
 /// A pin reference like "R1" (no dot, no pin name) must fail JSON Schema validation.
 #[test]
 fn test_net_pin_missing_dot_rejected_by_schema() {
@@ -562,7 +562,7 @@ fn test_net_pin_missing_dot_rejected_by_schema() {
         serde_json::from_str(schema_str).expect("circuit_v01.json must be valid JSON");
     let compiled = JSONSchema::compile(&schema_value).expect("schema compile failed");
 
-    // "R1" has no dot — does not satisfy the pattern `^[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_]+$`
+    // "R1" has no dot - does not satisfy the pattern `^[A-Z][A-Za-z0-9_]*\.[A-Za-z0-9_]+$`
     let instance: serde_json::Value = serde_json::from_str(r#"{
         "metadata": {
             "title": "Bad Pin Ref",
@@ -612,12 +612,12 @@ fn test_net_pin_missing_dot_rejected_by_schema() {
     );
 }
 
-/// Finding 4 — Component `id` pattern tightened to `^[A-Z][A-Za-z0-9_]*$`
+/// Finding 4 - Component `id` pattern tightened to `^[A-Z][A-Za-z0-9_]*$`
 /// (must start with uppercase letter, leading underscore no longer allowed).
 ///
 /// Sub-test A: `"_bypass"` (leading underscore) must fail JSON Schema validation.
 /// Sub-test B: `"C_bypass"` (uppercase first letter, underscore later) must still
-/// pass serde deserialization — confirming the existing test_underscore_id_in_component
+/// pass serde deserialization - confirming the existing test_underscore_id_in_component
 /// remains valid under the tightened pattern.
 #[test]
 fn test_leading_underscore_id_rejected_by_schema() {
@@ -628,7 +628,7 @@ fn test_leading_underscore_id_rejected_by_schema() {
         serde_json::from_str(schema_str).expect("circuit_v01.json must be valid JSON");
     let compiled = JSONSchema::compile(&schema_value).expect("schema compile failed");
 
-    // Sub-test A: "_bypass" starts with underscore — violates ^[A-Z][A-Za-z0-9_]*$
+    // Sub-test A: "_bypass" starts with underscore - violates ^[A-Z][A-Za-z0-9_]*$
     let instance_bad: serde_json::Value = serde_json::from_str(r#"{
         "metadata": {
             "title": "Bad ID",
@@ -698,7 +698,7 @@ fn test_leading_underscore_id_rejected_by_schema() {
     );
 }
 
-/// Findings 1 & 5 — No duplicate net names within any circuit in examples.json.
+/// Findings 1 & 5 - No duplicate net names within any circuit in examples.json.
 /// Finding 1 specifically checks that the LDO circuit (index 7) has exactly one GND net.
 /// Finding 5 generalises: all circuits in examples.json must have unique net names.
 #[test]
@@ -737,7 +737,7 @@ fn test_examples_json_no_duplicate_net_names() {
     }
 }
 
-/// Finding 6 — `shared/docs/contracts.md` must contain an error.code table with
+/// Finding 6 - `shared/docs/contracts.md` must contain an error.code table with
 /// all five defined error codes. These are the authoritative strings consumed by
 /// the gateway and by client error-handling code.
 #[test]
@@ -760,7 +760,7 @@ fn test_contracts_md_contains_all_error_codes() {
     }
 }
 
-/// Finding 7 — `shared/docs/log_schema.md` documents the ULID format for
+/// Finding 7 - `shared/docs/log_schema.md` documents the ULID format for
 /// `request_id`. The inline ULID example must be exactly 26 characters long,
 /// consistent with the ULID specification.
 #[test]
@@ -791,11 +791,11 @@ fn test_log_schema_md_ulid_example_is_26_chars() {
 }
 
 // ---------------------------------------------------------------------------
-// Round 2 constraint tests — uniqueItems on tags, minLength on tag items,
+// Round 2 constraint tests - uniqueItems on tags, minLength on tag items,
 // uniqueItems on nets[].pins
 // ---------------------------------------------------------------------------
 
-/// Round 2 — tags minLength: 1 constraint; an empty-string tag must fail JSON Schema validation.
+/// Round 2 - tags minLength: 1 constraint; an empty-string tag must fail JSON Schema validation.
 #[test]
 fn test_empty_tag_rejected_by_schema() {
     use jsonschema::JSONSchema;
@@ -844,7 +844,7 @@ fn test_empty_tag_rejected_by_schema() {
     );
 }
 
-/// Round 2 — tags uniqueItems constraint; duplicate tags must fail JSON Schema validation.
+/// Round 2 - tags uniqueItems constraint; duplicate tags must fail JSON Schema validation.
 #[test]
 fn test_duplicate_tags_rejected_by_schema() {
     use jsonschema::JSONSchema;
@@ -893,7 +893,7 @@ fn test_duplicate_tags_rejected_by_schema() {
     );
 }
 
-/// Round 2 — nets[].pins uniqueItems constraint; duplicate pin refs in one net must fail JSON Schema validation.
+/// Round 2 - nets[].pins uniqueItems constraint; duplicate pin refs in one net must fail JSON Schema validation.
 #[test]
 fn test_duplicate_net_pin_ref_rejected_by_schema() {
     use jsonschema::JSONSchema;

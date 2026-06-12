@@ -1,5 +1,5 @@
 """
-Cross-model benchmark — the three client implementations.
+Cross-model benchmark - the three client implementations.
 ==========================================================
 Every adapter exposes ONE method:
 
@@ -14,7 +14,7 @@ returning a uniform row fragment:
      "normalized_prompt": str}
 
 Hosted legs are SINGLE-SHOT (pass@1): they receive the byte-identical system
-prompt + user turn and must answer in one attempt — the ERC feedback loop is
+prompt + user turn and must answer in one attempt - the ERC feedback loop is
 proprietary and part of the Ohmatic product, not a free service to competitors
 (disclosed in the report). Ohmatic legs run the FULL product pipeline:
 T5 (realuser suite) -> Qwen -> ERC -> up to 3 corrections -> killswitch.
@@ -70,7 +70,7 @@ class AnthropicAdapter:
 
 class OpenAICompatAdapter:
     """Covers Codex (api.openai.com) AND any OpenAI-compatible endpoint via
-    OPENAI_BASE_URL — that's the plug-and-play reproducibility hook."""
+    OPENAI_BASE_URL - that's the plug-and-play reproducibility hook."""
 
     def __init__(self, model: str):
         from openai import OpenAI
@@ -121,7 +121,7 @@ class _LlamaCppChatModel:
 
 class OhmaticAdapter:
     """End-to-end product: T5 (when enabled) -> Qwen -> ERC -> retries ->
-    killswitch. Wraps inference.pipeline.OhmaticPipeline — the same code prod
+    killswitch. Wraps inference.pipeline.OhmaticPipeline - the same code prod
     serves, zero benchmark-special behavior."""
 
     def __init__(self, cfg: dict, use_t5: bool):
@@ -137,7 +137,7 @@ class OhmaticAdapter:
             gguf = hf_hub_download(cfg["gguf_repo"], cfg["gguf_file"],
                                    token=os.environ.get("HF_TOKEN"))
             generator = _LlamaCppChatModel(gguf)
-        else:  # hf — fully-merged repo loads like any causal LM (no adapter)
+        else:  # hf - fully-merged repo loads like any causal LM (no adapter)
             from inference.pipeline import HFChatModel
             generator = HFChatModel(cfg["qwen_model"],
                                     max_new_tokens=C.MAX_TOKENS)
@@ -149,7 +149,7 @@ class OhmaticAdapter:
     def chat_messages(self, messages: list[dict]) -> dict:
         """Correction suite: single-shot repair on the VERBATIM trained
         conversation (system + broken circuit + ERC feedback). No T5, no retry
-        loop — mirrors in-training correction_eval. Output verified like any
+        loop - mirrors in-training correction_eval. Output verified like any
         raw generation in stage 2."""
         t0 = time.time()
         text = self.pipeline.generator.chat(messages)
@@ -159,7 +159,7 @@ class OhmaticAdapter:
 
     def run(self, system_prompt: str, user_prompt: str) -> dict:
         # system_prompt arg ignored on purpose: the pipeline builds its own from
-        # the SAME shared single source — byte-identical to what hosted legs get.
+        # the SAME shared single source - byte-identical to what hosted legs get.
         t0 = time.time()
         r = self.pipeline.run(user_prompt)
         return {
@@ -185,6 +185,6 @@ def build_adapter(model_name: str, suite: str):
         return OpenAICompatAdapter(cfg["model"])
     if kind == "ohmatic":
         # T5 only for realuser (raw messy input). Holdout prompts are already
-        # normalized — pass-through there, same as prod_eval.
+        # normalized - pass-through there, same as prod_eval.
         return OhmaticAdapter(cfg, use_t5=(suite == "realuser"))
     raise SystemExit(f"Unknown adapter kind: {kind}")

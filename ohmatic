@@ -221,7 +221,7 @@ cmd_stats() {
 }
 
 cmd_fetch() {
-  step "Ohmatic fetch — downloading the doctor-recommended weights"
+  step "Ohmatic fetch - downloading the doctor-recommended weights"
   hw_assess
   ok "tier: ${OHMATIC_TIER} (${OHMATIC_TIER_WHY})"
   if detect_python; then "${PYTHON[@]}" tools/fetch_model.py "$@"; else fail "needs Python 3"; fi

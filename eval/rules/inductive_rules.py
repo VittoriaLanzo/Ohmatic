@@ -1,4 +1,4 @@
-"""Inductive load and speaker drive ERC rules — T3-17 through T3-19."""
+"""Inductive load and speaker drive ERC rules - T3-17 through T3-19."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -101,7 +101,7 @@ def _relay_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
                 items.append(ctx.make_item(
                     code="INTERACTION_RELAY_FLYBACK_DIODE_REVERSED",
                     path=f"$.nets[{ctx.net_index(anode_net)}].pins",
-                    message=f"{cid}: flyback diode anode (A) is on the supply side of relay {component_id} — diode is reversed",
+                    message=f"{cid}: flyback diode anode (A) is on the supply side of relay {component_id} - diode is reversed",
                     why_it_matters="A reversed flyback diode conducts continuously when the switch is ON, shorting the supply through the driver and destroying it.",
                     expected="cathode (K) toward the positive rail, anode (A) toward the switching node",
                     actual=f"{cid}.A on supply net '{anode_net.get('name', '')}'",
@@ -186,7 +186,7 @@ def _motor_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
                 items.append(ctx.make_item(
                     code="INTERACTION_MOTOR_FLYBACK_DIODE_REVERSED",
                     path=f"$.nets[{ctx.net_index(anode_net)}].pins",
-                    message=f"{cid}: flyback diode anode (A) is on the supply side of motor {component_id} — diode is reversed",
+                    message=f"{cid}: flyback diode anode (A) is on the supply side of motor {component_id} - diode is reversed",
                     why_it_matters="A reversed flyback diode conducts continuously when the switch is ON, shorting the supply through the driver and destroying it.",
                     expected="cathode (K) toward the positive rail, anode (A) toward the switching node",
                     actual=f"{cid}.A on supply net '{anode_net.get('name', '')}'",
@@ -296,7 +296,7 @@ def _speaker_direct_mcu_drive(ctx: "_Context") -> list[dict[str, Any]]:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def fixture_relay_no_flyback() -> dict[str, Any]:
-    """Relay coil driven by transistor with no flyback diode — triggers T3-17."""
+    """Relay coil driven by transistor with no flyback diode - triggers T3-17."""
     return {
         "metadata": {"title": "Bad Relay No Flyback", "description": "Relay coil with no flyback diode.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -318,7 +318,7 @@ def fixture_relay_no_flyback() -> dict[str, Any]:
 
 
 def fixture_motor_dc_no_flyback() -> dict[str, Any]:
-    """DC motor with no flyback diode — triggers T3-18."""
+    """DC motor with no flyback diode - triggers T3-18."""
     return {
         "metadata": {"title": "Bad Motor No Flyback", "description": "DC motor driven without flyback diodes.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -334,7 +334,7 @@ def fixture_motor_dc_no_flyback() -> dict[str, Any]:
 
 
 def fixture_speaker_direct_mcu() -> dict[str, Any]:
-    """Speaker connected directly to MCU with no audio driver — triggers T3-19."""
+    """Speaker connected directly to MCU with no audio driver - triggers T3-19."""
     return {
         "metadata": {"title": "Bad Speaker Direct MCU", "description": "Speaker driven directly from MCU GPIO.", "version": "0.1", "tags": ["fixture"]},
         "components": [

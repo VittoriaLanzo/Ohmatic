@@ -1,4 +1,4 @@
-//! `ohmatic-types` — shared circuit data model.
+//! `ohmatic-types` - shared circuit data model.
 //!
 //! Re-exports [`OhmaticCircuitV01`], [`Component`], [`ComponentType`],
 //! [`component_types`] constants, [`Net`], and [`CircuitMetadata`].

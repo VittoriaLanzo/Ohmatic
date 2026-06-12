@@ -35,7 +35,7 @@ def generate_circuit_cli(
         t5_model_id:   HF model ID or local path for T5 normalizer
         qwen_model_id: HF model ID or local path for Qwen generator
         max_retries:   Max ERC correction attempts
-        use_mock:      Use mock models (no loading) — for tests/demos
+        use_mock:      Use mock models (no loading) - for tests/demos
 
     Returns:
         Circuit dict or None on failure
@@ -67,7 +67,7 @@ def generate_circuit_cli(
         # KILLSWITCH: never hand the user an unverified circuit. The user-facing
         # output is the clarification message, not the broken design.
         print(result.user_message or
-              "I couldn't produce a verified circuit for this request — please add "
+              "I couldn't produce a verified circuit for this request - please add "
               "more detail (supply voltage, key components, intended behavior).")
         return None
 
@@ -93,7 +93,7 @@ Examples:
     parser.add_argument("--local", action="store_true",
                         help="Use the weights installed by './ohmatic fetch' (models/active.json)")
     parser.add_argument("--mock", action="store_true",
-                        help="Use mock models — no loading, instant output for testing")
+                        help="Use mock models - no loading, instant output for testing")
     parser.add_argument("--compact", action="store_true", help="Compact JSON output")
 
     args = parser.parse_args()

@@ -1,4 +1,4 @@
-"""Power regulation and oscillator ERC rules — T3-09 through T3-12."""
+"""Power regulation and oscillator ERC rules - T3-09 through T3-12."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 def _net_has_cap_to_gnd(ctx, net):  # type: ignore[no-untyped-def]
-    """Lazy proxy — defers import of _net_has_cap_to_gnd to avoid circular import."""
+    """Lazy proxy - defers import of _net_has_cap_to_gnd to avoid circular import."""
     import eval.diagnostic_rules as _dr  # noqa: PLC0415
     return _dr._net_has_cap_to_gnd(ctx, net)
 
@@ -112,7 +112,7 @@ def _crystal_missing_load_caps(ctx: "_Context") -> list[dict[str, Any]]:
             if not net or _net_has_cap_to_gnd(ctx, net):
                 continue
             # A crystal terminal tied directly to GND is grounded, not an oscillator
-            # node — it needs no load capacitor. Only oscillator pins (on non-ground
+            # node - it needs no load capacitor. Only oscillator pins (on non-ground
             # nets) require load caps. Skip grounded terminals to avoid a false positive.
             if _is_ground_net(ctx, net):
                 continue
@@ -121,9 +121,9 @@ def _crystal_missing_load_caps(ctx: "_Context") -> list[dict[str, Any]]:
                 path=f"$.nets[{ctx.net_index(net)}].pins",
                 message=f"{comp_id}: crystal pin {osc_pin} on net '{net.get('name', '')}' has no load capacitor",
                 why_it_matters="Crystal oscillators require load capacitors on both oscillator pins to start reliably and reach the rated frequency.",
-                expected=f"a capacitor from crystal pin {osc_pin} to GND (typically 18–22pF)",
+                expected=f"a capacitor from crystal pin {osc_pin} to GND (typically 18-22pF)",
                 actual=f"{pin_ref} on net '{net.get('name', '')}' with no capacitor",
-                repair_hint="Add a load capacitor (typically 18–22pF) from each crystal pin to GND.",
+                repair_hint="Add a load capacitor (typically 18-22pF) from each crystal pin to GND.",
                 component_id=comp_id,
                 component_type="crystal",
                 pin_ref=pin_ref,

@@ -133,7 +133,7 @@ def build_jameco_preflight_response(*, config: AvantLinkConfig | None = None) ->
 # Search deep-links that need NO credentials or approval (research 2026-06: the
 # param names are the load-bearing detail). Affiliate tracking is optional and
 # env-gated: set OHMATIC_LINKOUT_WRAP_<SUPPLIER> to a template containing {url}
-# (e.g. an Impact/CJ deep-link wrapper) once the program approves you — links
+# (e.g. an Impact/CJ deep-link wrapper) once the program approves you - links
 # then carry the disclosure. Without it, plain disclosed-free search links.
 #
 # TODO(vittoria): after affiliate approvals, set in .env (NEVER commit values):
@@ -181,7 +181,7 @@ def build_linkout_response(
     supplier: str,
     quantity: int = 1,
 ) -> dict[str, Any]:
-    """Search-link procurement for LINKOUT_SUPPLIERS — no API, no credentials.
+    """Search-link procurement for LINKOUT_SUPPLIERS - no API, no credentials.
 
     Each buyable parts_list row becomes one search deep-link. When the
     supplier's affiliate wrap template is configured (program approved), the

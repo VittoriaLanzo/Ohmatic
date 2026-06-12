@@ -6,7 +6,7 @@ vLLM-backed generation backend for Ohmatic.
 DESIGN
 ------
 Replaces _Gen (train/online_correction.py) and HFChatModel (inference/pipeline.py)
-with a vLLM LLM engine that performs CONTINUOUS BATCHING — all prompts are submitted
+with a vLLM LLM engine that performs CONTINUOUS BATCHING - all prompts are submitted
 in a single vllm.LLM.generate() call, which fills GPU memory with concurrent
 sequences and saturates CUDA compute.  The HF loop submits prompts one-at-a-time
 (or at best num_return_sequences × one prompt at a time), leaving the GPU idle
@@ -15,7 +15,7 @@ prod_eval (depending on circuit length distribution and A40 VRAM headroom).
 
 IMPORT SAFETY
 -------------
-vllm is NOT installed locally (no GPU).  The import is fully lazy — the top-level
+vllm is NOT installed locally (no GPU).  The import is fully lazy - the top-level
 module import never touches vllm.  py_compile passes without vllm present.
 
 USAGE
@@ -90,7 +90,7 @@ class VLLMChatModel:
         trust_remote_code: bool = True,
         enforce_eager: bool = False,
     ) -> None:
-        # ── Lazy vllm import — safe on CPU-only machines (py_compile, CI) ────────
+        # ── Lazy vllm import - safe on CPU-only machines (py_compile, CI) ────────
         try:
             from vllm import LLM  # type: ignore[import]
             from transformers import AutoTokenizer  # type: ignore[import]
@@ -105,7 +105,7 @@ class VLLMChatModel:
         self._max_tokens_default = 2560  # matches pipeline.py / _Gen default
         self._max_model_len = max_model_len
 
-        # Load tokenizer separately — we need apply_chat_template for prompt building.
+        # Load tokenizer separately - we need apply_chat_template for prompt building.
         # vLLM has its own tokenizer internally but does not expose apply_chat_template
         # in a stable public API, so we keep a HF tokenizer for that step only.
         self._tok = AutoTokenizer.from_pretrained(
@@ -135,7 +135,7 @@ class VLLMChatModel:
     # ── Internal prompt formatter ─────────────────────────────────────────────
 
     def _format_prompt(self, messages: list[dict[str, str]]) -> str:
-        """Apply chat template — identical logic to HFChatModel.chat and _Gen.__call__."""
+        """Apply chat template - identical logic to HFChatModel.chat and _Gen.__call__."""
         # enable_thinking=False matches pipeline.py + _Gen exactly.
         # TypeError guard covers tokenizers that don't know enable_thinking.
         try:
@@ -187,7 +187,7 @@ class VLLMChatModel:
                                     matching HFChatModel.chat's do_sample=False.
 
         Returns:
-            list[list[str]] — outer index = prompt index, inner index = sample index
+            list[list[str]] - outer index = prompt index, inner index = sample index
             (length n).  Ordered to match the input order.
         """
         from vllm import SamplingParams  # type: ignore[import]
@@ -197,7 +197,7 @@ class VLLMChatModel:
 
         max_tok = max_tokens if max_tokens is not None else self._max_tokens_default
 
-        # Build sampling params — greedy: temperature=0, top_p/top_k irrelevant.
+        # Build sampling params - greedy: temperature=0, top_p/top_k irrelevant.
         if greedy:
             sampling_params = SamplingParams(
                 n=n,
@@ -254,7 +254,7 @@ class VLLMChatModel:
 
         prompts: list[str] = [raw_prompts[i] for i in valid_indices]
 
-        # ONE vLLM call over ALL valid prompts — continuous batching happens here.
+        # ONE vLLM call over ALL valid prompts - continuous batching happens here.
         # vLLM returns one RequestOutput per prompt, preserving input order.
         # Belt-and-suspenders: catch per-request ValueError so one bad prompt
         # cannot crash the whole batch even after the pre-filter.
@@ -263,7 +263,7 @@ class VLLMChatModel:
         except ValueError as exc:
             # Should not happen after pre-filter, but guard anyway.
             print(
-                f"[VLLMChatModel.generate] vLLM ValueError on batch: {exc} — "
+                f"[VLLMChatModel.generate] vLLM ValueError on batch: {exc} - "
                 "returning empty completions for all prompts in this batch.",
                 file=sys.stderr,
                 flush=True,
@@ -299,7 +299,7 @@ class VLLMChatModel:
 
         The over-length pre-filter inside generate() applies here too: if the
         single prompt exceeds the input budget, generate() returns [[]] and this
-        method returns [] — the harvest correction loop interprets an empty list
+        method returns [] - the harvest correction loop interprets an empty list
         as no valid candidates and skips the prompt gracefully.
         """
         results = self.generate(
@@ -314,7 +314,7 @@ class VLLMChatModel:
     # ── Drop-in for HFChatModel.chat (pipeline) ───────────────────────────────
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        """Single-prompt, greedy, single completion — matches HFChatModel.chat.
+        """Single-prompt, greedy, single completion - matches HFChatModel.chat.
 
         Used by OhmaticPipeline when backend='vllm'.
         """

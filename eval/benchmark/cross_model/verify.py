@@ -1,10 +1,10 @@
 """
-Stage 2 — VERIFY (local, free, rerunnable forever).
+Stage 2 - VERIFY (local, free, rerunnable forever).
 ====================================================
     python -m eval.benchmark.cross_model.verify
 
 Reads every results/{model}.jsonl row and classifies it through the IDENTICAL
-extraction -> ERC path (eval.diagnostics.analyze_schematic — the single source
+extraction -> ERC path (eval.diagnostics.analyze_schematic - the single source
 of truth shared with training and prod). Outcomes:
 
     delivered_clean     a circuit reached the user and passes ERC
@@ -34,7 +34,7 @@ from eval.diagnostics import analyze_schematic   # SINGLE source of truth
 
 
 def extract_circuit(text: str) -> dict | None:
-    """Shared lenient extractor — applied to EVERY model equally.
+    """Shared lenient extractor - applied to EVERY model equally.
     Strips markdown fences / prose, takes the first balanced top-level {...}."""
     text = (text or "").strip()
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)

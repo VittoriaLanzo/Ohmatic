@@ -1,8 +1,8 @@
-//! Central rule-ID constants — prevents typos across modules.
+//! Central rule-ID constants - prevents typos across modules.
 //! Add a constant here whenever a new rule ID is introduced; use the constant
 //! everywhere instead of a bare string literal.
 
-/// Tier 2: component position normalised to the 0–300 viewport grid.
+/// Tier 2: component position normalised to the 0-300 viewport grid.
 pub const T2_NORMALISE: &str = "T2-01";
 
 /// Tier 2: axis-aligned bounding-box collision between two components.

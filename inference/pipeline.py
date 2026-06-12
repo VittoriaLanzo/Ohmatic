@@ -5,13 +5,13 @@ Full Ohmatic inference pipeline:
 
     User (any style)
         ↓
-    T5 normalizer          — maps diverse NL to clean technical description
+    T5 normalizer          - maps diverse NL to clean technical description
         ↓
-    Qwen generator         — generates circuit JSON from normalized prompt
+    Qwen generator         - generates circuit JSON from normalized prompt
         ↓
-    ERC static checker     — validates the circuit against all rules
+    ERC static checker     - validates the circuit against all rules
         ↓
-    [errors?] → Qwen retry — appends ERC error message; Qwen corrects the JSON
+    [errors?] → Qwen retry - appends ERC error message; Qwen corrects the JSON
         ↓
     Return circuit or final error report
 
@@ -47,7 +47,7 @@ from typing import Any, Callable, Protocol
 _ROOT = Path(__file__).resolve().parent.parent
 
 try:
-    # Use analyze_schematic — the SAME validity standard as training/the held-out benchmark
+    # Use analyze_schematic - the SAME validity standard as training/the held-out benchmark
     # (structural/schema validation via _validator + forbidden-field checks + the electrical
     # rules). The old path here ran ONLY electrical_diagnostics, skipping structural validation,
     # so prod passed malformed circuits the benchmark would fail (pass@1 inflated ~0.9 vs the
@@ -62,7 +62,7 @@ except Exception as _exc:
     ERC_AVAILABLE = False
 
     def _run_erc(circuit: dict) -> list[dict]:
-        return []  # ERC unavailable — pass through
+        return []  # ERC unavailable - pass through
 
 
 # ── Protocol interfaces (model-agnostic) ──────────────────────────────────────
@@ -81,7 +81,7 @@ class ChatModel(Protocol):
 
 @dataclass
 class PipelineConfig:
-    # T5 normalizer — trained Ohmatic restyler (held-out test: exact_match 52% vs 0.3% baseline,
+    # T5 normalizer - trained Ohmatic restyler (held-out test: exact_match 52% vs 0.3% baseline,
     # entity_preservation 81%). Falls back conceptually to "google/flan-t5-base" if unavailable.
     t5_model_id: str = "VittoriaLanzo/ohmatic-t5-normalizer"
     t5_max_new_tokens: int = 256
@@ -93,7 +93,7 @@ class PipelineConfig:
     qwen_max_new_tokens: int = 2560        # matches training/eval; longest valid circuit ~2.2k
     qwen_attn_implementation: str = "flash_attention_2"  # FA2 if available, else graceful fallback
 
-    # ERC retry loop — greedy decoding (set in HFChatModel) for deterministic JSON
+    # ERC retry loop - greedy decoding (set in HFChatModel) for deterministic JSON
     max_retries: int = 3                   # 4 total attempts (1 generate + 3 corrections); pass@k plateaus at 4.
 
     # ── Generation backend ────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ class PipelineConfig:
     #             (llama-cpp-python); greedy decoding to match training.
     # 'hf'   : use HFChatModel (default, works everywhere, no GPU constraint)
     # 'vllm' : use VLLMChatModel (requires vllm installed + GPU; qwen_model_id must
-    #          point to a FULLY-MERGED model dir — no LoRA at serve time).
+    #          point to a FULLY-MERGED model dir - no LoRA at serve time).
     #          When backend='vllm', qwen_adapter_id and qwen_adapter_revision are
     #          ignored (merging happens upstream via train/merge_adapter.py).
     backend: str = "hf"
@@ -150,8 +150,8 @@ class PipelineResult:
 
 # ── System prompt builder ─────────────────────────────────────────────────────
 
-# System prompt + ERC feedback come from the SHARED single sources of truth — the exact
-# same functions the training data was built with — so what the model is SERVED is
+# System prompt + ERC feedback come from the SHARED single sources of truth - the exact
+# same functions the training data was built with - so what the model is SERVED is
 # byte-identical to what it was TRAINED on. The previous inline versions here had drifted
 # (stale flat schema; a different ERC-error layout) and would have served the model
 # out-of-distribution prompts + feedback.
@@ -171,7 +171,7 @@ def _build_system_prompt(
     erc_rules: list[dict] | None = None,
 ) -> str:
     """Standardized Ohmatic system prompt (schema + full registry + full ERC catalog),
-    from shared/prompt_builder. Args are ignored (kept for call-site compatibility) —
+    from shared/prompt_builder. Args are ignored (kept for call-site compatibility) -
     the canonical config drives everything."""
     return _shared_system_prompt()
 
@@ -179,7 +179,7 @@ def _build_system_prompt(
 def _killswitch_message(erc_errors: list[dict], parse_error: str) -> str:
     """User-facing refusal when no attempt passed verification.
 
-    Never exposes the broken circuit or the internal rule taxonomy — just an
+    Never exposes the broken circuit or the internal rule taxonomy - just an
     honest 'not delivering unverified work' plus a concrete ask for clarification.
     """
     if parse_error and not erc_errors:
@@ -190,7 +190,7 @@ def _killswitch_message(erc_errors: list[dict], parse_error: str) -> str:
         )
     return (
         "I generated several candidate designs, but none passed my electrical "
-        "verification — and I don't deliver circuits I can't verify. Could you "
+        "verification - and I don't deliver circuits I can't verify. Could you "
         "clarify the requirements? The most helpful details: supply voltage, the "
         "key components you expect, and what the circuit should do. I'll try again "
         "with that."
@@ -210,7 +210,7 @@ def _parse_circuit(text: str) -> tuple[dict | None, str]:
         if isinstance(obj, dict):
             return obj, ""
     except json.JSONDecodeError:
-        pass  # not clean JSON — fall through to the prose-stripping regex fallback below
+        pass  # not clean JSON - fall through to the prose-stripping regex fallback below
 
     # Try to extract JSON block (in case model leaked prose before/after)
     match = re.search(r"\{[\s\S]*\}", text)
@@ -220,7 +220,7 @@ def _parse_circuit(text: str) -> tuple[dict | None, str]:
             if isinstance(obj, dict):
                 return obj, ""
         except json.JSONDecodeError:
-            pass  # extracted block still isn't valid JSON — report the explicit error below
+            pass  # extracted block still isn't valid JSON - report the explicit error below
 
     return None, f"Model output is not valid JSON: {text[:200]!r}"
 
@@ -301,7 +301,7 @@ class HFChatModel:
             print(f"[HFChatModel] adapter tokenizer load failed ({_tok_exc}); "
                   f"falling back to base {model_id}.", file=sys.stderr, flush=True)
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-        # Prefer FlashAttention-2 (Ampere/A40 supported) — ~2x faster generation than the
+        # Prefer FlashAttention-2 (Ampere/A40 supported) - ~2x faster generation than the
         # sdpa/xformers fallback on the long 6.2k-token prompts. GRACEFUL: FA2 is a SPEEDUP, not
         # a correctness requirement, so if flash-attn is not installed/loadable we fall back to
         # the default attention instead of crashing. The active impl is logged so a smoke run
@@ -325,7 +325,7 @@ class HFChatModel:
               f"@{adapter_revision or '-'})  attn={_impl}", file=sys.stderr, flush=True)
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        # GREEDY decoding (do_sample=False) + enable_thinking=False — identical to how the
+        # GREEDY decoding (do_sample=False) + enable_thinking=False - identical to how the
         # model was trained and evaluated. Sampling here would make serving drift from
         # training and add nondeterminism to a structured-JSON task.
         try:
@@ -339,7 +339,7 @@ class HFChatModel:
             output = self.model.generate(
                 **inputs,
                 max_new_tokens=self.max_new_tokens,
-                do_sample=False,            # greedy — temperature intentionally absent
+                do_sample=False,            # greedy - temperature intentionally absent
                 pad_token_id=self.tokenizer.eos_token_id,
             )
         n_input = inputs["input_ids"].shape[1]
@@ -347,7 +347,7 @@ class HFChatModel:
 
 
 class LlamaCppChatModel:
-    """GGUF inference via llama-cpp-python — one package for CPU (AVX), CUDA and
+    """GGUF inference via llama-cpp-python - one package for CPU (AVX), CUDA and
     Apple Metal. Greedy (temperature=0) to match training, like every backend."""
 
     def __init__(self, gguf_path: str, n_ctx: int = 16384, n_gpu_layers: int = -1,
@@ -479,9 +479,9 @@ class OhmaticPipeline:
         When cfg.backend == 'vllm':
             cfg.qwen_model_id must point to a FULLY-MERGED model dir on disk
             (produced by train/merge_adapter.py).  qwen_adapter_id and
-            qwen_adapter_revision are ignored — vLLM serves the plain merged model.
+            qwen_adapter_revision are ignored - vLLM serves the plain merged model.
         When cfg.backend == 'hf' (default):
-            behaviour is unchanged — HFChatModel loads base + LoRA as before.
+            behaviour is unchanged - HFChatModel loads base + LoRA as before.
         """
         # System prompt = the shared single source (exactly what the model trained on).
         system_prompt = _build_system_prompt()
@@ -501,7 +501,7 @@ class OhmaticPipeline:
                 max_new_tokens=cfg.qwen_max_new_tokens,
             )
         elif cfg.backend == "vllm":
-            # vLLM path — qwen_model_id must be a fully-merged local dir.
+            # vLLM path - qwen_model_id must be a fully-merged local dir.
             from inference.vllm_backend import VLLMChatModel  # lazy: vllm not on dev machines
             generator = VLLMChatModel(
                 model_dir=cfg.qwen_model_id or "Qwen/Qwen3-8B",
@@ -605,7 +605,7 @@ class OhmaticPipeline:
                     "role": "user",
                     "content": (
                         "The output above is not valid JSON. "
-                        "Return ONLY a valid JSON object — no prose, no markdown fences."
+                        "Return ONLY a valid JSON object - no prose, no markdown fences."
                     ),
                 })
                 continue
@@ -613,7 +613,7 @@ class OhmaticPipeline:
             last_circuit = circuit
 
             # ERC check. _run_erc now returns analyze_schematic's full diagnostics, whose
-            # validity standard is `valid = not diagnostics` — i.e. ANY diagnostic is blocking.
+            # validity standard is `valid = not diagnostics` - i.e. ANY diagnostic is blocking.
             # So treat every returned diagnostic as a failure (matching training/benchmark
             # exactly). Filtering by severity here would pass circuits the benchmark fails.
             erc_diags = _run_erc(circuit)
@@ -621,7 +621,7 @@ class OhmaticPipeline:
             last_erc_errors = failures
 
             if not failures:
-                # ✓ Circuit passes ERC — done
+                # ✓ Circuit passes ERC - done
                 if return_trace:
                     trace.append({
                         "attempt": attempt,
@@ -658,7 +658,7 @@ class OhmaticPipeline:
                 "content": _format_erc_errors(failures),
             })
 
-        # Exhausted retries — KILLSWITCH. The product never delivers an unverified
+        # Exhausted retries - KILLSWITCH. The product never delivers an unverified
         # circuit: blocked=True + a clarification ask is the user-facing surface.
         # circuit/erc_errors stay populated for internal logging and eval ONLY.
         return PipelineResult(

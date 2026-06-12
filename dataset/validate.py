@@ -287,7 +287,7 @@ class SchemaValidator:
             # v2: x/y must NOT be on topology components
             if is_v2 and ("x" in comp or "y" in comp):
                 self.errors.append(
-                    f"component '{comp_id}' has x/y in STAGE_1_TOPOLOGY — coordinates belong in STAGE_2_LAYOUT.spatial_nodes"
+                    f"component '{comp_id}' has x/y in STAGE_1_TOPOLOGY - coordinates belong in STAGE_2_LAYOUT.spatial_nodes"
                 )
 
             # Check required fields (x/y only required in old format)
@@ -306,7 +306,7 @@ class SchemaValidator:
                 if field in comp and not isinstance(comp[field], str):
                     self.errors.append(f"component '{comp_id}' '{field}' must be a string")
 
-            # Validate x and y are numbers in old format (bool subclasses int — exclude it)
+            # Validate x and y are numbers in old format (bool subclasses int - exclude it)
             if not is_v2:
                 for field in ["x", "y"]:
                     if field in comp:
@@ -316,7 +316,7 @@ class SchemaValidator:
                                 f"component '{comp_id}' '{field}' must be a number, got {type(val).__name__}"
                             )
 
-            # Validate pins is dict — only inspect if the field is present (missing
+            # Validate pins is dict - only inspect if the field is present (missing
             # already reported above); using get("pins") without a default avoids
             # the double-error that get("pins", {}) produces (empty-dict triggers the
             # "pins must not be empty" error even when the field is absent).
@@ -401,7 +401,7 @@ class SchemaValidator:
                 continue
             if len(pins) < 2:
                 self.errors.append(f"net '{net_name}' must have at least 2 pins, got {len(pins)}")
-                # Don't skip — still validate pin refs to populate used_pins and
+                # Don't skip - still validate pin refs to populate used_pins and
                 # avoid false "not connected" errors for pins only in this net.
 
             # Validate pin references

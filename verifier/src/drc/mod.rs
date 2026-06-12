@@ -1,4 +1,4 @@
-//! DRC module — Tier 1 (schema rules), Tier 2 (geometry correction), Tier 3 (electrical rules).
+//! DRC module - Tier 1 (schema rules), Tier 2 (geometry correction), Tier 3 (electrical rules).
 
 pub mod rule_ids;
 pub mod schema_rules;

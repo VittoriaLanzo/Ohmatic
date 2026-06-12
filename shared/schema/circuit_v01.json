@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://ohmatic.dev/schemas/circuit_v01.json",
   "title": "OhmaticCircuitV01",
-  "description": "Ohmatic v0.1 circuit schematic — single source of truth. additionalProperties at root is true to allow dataset annotations (e.g. tier3_reviewed).",
+  "description": "Ohmatic v0.1 circuit schematic, single source of truth. additionalProperties at root is true to allow dataset annotations (e.g. tier3_reviewed).",
   "type": "object",
   "required": ["metadata", "components", "nets"],
   "properties": {
@@ -51,7 +51,7 @@
             "maxLength": 64
           },
           "type": {
-            "description": "Component class. Must match a key in verifier/config/component_registry.toml — that file is the authoritative type registry. The enum below is kept in sync with the registry; the verifier enforces registry membership at runtime.",
+            "description": "Component class. Must match a key in verifier/config/component_registry.toml, the authoritative type registry. The enum below is kept in sync with the registry; the verifier enforces registry membership at runtime.",
             "type": "string",
             "enum": [
               "resistor", "capacitor", "inductor", "potentiometer", "thermistor", "varistor",
@@ -87,15 +87,15 @@
             "type": "string"
           },
           "x": {
-            "description": "X position of the component on the schematic canvas. Number; no bounds enforced (verifier normalises to 0–300).",
+            "description": "X position of the component on the schematic canvas. Number; no bounds enforced (verifier normalises to 0-300).",
             "type": "number"
           },
           "y": {
-            "description": "Y position of the component on the schematic canvas. Number; no bounds enforced (verifier normalises to 0–300).",
+            "description": "Y position of the component on the schematic canvas. Number; no bounds enforced (verifier normalises to 0-300).",
             "type": "number"
           },
           "pins": {
-            "description": "Map of pin names to internal node labels (e.g. {\"1\": \"VCC\", \"base\": \"NODE_A\"}). Values are local node identifiers cross-referenced by the `nets` array — they are not required to match net names directly. At least one entry required.",
+            "description": "Map of pin names to internal node labels (e.g. {\"1\": \"VCC\", \"base\": \"NODE_A\"}). Values are local node identifiers cross-referenced by the `nets` array; they are not required to match net names directly. At least one entry required.",
             "type": "object",
             "minProperties": 1,
             "additionalProperties": {"type": "string"}

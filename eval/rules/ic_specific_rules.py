@@ -1,4 +1,4 @@
-"""IC-specific ERC rules — T3-26, T3-29, T3-37, T3-38, T3-39, T3-40."""
+"""IC-specific ERC rules - T3-26, T3-29, T3-37, T3-38, T3-39, T3-40."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -51,7 +51,7 @@ def _comparator_open_drain_missing_pull(ctx: "_Context") -> list[dict[str, Any]]
             why_it_matters="Open-drain comparator outputs float high without a pull-up; the logic level will be indeterminate and may cause false triggers downstream.",
             expected="a pull-up resistor from the comparator OUT pin to VCC or a defined logic rail",
             actual=f"{pin_ref} on '{net.get('name', '')}' with no resistor",
-            repair_hint="Add a pull-up resistor (typically 4.7 kΩ–10 kΩ) from the comparator OUT pin to VCC.",
+            repair_hint="Add a pull-up resistor (typically 4.7 kΩ-10 kΩ) from the comparator OUT pin to VCC.",
             component_id=component_id,
             component_type="ic_comparator",
             pin_ref=pin_ref,
@@ -116,7 +116,7 @@ def _voltage_ref_missing_bypass(ctx: "_Context") -> list[dict[str, Any]]:
             path=f"$.nets[{ctx.net_index(net)}].pins",
             message=f"{component_id}: voltage_ref OUT net '{net.get('name', '')}' has no bypass capacitor",
             why_it_matters="Precision voltage references are sensitive to load transients and RF noise; a bypass capacitor at the output is required for stable reference voltage.",
-            expected="a bypass capacitor (typically 100 nF–10 µF) on the voltage reference output",
+            expected="a bypass capacitor (typically 100 nF-10 µF) on the voltage reference output",
             actual=f"{pin_ref} on '{net.get('name', '')}' with no capacitor",
             repair_hint="Add a ceramic bypass capacitor (100 nF) close to the voltage reference OUT pin.",
             component_id=component_id,
@@ -155,7 +155,7 @@ def _microphone_missing_decoupling(ctx: "_Context") -> list[dict[str, Any]]:
                 path=f"$.nets[{net_idx}].pins",
                 message=f"{component_id}: microphone {supply_pin} net '{net.get('name', '')}' has no decoupling capacitor",
                 why_it_matters="Electret and MEMS microphones need supply decoupling; noise on the bias line couples directly into the audio signal and causes audible hum or distortion.",
-                expected="a decoupling capacitor (typically 1 µF–10 µF) on the microphone supply or output net",
+                expected="a decoupling capacitor (typically 1 µF-10 µF) on the microphone supply or output net",
                 actual=f"{pin_ref} on '{net.get('name', '')}' with no capacitor",
                 repair_hint="Add a decoupling capacitor between the microphone supply/output pin and GND.",
                 component_id=component_id,
@@ -204,7 +204,7 @@ def _dac_output_missing_bypass(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _level_shifter_same_rail(ctx: "_Context") -> list[dict[str, Any]]:
-    """T3-40: level_shifter VCCA and VCCB on the same net — no level shifting occurs."""
+    """T3-40: level_shifter VCCA and VCCB on the same net - no level shifting occurs."""
     items = []
     for component in ctx.components_of_type("ic_level_shifter", "level_shifter"):
         component_id = str(component.get("id", ""))
@@ -219,7 +219,7 @@ def _level_shifter_same_rail(ctx: "_Context") -> list[dict[str, Any]]:
             items.append(ctx.make_item(
                 code="INTERACTION_LEVEL_SHIFTER_SAME_VOLTAGE_RAILS",
                 path=f"$.nets[{ctx.net_index(net_a)}].pins",
-                message=f"{component_id}: level_shifter VCCA and VCCB are both on net '{net_a.get('name', '')}' — no voltage difference exists",
+                message=f"{component_id}: level_shifter VCCA and VCCB are both on net '{net_a.get('name', '')}' - no voltage difference exists",
                 why_it_matters="A bidirectional level shifter with identical voltage on both supply rails performs no translation; signal integrity is not guaranteed and the design intent is likely wrong.",
                 expected="VCCA and VCCB connected to different voltage rails (e.g., 3.3 V and 5 V) to achieve level shifting",
                 actual=f"VCCA and VCCB both on '{net_a.get('name', '')}'",
@@ -237,7 +237,7 @@ def _level_shifter_same_rail(ctx: "_Context") -> list[dict[str, Any]]:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def fixture_comparator_no_pullup() -> dict[str, Any]:
-    """Comparator open-drain output with no pull-up — triggers T3-26."""
+    """Comparator open-drain output with no pull-up - triggers T3-26."""
     return {
         "metadata": {"title": "Bad Comparator No Pull-Up", "description": "Open-drain comparator output floating.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -256,7 +256,7 @@ def fixture_comparator_no_pullup() -> dict[str, Any]:
 
 
 def fixture_rtc_no_battery() -> dict[str, Any]:
-    """RTC without battery backup on VBAT — triggers T3-29."""
+    """RTC without battery backup on VBAT - triggers T3-29."""
     return {
         "metadata": {"title": "Bad RTC No Battery", "description": "RTC with VBAT tied directly to VCC without backup battery.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -274,7 +274,7 @@ def fixture_rtc_no_battery() -> dict[str, Any]:
 
 
 def fixture_voltage_ref_no_bypass() -> dict[str, Any]:
-    """Voltage reference output with no bypass cap — triggers T3-37."""
+    """Voltage reference output with no bypass cap - triggers T3-37."""
     return {
         "metadata": {"title": "Bad VRef No Bypass", "description": "Voltage reference output without bypass capacitor.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -291,7 +291,7 @@ def fixture_voltage_ref_no_bypass() -> dict[str, Any]:
 
 
 def fixture_level_shifter_same_rail() -> dict[str, Any]:
-    """Level shifter VCCA and VCCB on same rail — triggers T3-40."""
+    """Level shifter VCCA and VCCB on same rail - triggers T3-40."""
     return {
         "metadata": {"title": "Bad Level Shifter Same Rail", "description": "Level shifter with both supply rails at the same voltage.", "version": "0.1", "tags": ["fixture"]},
         "components": [

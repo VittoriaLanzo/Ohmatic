@@ -62,7 +62,7 @@ def main() -> int:
 
     plan = PLANS[tier]
     free_gb = shutil.disk_usage(ROOT).free / 1e9
-    print(f"tier      {tier} — {plan['note']}")
+    print(f"tier      {tier} - {plan['note']}")
     print(f"artifact  {REPO}" + (f" :: {plan['file']}" if plan["kind"] == "file" else " (snapshot, GGUFs excluded)"))
     print(f"disk      need ~{plan['gb']:.0f} GB free, have {free_gb:.0f} GB")
     if free_gb < plan["gb"]:

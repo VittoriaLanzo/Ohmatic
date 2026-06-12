@@ -7,7 +7,7 @@
 //   rules T3-04 and T3-06. Full multi-rail analysis is deferred to Stage 3.
 // - Differential pairs, transmission lines, and impedance matching are out of scope.
 // - Thermal analysis and power dissipation checks are out of scope.
-// - Rule T3-03 (floating gate) uses a structural net heuristic — false negatives are
+// - Rule T3-03 (floating gate) uses a structural net heuristic - false negatives are
 //   possible when gate bias is supplied by a component not in GATE_DRIVER_TYPES.
 
 use std::collections::{HashMap, HashSet};
@@ -41,8 +41,8 @@ const T3_07_EXEMPT: &[&str] = &[
     ct::BUTTON, ct::CRYSTAL, ct::SPEAKER,
     ct::SENSOR, ct::INDUCTOR,
     ct::BATTERY,      // self-contained power source
-    ct::ANTENNA,      // RF boundary — may appear isolated in RF sub-circuits
-    ct::MICROPHONE,   // transducer — input signal source
+    ct::ANTENNA,      // RF boundary - may appear isolated in RF sub-circuits
+    ct::MICROPHONE,   // transducer - input signal source
     ct::MOTOR_DC, ct::MOTOR_STEPPER, ct::SERVO, // load devices driven from other nets
 ];
 
@@ -62,7 +62,7 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
     // T3-INFO-01: multi-rail circuit detected.
     // Stage 1 only inspects the net literally named "VCC". Circuits that carry
     // multiple independent supply rails (e.g. power_3v3 + power_5v + power_vcc)
-    // will only be partially checked — emit an INFO marker so the caller knows.
+    // will only be partially checked - emit an INFO marker so the caller knows.
     const NAMED_RAIL_TYPES: &[&str] = &[
         ct::POWER_VCC, ct::POWER_VEE, ct::POWER_3V3, ct::POWER_5V, ct::POWER_12V,
     ];
@@ -79,7 +79,7 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
         warnings.push(DrcError::new(
             T3_MULTI_RAIL,
             format!(
-                "multi-rail circuit: {} — Stage 1 only inspects net 'VCC'; \
+                "multi-rail circuit: {} - Stage 1 only inspects net 'VCC'; \
                  full multi-rail analysis deferred to Stage 3",
                 rail_list.join(", ")
             ),
@@ -87,7 +87,7 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
         ));
     }
 
-    // T3-01: short circuit — net with both PowerVcc and PowerGnd pin
+    // T3-01: short circuit - net with both PowerVcc and PowerGnd pin
     for net in &circuit.nets {
         let comps_on = net_to_comps.get(net.name.as_str()).cloned().unwrap_or_default();
         let has_vcc = circuit.components.iter()
@@ -104,7 +104,7 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
     // T3-02: LED without current limiting resistor on anode net.
     // Applies to both `led` and `led_rgb` (each channel pin acts as an anode).
     // Exception: if a transistor (NPN/PNP) or MOSFET (N/P) has a pin on the anode net,
-    // that active device is acting as the current controller — rule does not fire.
+    // that active device is acting as the current controller - rule does not fire.
     for comp in circuit.components.iter()
         .filter(|c| c.component_type.as_str() == ct::LED || c.component_type.as_str() == ct::LED_RGB)
     {
@@ -118,7 +118,7 @@ pub fn run_tier3(circuit: &OhmaticCircuitV01) -> Vec<DrcError> {
             if has_resistor { continue; }
 
             // Active device exemption: a transistor/MOSFET controlling current to the LED
-            // anode net makes the resistor redundant — BUT only when the controlling terminal
+            // anode net makes the resistor redundant - BUT only when the controlling terminal
             // (drain for MOSFET, collector for BJT) is on the anode net.
             // Gate/base pins on the anode net do NOT provide current limiting.
             let has_active_device = circuit.components.iter().any(|c| {
@@ -548,7 +548,7 @@ mod tests {
         assert!(run_tier3(&c).iter().any(|e| e.rule_id == "T3-08"));
     }
 
-    // --- Seed circuits — no Violation-level findings, no Warning-level findings ---
+    // --- Seed circuits - no Violation-level findings, no Warning-level findings ---
     //
     // Seed circuits must be electrically clean: no DRC violations AND no warnings.
     // Keeping warnings visible here prevents regressions where bad circuits silently
@@ -572,7 +572,7 @@ mod tests {
                 "circuit {} '{}' has Violation-level T3 findings: {:?}",
                 idx, circuit.metadata.title,
                 violations.iter().map(|f| f.to_wire()).collect::<Vec<_>>());
-            // Warning-level findings are also surfaced — seed circuits must be fully clean.
+            // Warning-level findings are also surfaced - seed circuits must be fully clean.
             let warnings: Vec<_> = findings.iter()
                 .filter(|f| f.level == DrcLevel::Warning)
                 .collect();

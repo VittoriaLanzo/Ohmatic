@@ -6,7 +6,7 @@ import type { GenerateOptions, GenerateResult, JobStage } from "../../types/api"
  * useGenerateJob so the App swaps engines transparently.
  *
  * THE KILLSWITCH SURVIVES THE BROWSER MOVE: generation runs on the user's GPU,
- * but every candidate is verified by the local gateway's POST /v1/verify —
+ * but every candidate is verified by the local gateway's POST /v1/verify -
  * the SAME analyze_schematic + feedback format as training/prod/benchmark.
  * No unverified circuit is ever delivered; retries use the trained feedback.
  *
@@ -74,7 +74,7 @@ export function useBrowserEngine() {
         const circuit = extractCircuit(raw);
         if (!circuit) {
           messages.push({ role: "assistant", content: raw });
-          messages.push({ role: "user", content: "The output above is not valid JSON. Return ONLY a valid JSON object — no prose, no markdown fences." });
+          messages.push({ role: "user", content: "The output above is not valid JSON. Return ONLY a valid JSON object - no prose, no markdown fences." });
           continue;
         }
         setState((s) => ({ ...s, stage: "drc" }));
@@ -107,7 +107,7 @@ export function useBrowserEngine() {
         messages.push({ role: "assistant", content: raw });
         messages.push({ role: "user", content: verdict.feedback });
       }
-      // KILLSWITCH: retries exhausted — refuse, ask to clarify. Never deliver.
+      // KILLSWITCH: retries exhausted - refuse, ask to clarify. Never deliver.
       setState((s) => ({
         ...s,
         phase: "error",
@@ -116,7 +116,7 @@ export function useBrowserEngine() {
           code: "blocked_by_verification",
           message:
             `I generated several candidate designs on your GPU, but none passed ` +
-            `electrical verification (${lastDiags.length} open findings) — and I don't ` +
+            `electrical verification (${lastDiags.length} open findings) - and I don't ` +
             `deliver circuits I can't verify. Could you clarify the requirements? ` +
             `Supply voltage, key components, and intended behavior help most.`
         }

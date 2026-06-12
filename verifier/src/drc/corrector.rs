@@ -7,7 +7,7 @@ use ohmatic_types::{Component, OhmaticCircuitV01};
 
 pub const CANVAS_MAX: f64 = 300.0;
 
-/// Normalise component coordinates to the 0–300 canvas.
+/// Normalise component coordinates to the 0-300 canvas.
 /// If all coordinates are already within [0, CANVAS_MAX], returns the components unchanged
 /// and an empty warnings list.
 /// If any coordinate is outside [0, CANVAS_MAX], rescales ALL components proportionally
@@ -31,7 +31,7 @@ pub fn normalise_coordinates(
     }
 
     // Shift so min is 0, then scale to fit CANVAS_MAX preserving aspect ratio.
-    // For a single component (or all components at the same point), range is 0 — scale = 1.
+    // For a single component (or all components at the same point), range is 0 - scale = 1.
     let range_x = max_x - min_x;
     let range_y = max_y - min_y;
     let max_range = range_x.max(range_y);
@@ -49,7 +49,7 @@ pub fn normalise_coordinates(
 
     vec![DrcError::new(
         T2_NORMALISE,
-        "coordinates normalised to 0–300 canvas",
+        "coordinates normalised to 0-300 canvas",
         DrcLevel::Warning,
     )]
 }
@@ -249,7 +249,7 @@ mod tests {
             let circuit: OhmaticCircuitV01 = serde_json::from_value(val.clone())
                 .unwrap_or_else(|e| panic!("Circuit #{} failed to deserialise: {}", idx, e));
 
-            // Must not panic. Unresolvable collisions are accepted — they become T2-02 warnings.
+            // Must not panic. Unresolvable collisions are accepted - they become T2-02 warnings.
             let (comps, warnings) = run_tier2(&circuit, &bboxes);
 
             // Any remaining collision must have a corresponding T2-02 warning in the output.
@@ -267,7 +267,7 @@ mod tests {
     }
 
     /// Verify that after normalise_coordinates all component coordinates are within [0, CANVAS_MAX].
-    /// Normalisation does not guarantee zero collisions — components may share coordinates.
+    /// Normalisation does not guarantee zero collisions - components may share coordinates.
     #[test]
     fn seed_circuits_post_normalise_coords_in_range() {
         let _ = tracing_subscriber::fmt::try_init();

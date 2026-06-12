@@ -50,7 +50,7 @@ fn assign_t1_rule_id(err: &str) -> &'static str {
     {
         "T1-06"
     } else if err.starts_with("pin ref") && err.contains("more than one net") {
-        // "pin ref X appears in more than one net (electrical short)" — distinct from
+        // "pin ref X appears in more than one net (electrical short)" - distinct from
         // unknown-component/unknown-pin errors (T1-07) even though both are connectivity issues.
         "T1-SHORT"
     } else {
@@ -61,7 +61,7 @@ fn assign_t1_rule_id(err: &str) -> &'static str {
 }
 
 /// Run Tier 1 structural checks. Returns Err with all DRC violations found.
-/// Delegates entirely to `circuit.validate()` — does not reimplement any logic.
+/// Delegates entirely to `circuit.validate()` - does not reimplement any logic.
 pub fn run_tier1(circuit: &OhmaticCircuitV01) -> Result<(), Vec<DrcError>> {
     match circuit.validate() {
         Ok(()) => Ok(()),
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn t1_05_violation() {
         let mut circuit = valid_circuit();
-        // Replace the VCC component with another resistor — neither component is power_vcc,
+        // Replace the VCC component with another resistor - neither component is power_vcc,
         // triggering "Missing required power_vcc component" (T1-05).
         // Use a unique ID (VCC1 is renamed) and rebuild nets to avoid connectivity errors.
         circuit.components[0] = Component {
@@ -272,7 +272,7 @@ mod tests {
                 pins: vec!["GND1.1".to_string(), "R1.2".to_string()],
             },
         ];
-        // R2 pin "1" is connected; add a net for R2's single pin group — already done above.
+        // R2 pin "1" is connected; add a net for R2's single pin group - already done above.
         // But R2 has only one pin "1" so net "VCC" covers it.
         // Note: GND1.1 is in GND; R2.1 in VCC; R1.1 in VCC; R1.2 in GND. No short.
         let result = run_tier1(&circuit);
@@ -365,7 +365,7 @@ mod tests {
     fn examples_json_all_pass_tier1() {
         use serde_json::Value;
 
-        // CARGO_MANIFEST_DIR is verifier/ — dataset/ is one level up at workspace root.
+        // CARGO_MANIFEST_DIR is verifier/ - dataset/ is one level up at workspace root.
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let examples_path = std::path::Path::new(manifest_dir)
             .join("../dataset/examples.json");

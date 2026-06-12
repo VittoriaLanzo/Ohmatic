@@ -1,5 +1,5 @@
 """
-upload_holdout_to_hf.py — Push the frozen held-out benchmark to HF (PRIVATE)
+upload_holdout_to_hf.py - Push the frozen held-out benchmark to HF (PRIVATE)
 =============================================================================
 The benchmark data is moat: prompts + reference circuits derived from the private
 dataset. It is gitignored locally and lives ONLY on the private HF dataset repo,
@@ -13,7 +13,7 @@ Uploads (to data/ in VittoriaLanzo/Ohmatic, private):
   holdout_exclude_loopback.txt   loopback row signatures to exclude
   holdout_manifest.json          provenance
 
-Run build_holdout.py FIRST. Repo stays PRIVATE — never set private=False.
+Run build_holdout.py FIRST. Repo stays PRIVATE - never set private=False.
 
 Usage:
   python eval/benchmark/upload_holdout_to_hf.py

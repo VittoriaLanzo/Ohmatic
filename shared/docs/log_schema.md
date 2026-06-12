@@ -1,6 +1,6 @@
 # Ohmatic Log Schema v0.1
 
-> **Normative** — all four services (gateway, inference, verifier, enricher) MUST emit
+> **Normative**: all four services (gateway, inference, verifier, enricher) MUST emit
 > newline-delimited JSON logs matching this schema. Log aggregators (e.g., Loki, CloudWatch)
 > depend on the field names being stable.
 
@@ -68,22 +68,22 @@ within a service.
 
 ## Example Log Lines
 
-**gateway** — job accepted:
+**gateway**, job accepted:
 ```json
 {"timestamp":"2026-05-23T14:32:01.004Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"gateway","level":"info","message":"Job accepted","job_id":"01HWABCDE9876543210ABCDEF0","http_method":"POST","http_path":"/v1/generate","http_status":202,"latency_ms":3}
 ```
 
-**inference** — generation complete:
+**inference**, generation complete:
 ```json
 {"timestamp":"2026-05-23T14:32:03.712Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"inference","level":"info","message":"Circuit generated","model":"ohmatic-v0.1-finetune","raw_tokens":847,"duration_ms":2708,"temperature":0.4}
 ```
 
-**verifier** — Tier 3 warning emitted:
+**verifier**, Tier 3 warning emitted:
 ```json
 {"timestamp":"2026-05-23T14:32:03.901Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"verifier","level":"warn","message":"Tier 3 DRC warning: missing bypass capacitor near U1","tier":3,"warnings_count":1,"errors_count":0,"circuit_id":"555 Timer Astable Oscillator"}
 ```
 
-**enricher** — BOM resolved:
+**enricher**, BOM resolved:
 ```json
 {"timestamp":"2026-05-23T14:32:04.210Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"enricher","level":"info","message":"BOM enrichment complete","supplier":"local","bom_entries":8,"mpn_hit_rate":0.875}
 ```
@@ -94,7 +94,7 @@ within a service.
 
 > **Stage 0 note:** The Stage 0 stubs emit minimal stdout only. The logging contract below applies to the Stage 1 production implementation.
 
-- **Rust services** (gateway, verifier, enricher — Stage 1 target; Stage 0 uses Python stubs): use
+- **Rust services** (gateway, verifier, enricher; Stage 1 target; Stage 0 uses Python stubs): use
   [`tracing`](https://docs.rs/tracing) with [`tracing-subscriber`](https://docs.rs/tracing-subscriber)
   configured for JSON output via `tracing_subscriber::fmt().json().init();`. Set `RUST_LOG=info` in production.
 

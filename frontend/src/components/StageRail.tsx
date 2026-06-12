@@ -12,7 +12,7 @@ type StageRailProps = {
 // The progress indicator is a routed PCB trace connecting five pads. Current
 // flows through it CONTINUOUSLY: while a stage runs, the lit portion keeps
 // creeping toward a target just short of the next pad (long eased transition),
-// so the light never sits still and never jumps — on stage change it simply
+// so the light never sits still and never jumps - on stage change it simply
 // continues from wherever it is.
 const STATIONS = [
   { id: "queued", label: "Queued", x: 36, target: 0.21 },

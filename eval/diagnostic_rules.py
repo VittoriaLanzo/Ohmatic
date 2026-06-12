@@ -42,14 +42,14 @@ GATE_DRIVER_TYPES: frozenset[str] = frozenset({
 IC_TYPES_WITH_VCC: frozenset[str] = frozenset({
     # Original 6
     "ic_opamp", "ic_timer", "ic_regulator", "ic_logic", "ic_mcu", "ic_driver",
-    # Extended — all registry IC types with supply pins
+    # Extended - all registry IC types with supply pins
     "ic_comparator", "ic_adc", "ic_dac", "ic_memory", "ic_eeprom",
     "ic_rtc", "ic_audio_amp", "ic_power_converter", "ic_bms",
     "ic_battery_charger", "ic_display_driver", "ic_encoder",
     "ic_protection",
     # Corrected type names (registry uses ic_ prefix)
     "ic_level_shifter",
-    # NOTE: ic_voltage_ref is a shunt reference (2/3-terminal, no VCC pin) —
+    # NOTE: ic_voltage_ref is a shunt reference (2/3-terminal, no VCC pin) -
     # it is handled by T3-37 (_voltage_ref_missing_bypass) separately and must
     # NOT be in IC_TYPES_WITH_VCC (T3-04/T3-06 would fire spuriously).
     # Additional IC types found in corpus that need VCC bypass
@@ -57,10 +57,10 @@ IC_TYPES_WITH_VCC: frozenset[str] = frozenset({
 })
 
 # Positive supply-rail power symbols. An IC supply pin is satisfied by ANY of these
-# rails, not only a net literally named "VCC" — real designs name rails VCC_IN,
+# rails, not only a net literally named "VCC" - real designs name rails VCC_IN,
 # PLL_3V3, RF_3V3, etc. Recognizing them removes a false positive in T3-06 AND lets
 # T3-04 enforce bypass capacitors on every supply rail (not just one named "VCC").
-# power_vee is excluded — it is a NEGATIVE rail and never an IC positive supply.
+# power_vee is excluded - it is a NEGATIVE rail and never an IC positive supply.
 POSITIVE_SUPPLY_SYMBOLS: frozenset[str] = frozenset({
     "power_vcc", "power_3v3", "power_5v", "power_12v",
 })
@@ -73,7 +73,7 @@ T3_07_EXEMPT: frozenset[str] = frozenset({
     "motor_stepper", "servo", "transformer",
 })
 
-# ── Rule module registry — append here to add new domains ─────────────────────
+# ── Rule module registry - append here to add new domains ─────────────────────
 # Each entry is a callable: (ctx: _Context) -> list[dict[str, Any]]
 _RULE_MODULES: list[Callable] = [
     power_regulation_diagnostics,    # T3-09 → T3-12
@@ -93,7 +93,7 @@ def _extract_topology(circuit: dict[str, Any]) -> tuple[list, list]:
     Deliberately NOT validate.resolve_circuit_topology: that resolver tolerates a
     non-dict STAGE_1_TOPOLOGY (``... or {}``) and would silently yield empty lists,
     whereas here a non-dict STAGE_1 must RAISE so _safe_rule turns it into a blocking
-    ERC_RULE/ANALYZER_ERROR — an un-analyzable circuit is not ERC-clean."""
+    ERC_RULE/ANALYZER_ERROR - an un-analyzable circuit is not ERC-clean."""
     if "STAGE_1_TOPOLOGY" in circuit:
         topo = circuit["STAGE_1_TOPOLOGY"]
         return topo.get("components", []), topo.get("nets", [])
@@ -108,12 +108,12 @@ def _safe_rule(rule: Callable[..., Any], ctx: "_Context",
     the prod correction loop feed ARBITRARY model-generated JSON through here, which
     can be malformed (missing 'type'/'id', wrong shapes). A single rule raising must
     never abort the whole analysis (that crashes the caller). Instead we flag the
-    circuit invalid — a circuit that cannot be analyzed is, by definition, not
-    ERC-clean — and continue with the remaining rules.
+    circuit invalid - a circuit that cannot be analyzed is, by definition, not
+    ERC-clean - and continue with the remaining rules.
     """
     try:
         return list(rule(ctx))
-    except Exception as exc:  # noqa: BLE001 — robustness boundary, must catch all
+    except Exception as exc:  # noqa: BLE001 - robustness boundary, must catch all
         name = getattr(rule, "__name__", "rule")
         return [make_item(
             code="ERC_RULE_ERROR",
@@ -153,7 +153,7 @@ def electrical_diagnostics(circuit: dict[str, Any], make_item: DiagnosticFactory
     return items
 
 
-# ── Shared context — O(1) indices ─────────────────────────────────────────────
+# ── Shared context - O(1) indices ─────────────────────────────────────────────
 
 class _Context:
     """Shared diagnostic context.
@@ -162,11 +162,11 @@ class _Context:
     function runs in O(components_of_that_type) rather than O(all_nets ×
     all_pins):
 
-    * ``pin_to_net``  — direct pin-ref → net dict lookup
-    * ``by_type``     — component type → list of component dicts
-    * ``by_id``       — component id  → component dict
-    * ``_net_idx``    — net identity  → position in self.nets list
-    * ``_net_types``  — net identity  → set of component types (lazily cached)
+    * ``pin_to_net``  - direct pin-ref → net dict lookup
+    * ``by_type``     - component type → list of component dicts
+    * ``by_id``       - component id  → component dict
+    * ``_net_idx``    - net identity  → position in self.nets list
+    * ``_net_types``  - net identity  → set of component types (lazily cached)
     """
 
     def __init__(self, components: list[Any], nets: list[Any], make_item: DiagnosticFactory) -> None:
@@ -207,15 +207,15 @@ class _Context:
         return self._pin_to_net.get(pin_ref)
 
     def net_has_type(self, net: dict[str, Any], component_type: str) -> bool:
-        """O(1) membership check — does *net* carry a component of *component_type*?"""
+        """O(1) membership check - does *net* carry a component of *component_type*?"""
         return component_type in self._types_on_net(net)
 
     def net_has_any_type(self, net: dict[str, Any], type_set: frozenset[str]) -> bool:
-        """O(1) set-intersection check — any of *type_set* present on *net*?"""
+        """O(1) set-intersection check - any of *type_set* present on *net*?"""
         return bool(self._types_on_net(net) & type_set)
 
     def comps_on_net(self, net: dict[str, Any]) -> set[str]:
-        """Component IDs (not pin IDs) on *net*. Memoized by id(net) — called
+        """Component IDs (not pin IDs) on *net*. Memoized by id(net) - called
         32x across rules; same pattern as _net_types."""
         key = id(net)
         if key not in self._net_comps:
@@ -234,7 +234,7 @@ class _Context:
         return self._net_idx.get(id(net), -1)
 
     def components_of_type(self, *types: str) -> list[dict[str, Any]]:
-        """Return all components whose type is one of *types* — O(result)."""
+        """Return all components whose type is one of *types* - O(result)."""
         out: list[dict[str, Any]] = []
         for t in types:
             out.extend(self.by_type.get(t, []))
@@ -297,7 +297,7 @@ def _short_vcc_gnd(ctx: _Context) -> list[dict[str, Any]]:
         items.append(ctx.make_item(
             code="POWER_SHORT_VCC_GND",
             path="$.components",
-            message=f"{comp_id}: 0-ohm resistor bridges a VCC-type net to a GND-type net — dead short",
+            message=f"{comp_id}: 0-ohm resistor bridges a VCC-type net to a GND-type net - dead short",
             why_it_matters="A 0-ohm link between the positive rail and ground is a dead short that blows the supply or traces on power-up.",
             expected="0-ohm jumpers must not connect supply and ground rails",
             actual=f"{comp_id} (value={comp.get('value','0')}) bridges VCC and GND",
@@ -336,7 +336,7 @@ def _net_has_resistor_to_vcc(ctx: _Context, net: dict) -> bool:
     This is the correct "pull-up / current-limit" check.  A resistor whose
     other end goes to GND, IN+, or any other non-supply net does NOT count.
     Supply recognition uses _is_positive_supply_net so a pull-up to a 3V3 / named /
-    regulator-output rail counts, not only a literal power_vcc symbol — otherwise the
+    regulator-output rail counts, not only a literal power_vcc symbol - otherwise the
     check false-positives ("no pull-up") on the many corpus rails that aren't a
     power_vcc symbol.
     """
@@ -364,11 +364,11 @@ def _led_missing_current_limit(ctx: _Context) -> list[dict[str, Any]]:
         if not net:
             continue
         # Fire if:
-        #   (a) anode net has no resistor at all — no current limiter anywhere, or
-        #   (b) anode net IS a power rail (power_vcc present) — even if unrelated
+        #   (a) anode net has no resistor at all - no current limiter anywhere, or
+        #   (b) anode net IS a power rail (power_vcc present) - even if unrelated
         #       resistors exist on that rail, the LED is wired directly to the supply.
         # Do NOT fire if the anode is on an intermediate net that has a series R
-        # (the R may connect upstream to a transistor output, IC pin, etc. — not
+        # (the R may connect upstream to a transistor output, IC pin, etc. - not
         # necessarily to VCC directly).
         anode_on_power_rail = ctx.net_has_type(net, "power_vcc")
         if ctx.net_has_type(net, "resistor") and not anode_on_power_rail:
@@ -478,7 +478,7 @@ def _is_ground_net(ctx: _Context, net: dict) -> bool:
 
 def _ic_missing_bypass(ctx: _Context) -> list[dict[str, Any]]:
     # Compliance-first: every supply rail an IC connects to must have a local bypass
-    # capacitor to GND — not only a rail literally named "VCC". This both removes the
+    # capacitor to GND - not only a rail literally named "VCC". This both removes the
     # old false negative (non-VCC rails were skipped entirely) and keeps the strict
     # catch (an IC on a bypass-less rail still fails).
     supply_nets = _positive_supply_nets(ctx)
@@ -549,7 +549,7 @@ def _cap_polarity_item(ctx: _Context, component_id: str, pin_ref: str, net_name:
 
 def _ic_missing_literal_vcc(ctx: _Context) -> list[dict[str, Any]]:
     # An IC is powered if any of its pins sits on a positive supply rail (VCC, 3V3,
-    # 5V, 12V) — not only a net literally named "VCC". This still fires for a genuinely
+    # 5V, 12V) - not only a net literally named "VCC". This still fires for a genuinely
     # unpowered IC (no pin on any supply rail), so the floating-supply catch is intact.
     supply_nets = _positive_supply_nets(ctx)
     powered_ids: set[str] = set()

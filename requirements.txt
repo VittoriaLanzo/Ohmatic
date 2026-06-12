@@ -1,7 +1,7 @@
 # Core inference
 llama-cpp-python>=0.2.0
 
-# Training (Colab / GPU machine only — comment out for CPU-only installs)
+# Training (Colab / GPU machine only; comment out for CPU-only installs)
 # unsloth>=2024.1
 # bitsandbytes>=0.41.0
 

@@ -4,13 +4,13 @@ __pycache__/
 *.py[cod]
 .env
 
-# Dataset / training data lives on HF (private) — never in git
+# Dataset / training data lives on HF (private), never in git
 .dataset_cache/
 dataset/prepared/
 dataset/authored/
 dataset/generated/
 
-# Held-out benchmark data + derived fixtures (IP — scripts stay tracked)
+# Held-out benchmark data + derived fixtures (IP; scripts stay tracked)
 eval/benchmark/*.jsonl
 eval/benchmark/*.txt
 eval/benchmark/holdout_manifest.json

@@ -1,4 +1,4 @@
-"""Polarity, rectification, and power-path ERC rules — T3-30 through T3-35."""
+"""Polarity, rectification, and power-path ERC rules - T3-30 through T3-35."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -68,7 +68,7 @@ def _transformer_secondary_no_rectification(ctx: "_Context") -> list[dict[str, A
 
 
 def _tvs_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
-    """T3-32: tvs_diode anode on a positive supply rail — forward biased, not clamping."""
+    """T3-32: tvs_diode anode on a positive supply rail - forward biased, not clamping."""
     items = []
     for component in ctx.components_of_type("tvs_diode"):
         component_id = str(component.get("id", ""))
@@ -88,7 +88,7 @@ def _tvs_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
         items.append(ctx.make_item(
             code="POLARITY_TVS_DIODE_REVERSED",
             path=f"$.nets[{ctx.net_index(anode_net)}].pins",
-            message=f"{component_id}: tvs_diode anode (A) is on supply net '{anode_net.get('name', '')}' — TVS is forward-biased, not clamping",
+            message=f"{component_id}: tvs_diode anode (A) is on supply net '{anode_net.get('name', '')}' - TVS is forward-biased, not clamping",
             why_it_matters="A TVS diode with its anode on the positive rail is forward biased; it clamps the line to ~0.7 V above GND, not the intended reverse-breakdown clamp voltage.",
             expected="tvs_diode cathode (K) toward the positive rail and anode (A) toward GND or the protected node for proper transient clamping",
             actual=f"{anode_ref} on supply net '{anode_net.get('name', '')}'",
@@ -105,13 +105,13 @@ def _tvs_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
 
 def _battery_unprotected(ctx: "_Context") -> list[dict[str, Any]]:
     """T3-33: battery with no protection IC, fuse, or polyfuse on its output net."""
-    # ferrite_bead is an EMI filter with no overcurrent trip — NOT protection
+    # ferrite_bead is an EMI filter with no overcurrent trip - NOT protection
     FUSE_TYPES = {"fuse", "polyfuse"}
     items = []
     for component in ctx.components_of_type("battery"):
         component_id = str(component.get("id", ""))
         pins = component.get("pins", {})
-        # Look for the positive terminal — usually pin "+" or "1"
+        # Look for the positive terminal - usually pin "+" or "1"
         pos_pin = next((p for p in ("+", "1", "POS", "VBAT") if p in pins), None)
         if not pos_pin:
             continue
@@ -145,7 +145,7 @@ def _battery_unprotected(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _phototransistor_collector_reversed(ctx: "_Context") -> list[dict[str, Any]]:
-    """T3-34: phototransistor collector (C) on GND and emitter (E) on VCC — reversed biasing."""
+    """T3-34: phototransistor collector (C) on GND and emitter (E) on VCC - reversed biasing."""
     items = []
     for component in ctx.components_of_type("phototransistor"):
         component_id = str(component.get("id", ""))
@@ -171,7 +171,7 @@ def _phototransistor_collector_reversed(ctx: "_Context") -> list[dict[str, Any]]
         items.append(ctx.make_item(
             code="POLARITY_PHOTOTRANSISTOR_REVERSED",
             path=f"$.nets[{ctx.net_index(collector_net)}].pins",
-            message=f"{component_id}: phototransistor collector (C) is on GND and emitter (E) is on VCC — transistor is reversed",
+            message=f"{component_id}: phototransistor collector (C) is on GND and emitter (E) is on VCC - transistor is reversed",
             why_it_matters="A phototransistor biased with emitter at VCC and collector at GND operates in reverse active mode; it will not respond correctly to light and output characteristics are unreliable.",
             expected="collector (C) toward the positive rail, emitter (E) toward GND for standard common-emitter operation",
             actual=f"C on GND '{collector_net.get('name', '')}', E on VCC '{emitter_net.get('name', '')}'",
@@ -225,7 +225,7 @@ def _diode_bridge_ac_from_dc(ctx: "_Context") -> list[dict[str, Any]]:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def fixture_transformer_no_rectifier() -> dict[str, Any]:
-    """Transformer secondary with no rectifier — triggers T3-30."""
+    """Transformer secondary with no rectifier - triggers T3-30."""
     return {
         "metadata": {"title": "Bad Transformer No Rectifier", "description": "Transformer secondary directly connected to DC bus without rectification.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -242,7 +242,7 @@ def fixture_transformer_no_rectifier() -> dict[str, Any]:
 
 
 def fixture_tvs_reversed() -> dict[str, Any]:
-    """TVS diode with anode on VCC (forward biased) — triggers T3-32."""
+    """TVS diode with anode on VCC (forward biased) - triggers T3-32."""
     return {
         "metadata": {"title": "Bad TVS Reversed", "description": "TVS diode installed forwards on supply rail.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -258,7 +258,7 @@ def fixture_tvs_reversed() -> dict[str, Any]:
 
 
 def fixture_battery_unprotected() -> dict[str, Any]:
-    """Battery with no BMS or fuse — triggers T3-33."""
+    """Battery with no BMS or fuse - triggers T3-33."""
     return {
         "metadata": {"title": "Bad Battery Unprotected", "description": "Lithium battery with no protection circuit.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -274,7 +274,7 @@ def fixture_battery_unprotected() -> dict[str, Any]:
 
 
 def fixture_diode_bridge_ac_from_dc() -> dict[str, Any]:
-    """Diode bridge AC input fed from DC rail — triggers T3-35."""
+    """Diode bridge AC input fed from DC rail - triggers T3-35."""
     return {
         "metadata": {"title": "Bad Bridge AC From DC", "description": "Diode bridge AC pins connected to DC supply.", "version": "0.1", "tags": ["fixture"]},
         "components": [

@@ -1,5 +1,5 @@
 """
-Stage 3 — REPORT (deterministic tables from verified/).
+Stage 3 - REPORT (deterministic tables from verified/).
 ========================================================
     python -m eval.benchmark.cross_model.report [--suite forward]
 
@@ -11,7 +11,7 @@ per-category breakdown. The two headline columns:
                 (killswitch should push Ohmatic legs to ~100; hosted legs
                  deliver everything, so precision == raw pass rate)
   availability  % of requests that got a circuit at all
-                (the price the killswitch pays — disclosed, not hidden)
+                (the price the killswitch pays - disclosed, not hidden)
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def main() -> None:
     if args.suite:
         rows = [r for r in rows if r["suite"] == args.suite]
     if not rows:
-        raise SystemExit("No verified rows — run verify.py first.")
+        raise SystemExit("No verified rows - run verify.py first.")
 
     groups: dict[tuple, list] = defaultdict(list)
     for r in rows:

@@ -1,8 +1,8 @@
 """
-prod_eval.py — production-path evaluation (the REAL product metric).
+prod_eval.py - production-path evaluation (the REAL product metric).
 
 Drives the ACTUAL production pipeline (inference.pipeline.OhmaticPipeline) on the held-out
-set — same code, same system prompt, same ERC-feedback format, same greedy decoding that
+set - same code, same system prompt, same ERC-feedback format, same greedy decoding that
 serving uses. So eval == prod, byte-for-byte; there is no parallel re-implementation here.
 
 The pipeline runs: generate -> ERC check -> (if invalid) feed errors back -> correct ...
@@ -94,7 +94,7 @@ def main():
     )
     pipeline = OhmaticPipeline.from_config(cfg)
 
-    # wandb — LIVE pass@k graphs (overall + per partition), logged per prompt. Same
+    # wandb - LIVE pass@k graphs (overall + per partition), logged per prompt. Same
     # project/entity as the training runs; None means telemetry is disabled.
     wandb = _init_wandb(args)
 
@@ -106,7 +106,7 @@ def main():
     outp.parent.mkdir(parents=True, exist_ok=True)
     interval = max(1, len(items) // 5)   # checkpoint every ~1/5 of the run
 
-    # Traces file — opened once and written line by line so a mid-run crash loses nothing.
+    # Traces file - opened once and written line by line so a mid-run crash loses nothing.
     traces_outp = ROOT / args.traces_out
     if args.save_traces:
         traces_outp.parent.mkdir(parents=True, exist_ok=True)
@@ -191,7 +191,7 @@ def main():
                        # the FULL pass/fail picture, not just the count
                        "fail_rules": sorted({e.get("code") for e in (result.erc_errors or [])
                                              if e.get("code")}) if not result.ok else []})
-        # Write trace line — never crash the eval on trace errors.
+        # Write trace line - never crash the eval on trace errors.
         if args.save_traces and _traces_fh is not None:
             try:
                 trace_line = json.dumps({

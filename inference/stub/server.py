@@ -79,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not (0.0 <= temperature <= 1.0):
                     self.send_json(400, {"error": "temperature must be in [0, 1]"})
                     return
-            # Stage 0 synthetic values — not reflective of production latency
+            # Stage 0 synthetic values - not reflective of production latency
             self.send_json(200, {
                 "circuit": HARDCODED_CIRCUIT,
                 "raw_tokens": 512,

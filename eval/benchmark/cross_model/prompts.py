@@ -1,5 +1,5 @@
 """
-Cross-model benchmark — suite loaders.
+Cross-model benchmark - suite loaders.
 =======================================
 Uniform item shape across all three suites:
     {"prompt_id": str, "suite": str, "user_prompt": str,
@@ -36,7 +36,7 @@ def _hf_jsonl(filename: str) -> list[dict]:
 
 def load_forward(n: int = 0) -> list[dict]:
     """Frozen held-out forward set (HF, private). Deterministic order +
-    partition-proportional subsetting — same convention as prod_eval."""
+    partition-proportional subsetting - same convention as prod_eval."""
     rows = _hf_jsonl(C.FORWARD_HOLDOUT)
     rows.sort(key=lambda r: r.get("prompt_sha1", r["prompt"]))
     if n and n < len(rows):
@@ -57,11 +57,11 @@ def load_forward(n: int = 0) -> list[dict]:
 
 
 def load_realuser() -> list[dict]:
-    """Novel messy 'real user' prompts — authored by a NEUTRAL model (Opus,
+    """Novel messy 'real user' prompts - authored by a NEUTRAL model (Opus,
     not in the matrix), dedup-checked against the training corpus, committed
     to the repo so the suite is frozen and citable."""
     if not C.REALUSER_FILE.exists():
-        raise SystemExit(f"{C.REALUSER_FILE} missing — run the Opus prompt-"
+        raise SystemExit(f"{C.REALUSER_FILE} missing - run the Opus prompt-"
                          f"authoring step first (see README).")
     rows = [json.loads(l) for l in C.REALUSER_FILE.read_text(encoding="utf-8")
             .splitlines() if l.strip()]
@@ -73,18 +73,18 @@ def load_realuser() -> list[dict]:
 
 
 def load_correction(per_category: int = 0) -> list[dict]:
-    """Held-out ERC-repair cases (LOCAL legs only — enforced in config).
+    """Held-out ERC-repair cases (LOCAL legs only - enforced in config).
 
     Real holdout_loopback_v1 row schema (validated against the live file):
         signature        stable row id
         rule             break category (e.g. POWER_IC_MISSING_BYPASS_CAPACITOR)
         input_messages   the FULL trained conversation (system + broken circuit
-                         + ERC feedback) — passed to the generator VERBATIM
+                         + ERC feedback) - passed to the generator VERBATIM
         reference_fixed  reference repair (not used for scoring; ERC is the judge)
 
     Correction is a SINGLE-SHOT repair task (mirrors in-training correction_eval):
     the item carries `messages` and generate.py routes it straight to the
-    generator's chat() — no T5, no retry loop."""
+    generator's chat() - no T5, no retry loop."""
     rows = _hf_jsonl(C.CORRECTION_HOLDOUT)
     if per_category:
         from collections import defaultdict

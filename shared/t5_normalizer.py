@@ -7,7 +7,7 @@ Imported by ALL three sites so train/serve/data-build can never drift:
 
 Design decisions locked here (see also OHMATIC_HANDOFF.md):
   - T5 OUTPUT format == Qwen INPUT format: freeform normalized NL (the "normal" precision
-    prompt). We deliberately do NOT use the structured `t5_helper_target` intent format —
+    prompt). We deliberately do NOT use the structured `t5_helper_target` intent format -
     Qwen was trained on freeform normalized NL, so that is the contract.
   - Scope: ENGLISH ONLY (see looks_non_english). Non-English is out of scope for now.
 """
@@ -16,7 +16,7 @@ import re
 
 # THE canonical task prefix. The 75k training rows already use exactly this string; never
 # change it without rebuilding the dataset. (NB: teacher_corpus records carry a stale
-# `t5_task_prefix` field — it is IGNORED; this constant wins.)
+# `t5_task_prefix` field - it is IGNORED; this constant wins.)
 T5_TASK_PREFIX = "normalize circuit description: "
 
 

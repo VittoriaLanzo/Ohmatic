@@ -1,9 +1,9 @@
 """
-grokking_signature.py — Detect & quantify the grokking transition
+grokking_signature.py - Detect & quantify the grokking transition
 ==================================================================
 Grokking, operationally, is: TRAIN LOSS plateaus, yet held-out generalization
 (here ERC pass-rate) keeps RISING after that plateau. That divergence is the
-evidence the model learned the rules rather than memorizing examples — and it is
+evidence the model learned the rules rather than memorizing examples - and it is
 the single most defensible chart for a technical audience.
 
 This script reads the training run's logged history (train loss + ERC pass-rate),
@@ -59,7 +59,7 @@ def _from_wandb(run_path: str) -> list[dict]:
     try:
         import wandb
     except ImportError:
-        sys.exit("wandb not installed — `pip install wandb` or use --csv.")
+        sys.exit("wandb not installed - `pip install wandb` or use --csv.")
     api = wandb.Api()
     run = api.run(run_path)
     rows = []
@@ -157,7 +157,7 @@ def _maybe_plot(rows: list[dict], res: dict, out_png: Path):
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except Exception:
-        print("[plot] matplotlib unavailable — skipping PNG")
+        print("[plot] matplotlib unavailable - skipping PNG")
         return
     rows = sorted(rows, key=lambda r: r["step"])
     ls = [(r["step"], r["train_loss"]) for r in rows if r["train_loss"] is not None]
@@ -198,13 +198,13 @@ def main():
     if not res.get("ok"):
         print("Analysis inconclusive:", res.get("reason"))
         (REPORT_DIR / f"grokking_{ts}.md").write_text(
-            f"# Grokking analysis — inconclusive\n\n{res.get('reason')}\n", encoding="utf-8")
+            f"# Grokking analysis - inconclusive\n\n{res.get('reason')}\n", encoding="utf-8")
         return
 
     verdict = ("GROKKING SIGNATURE DETECTED" if res["grokking_signature"]
                else "no clear post-plateau rise (not grokking by this threshold)")
     md = "\n".join([
-        f"# Grokking signature — {ts}",
+        f"# Grokking signature - {ts}",
         "",
         f"**Verdict: {verdict}**",
         "",
@@ -216,7 +216,7 @@ def main():
         f"- ERC pass-rate at end of run: {100*res['erc_final']:.0f}%.",
         "",
         "Interpretation: a positive rise after the loss plateau means the model kept "
-        "improving on held-out circuits after it stopped reducing training loss — i.e. it "
+        "improving on held-out circuits after it stopped reducing training loss - i.e. it "
         "generalized the circuit-construction rules rather than memorizing the data.",
         "",
     ])

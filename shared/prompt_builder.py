@@ -1,5 +1,5 @@
 """
-prompt_builder.py — single source of truth for the Ohmatic system prompt.
+prompt_builder.py - single source of truth for the Ohmatic system prompt.
 ================================================================================
 ONE function builds the standardized system prompt from the canonical config:
 
@@ -9,11 +9,11 @@ ONE function builds the standardized system prompt from the canonical config:
 Both the dataset builder AND the eval/inference path import build_system_prompt()
 so the prompt the model is TRAINED on is byte-identical to the prompt it is
 EVALUATED/served with. (Previously the dataset embedded a stale flat schema + a
-per-request registry subset while eval sent no system prompt at all — the model
+per-request registry subset while eval sent no system prompt at all, so the model
 saw three different contexts. This module makes that drift impossible.)
 
 The prompt is fully minified (the model emits minified JSON, so the examples match
-the target and the token budget stays small — ~5.6k tokens with the full registry
+the target and the token budget stays small, ~5.6k tokens with the full registry
 and full rule catalog).
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ _RULES_JSON = _REPO_ROOT / "verifier" / "config" / "erc_rules_catalog.json"
 # Registry fields the model actually needs: what the type is, its reference-designator
 # prefix (for id naming), and its bounding box (informs STAGE_2 placement spacing).
 _REGISTRY_FIELDS = ("description", "ref_prefix", "bbox")
-# Full rule record — code + severity + the constraint (message) + the rationale (why)
+# Full rule record: code + severity + the constraint (message) + the rationale (why)
 # + the fix (repair). All of it fits in budget and is useful training signal.
 _RULE_FIELDS = ("code", "severity", "message", "why", "repair")
 

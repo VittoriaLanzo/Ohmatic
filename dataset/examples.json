@@ -142,7 +142,7 @@
   {
     "metadata": {
       "title": "MOSFET Switch",
-      "description": "N-channel MOSFET low-side switch — LED load with current-limiting resistor, gate driven through pull-up",
+      "description": "N-channel MOSFET low-side switch, LED load with current-limiting resistor, gate driven through pull-up",
       "version": "0.1",
       "tags": ["mosfet", "switch", "power"]
     },
@@ -410,7 +410,7 @@
   {
     "metadata": {
       "title": "Buck Converter",
-      "description": "P-channel MOSFET high-side buck converter with freewheeling diode, 12V input. P-MOSFET requires no bootstrap gate driver — gate pulled low to turn on.",
+      "description": "P-channel MOSFET high-side buck converter with freewheeling diode, 12V input. P-MOSFET requires no bootstrap gate driver; gate pulled low to turn on.",
       "version": "0.1",
       "tags": ["power", "smps", "dcdc", "buck"]
     },

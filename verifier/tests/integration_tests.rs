@@ -24,7 +24,7 @@ async fn health_returns_ok() {
 }
 
 // ---------------------------------------------------------------------------
-// Category A — all seed circuits return 200
+// Category A - all seed circuits return 200
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -48,7 +48,7 @@ async fn seed_circuits_all_return_200() {
 }
 
 // ---------------------------------------------------------------------------
-// Category B — T1 violations → 422
+// Category B - T1 violations → 422
 // ---------------------------------------------------------------------------
 
 // Helper: minimal valid circuit body suitable for modification.
@@ -80,7 +80,7 @@ fn minimal_valid_circuit() -> Value {
 #[tokio::test]
 async fn t1_parse_unknown_component_type_422() {
     let server = make_server();
-    // "unknown_widget" is not in the component registry — the verifier rejects it as T1-PARSE.
+    // "unknown_widget" is not in the component registry - the verifier rejects it as T1-PARSE.
     let body = json!({
         "circuit": {
             "metadata": {
@@ -135,7 +135,7 @@ async fn t1_01_wrong_version_422() {
 #[tokio::test]
 async fn t1_04_duplicate_id_422() {
     let server = make_server();
-    // Two components both with id "R1" — duplicate ID violation.
+    // Two components both with id "R1" - duplicate ID violation.
     // Nets reference R1.1 and R1.2 (valid pin names on R1, which has pins 1 and 2).
     let body = json!({
         "circuit": {
@@ -175,7 +175,7 @@ async fn t1_04_duplicate_id_422() {
 #[tokio::test]
 async fn t1_05_no_vcc_422() {
     let server = make_server();
-    // Replace VCC1 with another resistor R2 — no power_vcc present.
+    // Replace VCC1 with another resistor R2 - no power_vcc present.
     let body = json!({
         "circuit": {
             "metadata": {
@@ -212,7 +212,7 @@ async fn t1_05_no_vcc_422() {
 #[tokio::test]
 async fn t1_06_net_one_pin_422() {
     let server = make_server();
-    // The ISOLATED_PIN net has only 1 pin reference — T1-06 must fire.
+    // The ISOLATED_PIN net has only 1 pin reference - T1-06 must fire.
     // VCC1 and GND1 are connected through a two-resistor chain so T1 passes
     // for all other rules. R2 has an isolated single-pin net that triggers T1-06.
     let body = json!({
@@ -254,7 +254,7 @@ async fn t1_06_net_one_pin_422() {
 #[tokio::test]
 async fn t1_07_unknown_ref_422() {
     let server = make_server();
-    // A net references "FAKE" — component that doesn't exist.
+    // A net references "FAKE" - component that doesn't exist.
     // We need FAKE.1 to have a valid format (starts with uppercase letter).
     let body = json!({
         "circuit": {
@@ -291,13 +291,13 @@ async fn t1_07_unknown_ref_422() {
 }
 
 // ---------------------------------------------------------------------------
-// Category B — T2 tests → 200 with warnings
+// Category B - T2 tests → 200 with warnings
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn t2_01_out_of_range_normalised_200() {
     let server = make_server();
-    // x=1000 is out of 0-300 range — normalisation fires → T2-01 warning.
+    // x=1000 is out of 0-300 range - normalisation fires → T2-01 warning.
     let body = json!({
         "circuit": {
             "metadata": {
@@ -334,7 +334,7 @@ async fn t2_01_out_of_range_normalised_200() {
 #[tokio::test]
 async fn t2_02_unresolvable_collision_200() {
     let server = make_server();
-    // 3 resistors all at (50, 50) — packed collision, at least one pair will
+    // 3 resistors all at (50, 50) - packed collision, at least one pair will
     // still collide after correction. T2 never returns 422 regardless.
     let body = json!({
         "circuit": {
@@ -367,7 +367,7 @@ async fn t2_02_unresolvable_collision_200() {
     assert!(r.get("circuit").is_some(), "response missing 'circuit' field");
     let warnings = r["warnings"].as_array().unwrap();
     assert!(r.get("errors").is_some(), "response missing 'errors' field");
-    // All 4 components are at the same position — at least one pair must remain
+    // All 4 components are at the same position - at least one pair must remain
     // colliding after the sequential pair-correction pass, producing a [T2-02] warning.
     assert!(
         warnings.iter().any(|w| w.as_str().unwrap_or("").starts_with("[T2-02]")),
@@ -377,7 +377,7 @@ async fn t2_02_unresolvable_collision_200() {
 }
 
 // ---------------------------------------------------------------------------
-// Category B — T3 tests → 200 with warnings containing the rule ID
+// Category B - T3 tests → 200 with warnings containing the rule ID
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -460,7 +460,7 @@ async fn t3_02_led_no_resistor_200_with_warning() {
 async fn t3_03_floating_mosfet_gate_200_with_warning() {
     let server = make_server();
     // MOSFET gate on a net with no driver/bias component.
-    // Two MOSFETs share a gate net — neither qualifies as a driver for the other.
+    // Two MOSFETs share a gate net - neither qualifies as a driver for the other.
     let body = json!({
         "circuit": {
             "metadata": {
@@ -537,7 +537,7 @@ async fn t3_04_ic_no_bypass_cap_200_with_warning() {
 #[tokio::test]
 async fn t3_05_reversed_capacitor_200_with_warning() {
     let server = make_server();
-    // Capacitor pin1 (positive) connected to GND — polarity reversed.
+    // Capacitor pin1 (positive) connected to GND - polarity reversed.
     let body = json!({
         "circuit": {
             "metadata": {
@@ -615,7 +615,7 @@ async fn t3_06_ic_no_vcc_pin_200_with_warning() {
 #[tokio::test]
 async fn t3_07_isolated_component_200_with_warning() {
     let server = make_server();
-    // R2 is isolated — not reachable from any power net via BFS.
+    // R2 is isolated - not reachable from any power net via BFS.
     // But it still needs ≥1 net with ≥2 pins to pass T1.
     // We give R2 its own island net, and give that net 2 pins from R2.
     // Wait: R2 only has 2 pins, so R2.1 and R2.2 can share a net of 2 pins.
@@ -644,9 +644,9 @@ async fn t3_07_isolated_component_200_with_warning() {
             ]
         }
     });
-    // R2.1 and R2.2 on ISLAND_A — both pins covered. But ISLAND_A is disconnected from
-    // any power net. However R2.1 and R2.2 appear in only one net (ISLAND_A) — that's fine.
-    // Wait: R2 has pins "1" and "2". ISLAND_A has R2.1 and R2.2 — both covered.
+    // R2.1 and R2.2 on ISLAND_A - both pins covered. But ISLAND_A is disconnected from
+    // any power net. However R2.1 and R2.2 appear in only one net (ISLAND_A) - that's fine.
+    // Wait: R2 has pins "1" and "2". ISLAND_A has R2.1 and R2.2 - both covered.
     // T1 validation requires: all component pins connected. R2.1 → ISLAND_A, R2.2 → ISLAND_A. OK.
     // ISLAND_A has 2 pins. OK. T1 passes. T3-07 should fire.
     let resp = server.post("/verify").json(&body).await;
@@ -705,7 +705,7 @@ async fn t3_08_button_no_pullup_200_with_warning() {
 }
 
 // ---------------------------------------------------------------------------
-// Edge cases — empty body, missing/null 'circuit' field → 400
+// Edge cases - empty body, missing/null 'circuit' field → 400
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -731,7 +731,7 @@ async fn null_circuit_field_400() {
 
 #[tokio::test]
 async fn t1_01_version_02_422() {
-    // version "0.2" is not supported — must return 422 with T1-01 error.
+    // version "0.2" is not supported - must return 422 with T1-01 error.
     let server = make_server();
     let mut circuit = minimal_valid_circuit();
     circuit["metadata"]["version"] = json!("0.2");

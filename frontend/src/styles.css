@@ -1805,7 +1805,7 @@ th {
 .hw-webgpu-unavailable { color: #d29922; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   COPPER CARTRIDGE — the board bolted to your screen
+   COPPER CARTRIDGE - the board bolted to your screen
    Soldermask + copper + ENIG gold, presented like retro game hardware.
    Pixel display font: Silkscreen (yes, really). Body mono: Fragment Mono.
    This section overrides the legacy theme wholesale; class structure intact.
@@ -1853,7 +1853,7 @@ html {
   background-size: 100% 100%, 100% 100%, 720px 720px, 4px 4px, auto;
 }
 
-/* Corner screws — the board is BOLTED to the viewport */
+/* Corner screws - the board is BOLTED to the viewport */
 body::before, body::after, #root::before, #root::after {
   content: "";
   position: fixed;
@@ -1889,7 +1889,7 @@ body::after  { top: 14px; right: 14px; }
   background: var(--board-dark);
   font-family: var(--font-pixel);
   font-size: 0.62rem;
-  border-radius: 6px;            /* chips, not pills — components are rectangular */
+  border-radius: 6px;            /* chips, not pills - components are rectangular */
 }
 .health-pill.is-ok::before {
   content: "";
@@ -1915,7 +1915,7 @@ body::after  { top: 14px; right: 14px; }
   color: var(--copper-bright);
 }
 
-/* The logo is the owner's mark — original colors, untouched by the theme. */
+/* The logo is the owner's mark - original colors, untouched by the theme. */
 
 /* Panels: routed board modules - chamfered corners, corner vias, copper rail */
 .main-panel, .json-panel, .schematic-frame {
@@ -2002,7 +2002,7 @@ body::after  { top: 14px; right: 14px; }
 .stage-bus-charge, .stage-bus-packet { stroke: var(--copper-bright); fill: var(--copper-bright); }
 
 /* Killswitch ask: a collaborative re-prompt, NOT a rejection. Calm amber,
-   reads as "help me get this right" — matches the pipeline's user_message. */
+   reads as "help me get this right" - matches the pipeline's user_message. */
 .error-box {
   border: 1.5px solid var(--led-amber);
   background: rgba(255, 177, 69, 0.05);

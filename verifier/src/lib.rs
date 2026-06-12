@@ -1,4 +1,4 @@
-//! Ohmatic verifier — public library surface.
+//! Ohmatic verifier - public library surface.
 //!
 //! Exposes [`create_app`] (the axum Router) and [`BBOX_TOML`] (the embedded
 //! component registry) so integration tests and the binary entry-point can
@@ -42,7 +42,7 @@ async fn verify_handler(
     State(state): State<AppState>,
     req: Request,
 ) -> (StatusCode, Json<Value>) {
-    // Extract raw bytes from the request body — cap at 1 MiB to prevent memory exhaustion DoS.
+    // Extract raw bytes from the request body - cap at 1 MiB to prevent memory exhaustion DoS.
     const MAX_BODY_BYTES: usize = 1_048_576; // 1 MiB
     let body_bytes = match axum::body::to_bytes(req.into_body(), MAX_BODY_BYTES).await {
         Ok(b) => b,
@@ -71,7 +71,7 @@ async fn verify_handler(
         }
     };
 
-    // Step 2: extract "circuit" field — must be present and non-null.
+    // Step 2: extract "circuit" field - must be present and non-null.
     let circuit_value = match body_value.get("circuit") {
         Some(v) if !v.is_null() => v.clone(),
         Some(_) => {

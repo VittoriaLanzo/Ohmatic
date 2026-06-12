@@ -1,4 +1,4 @@
-# Component Registry — Ohmatic Stage 1+
+# Component Registry - Ohmatic Stage 1+
 #
 # Single source of truth for component type metadata.
 # Each section name matches the serde snake_case output of ComponentType.
@@ -233,7 +233,7 @@ description = "LCD display module; VCC, GND + data/control bus"
 parts_list_part = "lcd"
 is_physical     = true
 
-# ── ICs — analog ──────────────────────────────────────────────────────────────
+# ICs - analog
 
 [ic_timer]
 bbox        = [16, 12]
@@ -298,7 +298,7 @@ description = "Phase-locked loop; pins VCO_IN, CLK_IN, CLK_OUT, VCC, GND"
 parts_list_part = "ic_pll"
 is_physical     = true
 
-# ── ICs — digital / mixed-signal ──────────────────────────────────────────────
+# ICs - digital / mixed-signal
 
 [ic_logic]
 bbox        = [16, 12]

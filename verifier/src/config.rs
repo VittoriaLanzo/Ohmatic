@@ -1,4 +1,4 @@
-//! Component registry — loads `component_registry.toml` and provides
+//! Component registry - loads `component_registry.toml` and provides
 //! bounding-box and metadata lookups used by the Tier 2 geometry pipeline.
 
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ pub struct RegistryDefaults {
     pub bbox: [f64; 2],
 }
 
-/// Internal raw TOML shape — `defaults` section + every other key as a component entry.
+/// Internal raw TOML shape - `defaults` section + every other key as a component entry.
 #[derive(Debug, Clone, Deserialize)]
 struct ComponentRegistryRaw {
     pub defaults: RegistryDefaults,
@@ -89,7 +89,7 @@ mod tests {
         let config = load_registry();
 
         // Every entry in the registry must have positive bbox dimensions.
-        // The registry is the single source of truth — no hardcoded type list to maintain.
+        // The registry is the single source of truth - no hardcoded type list to maintain.
         // To add a new type: add an entry to component_registry.toml; this test auto-covers it.
         assert!(
             config.components.len() >= 70,

@@ -115,7 +115,7 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
           {!result ? (
             <p className="muted">Parts appear here when the circuit artifact is ready.</p>
           ) : (result.parts_list?.length ?? 0) > 0 ? (
-            // Deterministic local parts_list: supplier-free by design (no MPN/price —
+            // Deterministic local parts_list: supplier-free by design (no MPN/price -
             // procurement is a separate, disclosed link-out layer).
             <table>
               <thead>

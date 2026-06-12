@@ -25,7 +25,7 @@
     "severity": "error",
     "message": "Q1: BJT base net 'BASE_DRIVE' has no current-limiting resistor",
     "why": "A BJT base driven directly from a logic output without a series resistor can draw excessive base current and damage the driving IC or the transistor.",
-    "repair": "Insert a base resistor (typically 1k–10kΩ) in series between the driver and the BJT base."
+    "repair": "Insert a base resistor (typically 1k-10kΩ) in series between the driver and the BJT base."
   },
   {
     "code": "POWER_VOLTAGE_REF_MISSING_BYPASS_CAPACITOR",
@@ -51,14 +51,14 @@
   {
     "code": "POLARITY_DIODE_REVERSED",
     "severity": "error",
-    "message": "D1: diode anode (A) is on GND and cathode (K) is on VCC — diode is reversed",
+    "message": "D1: diode anode (A) is on GND and cathode (K) is on VCC - diode is reversed",
     "why": "A rectifier or protection diode installed backwards conducts in the wrong direction, clamping the supply rail or bypassing reverse-polarity protection.",
     "repair": "Flip the diode: anode (A) toward the lower potential node, cathode (K) toward the higher potential node."
   },
   {
     "code": "POLARITY_TVS_DIODE_REVERSED",
     "severity": "error",
-    "message": "D1: tvs_diode anode (A) is on supply net 'VCC' — TVS is forward-biased, not clamping",
+    "message": "D1: tvs_diode anode (A) is on supply net 'VCC' - TVS is forward-biased, not clamping",
     "why": "A TVS diode with its anode on the positive rail is forward biased; it clamps the line to ~0.7 V above GND, not the intended reverse-breakdown clamp voltage.",
     "repair": "Reverse the TVS: cathode (K) to the positive rail or protected node, anode (A) to GND."
   },
@@ -74,7 +74,7 @@
     "severity": "error",
     "message": "Y1: crystal pin 1 on net 'XTAL1' has no load capacitor",
     "why": "Crystal oscillators require load capacitors on both oscillator pins to start reliably and reach the rated frequency.",
-    "repair": "Add a load capacitor (typically 18–22pF) from each crystal pin to GND."
+    "repair": "Add a load capacitor (typically 18-22pF) from each crystal pin to GND."
   },
   {
     "code": "INTERACTION_DIODE_BRIDGE_AC_FROM_DC_RAIL",
@@ -109,7 +109,7 @@
     "severity": "error",
     "message": "U1: comparator OUT net 'COMP_OUT' has no pull-up resistor",
     "why": "Open-drain comparator outputs float high without a pull-up; the logic level will be indeterminate and may cause false triggers downstream.",
-    "repair": "Add a pull-up resistor (typically 4.7 kΩ–10 kΩ) from the comparator OUT pin to VCC."
+    "repair": "Add a pull-up resistor (typically 4.7 kΩ-10 kΩ) from the comparator OUT pin to VCC."
   },
   {
     "code": "INTERACTION_MOTOR_DC_MISSING_FLYBACK_DIODE",
@@ -121,7 +121,7 @@
   {
     "code": "INTERACTION_LEVEL_SHIFTER_SAME_VOLTAGE_RAILS",
     "severity": "error",
-    "message": "U1: level_shifter VCCA and VCCB are both on net 'VCC' — no voltage difference exists",
+    "message": "U1: level_shifter VCCA and VCCB are both on net 'VCC' - no voltage difference exists",
     "why": "A bidirectional level shifter with identical voltage on both supply rails performs no translation; signal integrity is not guaranteed and the design intent is likely wrong.",
     "repair": "Connect VCCA to one logic rail (e.g., 3.3 V) and VCCB to the other (e.g., 5 V), or replace the level shifter with a direct connection if the rails are truly identical."
   },
@@ -137,12 +137,12 @@
     "severity": "error",
     "message": "SCR1: SCR gate net 'SCR_GATE' has no current-limiting resistor",
     "why": "An SCR gate without a resistor is susceptible to noise-triggered false firing and has no current limit, which can damage the gate junction.",
-    "repair": "Add a series gate resistor (typically 47Ω–1kΩ) and optionally a pull-down to cathode."
+    "repair": "Add a series gate resistor (typically 47Ω-1kΩ) and optionally a pull-down to cathode."
   },
   {
     "code": "POLARITY_ZENER_ANODE_ON_HIGH_RAIL",
     "severity": "error",
-    "message": "D1: zener_diode anode (A) is on a positive supply net 'VCC' — diode is forward-biased",
+    "message": "D1: zener_diode anode (A) is on a positive supply net 'VCC' - diode is forward-biased",
     "why": "A zener diode with its anode on VCC is forward-biased; it acts as a standard diode rather than a voltage clamp and will draw excessive current.",
     "repair": "Reverse the zener: connect cathode (K) to the positive rail and anode (A) to GND or the lower rail."
   },
@@ -179,7 +179,7 @@
     "severity": "error",
     "message": "K1: solid-state relay IN+ net 'SSR_IN' has no current-limiting resistor",
     "why": "SSR input circuitry contains an internal LED; driving it without a current-limiting resistor will burn out the input optocoupler and disable the relay permanently.",
-    "repair": "Add a current-limiting resistor between the driving signal and IN+, sized for the SSR input current specification (typically 5–20mA)."
+    "repair": "Add a current-limiting resistor between the driving signal and IN+, sized for the SSR input current specification (typically 5-20mA)."
   },
   {
     "code": "INTERACTION_IGBT_GATE_MISSING_DRIVER",
@@ -207,13 +207,13 @@
     "severity": "error",
     "message": "DS1: seven_segment segment pin F on net 'GND' has no current-limiting resistor",
     "why": "Seven-segment LED segments require individual current-limiting resistors; direct connection to a logic rail will overcurrent the segment and may destroy the display or driving IC.",
-    "repair": "Add a current-limiting resistor (typically 100Ω–470Ω depending on VCC and desired brightness) in series with each segment pin."
+    "repair": "Add a current-limiting resistor (typically 100Ω-470Ω depending on VCC and desired brightness) in series with each segment pin."
   },
   {
     "code": "INTERACTION_TRIAC_GATE_MISSING_RESISTOR",
     "severity": "error",
     "message": "TR1: TRIAC gate net 'TRIAC_GATE' has no current-limiting resistor",
     "why": "A TRIAC gate without a series resistor can be noise-triggered or have unlimited gate surge current.",
-    "repair": "Add a series gate resistor (typically 100Ω–1kΩ)."
+    "repair": "Add a series gate resistor (typically 100Ω-1kΩ)."
   }
 ]

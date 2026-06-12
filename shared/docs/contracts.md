@@ -34,7 +34,7 @@ the client must poll `/v1/jobs/{id}/status` for the result.
 | `options.supplier` | string | `"local"` | BOM supplier: `"local"` or `"octopart"`. |
 | `options.max_components` | integer | `30` | Soft cap; inference is warned but not hard-blocked. |
 
-### Response 202 — Accepted
+### Response 202: Accepted
 
 ```json
 {
@@ -43,13 +43,13 @@ the client must poll `/v1/jobs/{id}/status` for the result.
 }
 ```
 
-### Response 400 — Bad Request
+### Response 400: Bad Request
 
 ```json
 { "error": "prompt must not be empty" }
 ```
 
-### Response 503 — Service Unavailable
+### Response 503: Service Unavailable
 
 ```json
 { "error": "inference service unavailable" }
@@ -63,7 +63,7 @@ the client must poll `/v1/jobs/{id}/status` for the result.
 
 Polls the status of an async job. The client should poll at ~500 ms intervals.
 
-### Response 200 — Pending
+### Response 200: Pending
 
 ```json
 {
@@ -74,7 +74,7 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 }
 ```
 
-### Response 200 — Running
+### Response 200: Running
 
 ```json
 {
@@ -87,7 +87,7 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 
 `stage` is one of `"inference"`, `"drc"`, `"bom"`, or `null` (pending / done / failed states).
 
-### Response 200 — Done
+### Response 200: Done
 
 ```json
 {
@@ -118,7 +118,7 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 
 The `latency_ms` sub-fields (`inference`, `drc`, `bom`) are **integer milliseconds**.
 
-### Response 200 — Failed
+### Response 200: Failed
 
 ```json
 {
@@ -142,9 +142,9 @@ The `latency_ms` sub-fields (`inference`, `drc`, `bom`) are **integer millisecon
 | `unsupported_schema_version` | `metadata.version` returned by inference is not `"0.1"`. |
 | `inference_unavailable` | Inference service unreachable; gateway returned 503. |
 
-> **Error shape note:** Synchronous gateway errors (400, 503 on `POST /v1/generate`) and internal service errors (`POST /infer` 422) use a flat string form: `{ "error": "message" }`. Async job failures use a structured object: `{ "code": "...", "message": "..." }`. These are two different response surfaces — clients must handle both.
+> **Error shape note:** Synchronous gateway errors (400, 503 on `POST /v1/generate`) and internal service errors (`POST /infer` 422) use a flat string form: `{ "error": "message" }`. Async job failures use a structured object: `{ "code": "...", "message": "..." }`. These are two different response surfaces; clients must handle both.
 
-### Response 404 — Not Found
+### Response 404: Not Found
 
 ```json
 { "error": "job_not_found" }
@@ -158,7 +158,7 @@ The `latency_ms` sub-fields (`inference`, `drc`, `bom`) are **integer millisecon
 
 Liveness probe for Docker health checks and load balancer readiness.
 
-### Response 200 — OK
+### Response 200: OK
 
 ```json
 { "status": "ok" }
@@ -183,7 +183,7 @@ Generates an `OhmaticCircuitV01` object from a natural-language prompt.
 }
 ```
 
-### Response 200 — OK
+### Response 200: OK
 
 ```json
 {
@@ -197,7 +197,7 @@ Generates an `OhmaticCircuitV01` object from a natural-language prompt.
 }
 ```
 
-### Response 422 — Grammar Timeout
+### Response 422: Grammar Timeout
 
 Returned when constrained decoding times out before producing a valid circuit.
 
@@ -224,14 +224,14 @@ Validates an `OhmaticCircuitV01` object against the three-tier DRC rule set (see
 }
 ```
 
-### Response 200 — OK
+### Response 200: OK
 
 Returned for circuits that pass Tier 1 and Tier 2 (errors is empty). Tier 3 issues
 are reported as warnings; the gateway surfaces these in `result.drc_warnings`.
 
 ```json
 {
-  "circuit": { "...": "OhmaticCircuitV01 object (coordinates normalized to 0–300)" },
+  "circuit": { "...": "OhmaticCircuitV01 object (coordinates normalized to 0-300)" },
   "warnings": ["Missing bypass capacitor near U1 (Tier 3)"],
   "errors": []
 }
@@ -239,7 +239,7 @@ are reported as warnings; the gateway surfaces these in `result.drc_warnings`.
 
 `errors` is always `[]` on a 200. A non-empty errors array is always signalled via HTTP 422. Gateway reads: 200 → pass, 422 → Tier 1/2 failure.
 
-### Response 400 — Bad Request
+### Response 400: Bad Request
 
 ```json
 { "error": "missing 'circuit' field" }
@@ -247,11 +247,11 @@ are reported as warnings; the gateway surfaces these in `result.drc_warnings`.
 
 Request body absent, not valid JSON, or missing the `circuit` field.
 
-### Response 422 — Parse Error (circuit field present but undeserializable)
+### Response 422: Parse Error (circuit field present but undeserializable)
 
 Two sub-cases, distinguished by rule ID prefix:
 
-**T1-PARSE-SERDE**: `circuit` JSON structure is valid but cannot be coerced into `OhmaticCircuitV01` (missing required field, wrong type, deny_unknown_fields violation on a Component or Net). Not retry-able — the model produced malformed JSON.
+**T1-PARSE-SERDE**: `circuit` JSON structure is valid but cannot be coerced into `OhmaticCircuitV01` (missing required field, wrong type, deny_unknown_fields violation on a Component or Net). Not retry-able; the model produced malformed JSON.
 
 ```json
 {
@@ -260,7 +260,7 @@ Two sub-cases, distinguished by rule ID prefix:
 }
 ```
 
-**T1-PARSE-REGISTRY**: `circuit` deserialises successfully but a component carries a `type` string absent from the component registry. Retry-able — the model hallucinated an unknown component type.
+**T1-PARSE-REGISTRY**: `circuit` deserialises successfully but a component carries a `type` string absent from the component registry. Retry-able; the model hallucinated an unknown component type.
 
 ```json
 {
@@ -269,7 +269,7 @@ Two sub-cases, distinguished by rule ID prefix:
 }
 ```
 
-### Response 422 — Validation Error (Tier 1 or Tier 2)
+### Response 422: Validation Error (Tier 1 or Tier 2)
 
 ```json
 {
@@ -297,7 +297,7 @@ Resolves MPNs and pricing for every component in a circuit.
 }
 ```
 
-### Response 200 — OK
+### Response 200: OK
 
 Returns one `BomEntry` per component in the same order as `circuit.components`.
 
@@ -314,7 +314,7 @@ Returns one `BomEntry` per component in the same order as `circuit.components`.
   {
     "id": "VCC1",
     "mpn": null,
-    "description": "Power symbol — no physical part",
+    "description": "Power symbol, no physical part",
     "price_usd": null,
     "url": null,
     "mpn_found": false
@@ -343,7 +343,7 @@ prevents Tier 2 checks from running, and so on.
 | Tier | Category | Gateway behaviour | Example rules |
 |------|----------|-------------------|---------------|
 | **Tier 1** | Schema violations | Return 422, increment retry counter | Duplicate component IDs; duplicate net names; invalid component type; missing required pin; no VCC component; no GND component |
-| **Tier 2** | Geometric violations | Normalize coordinates and push-apart collisions (max 20 iterations). Always returns 200. Unresolvable collisions appear as `[T2-02]` entries in the `warnings` array; the gateway does not retry Tier 2. | Component bounding-box collision; component placed outside the 0–300 canvas after normalization |
+| **Tier 2** | Geometric violations | Normalize coordinates and push-apart collisions (max 20 iterations). Always returns 200. Unresolvable collisions appear as `[T2-02]` entries in the `warnings` array; the gateway does not retry Tier 2. | Component bounding-box collision; component placed outside the 0-300 canvas after normalization |
 | **Tier 3** | Electrical correctness | Return 200 with `drc_warnings` populated | LED without series resistor; IC power pin unconnected; missing bypass capacitor near IC; floating MOSFET gate; reverse-polarity capacitor |
 
 - **Tier 1 → 422:** the gateway may retry inference up to `options.max_retries` times
@@ -367,7 +367,7 @@ running instance.
 
 | `metadata.version` | Action |
 |--------------------|--------|
-| `"0.1"` | Apply full Tier 1–3 rule set against `shared/schema/circuit_v01.json`. |
+| `"0.1"` | Apply full Tier 1-3 rule set against `shared/schema/circuit_v01.json`. |
 | Any other value | Job fails with `error.code = "unsupported_schema_version"` (see §2 failed state). |
 
 **Dispatch example:**
@@ -397,14 +397,14 @@ Forward-compatible: adding `circuit_v02.json` with a new rule set requires no ga
 
 ## 9. Extending the Component Type Enum
 
-`ComponentType` is a **transparent string newtype** — it is not a Rust enum. To add a new component type (e.g. `relay_solid_state`):
+`ComponentType` is a **transparent string newtype**; it is not a Rust enum. To add a new component type (e.g. `relay_solid_state`):
 
 1. Add the new string to `circuit_v01.json` `components[].type.enum` (keeps the schema in sync with the registry).
 2. Add an entry to `verifier/config/component_registry.toml` (`bbox`, `ref_prefix`, `description` fields).
-3. Optionally add a `pub const` to the `component_types` module in `shared/ohmatic-types/src/circuit.rs` for use in rule code — no other Rust change is required.
+3. Optionally add a `pub const` to the `component_types` module in `shared/ohmatic-types/src/circuit.rs` for use in rule code; no other Rust change is required.
 4. Add an example circuit using the new type to `dataset/examples.json`.
 5. Update the Tier 3 DRC rules in `shared/docs/contracts.md` if new electrical rules apply.
-6. Bump `metadata.version` only when introducing breaking schema changes (adding a field to components, changing a required field type). Adding a new type to the enum is additive and non-breaking — no version bump required.
+6. Bump `metadata.version` only when introducing breaking schema changes (adding a field to components, changing a required field type). Adding a new type to the enum is additive and non-breaking; no version bump required.
 
 > **`/health` versioning note:** The `/health` endpoint on all four services is intentionally unversioned (no `/v1/` prefix). It is a liveness probe, not an API resource. All other endpoints are versioned under `/v1/`.
 

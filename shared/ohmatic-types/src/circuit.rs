@@ -1,8 +1,8 @@
-// Hand-authored circuit data model — derived from shared/schema/circuit_v01.json
+// Hand-authored circuit data model - derived from shared/schema/circuit_v01.json
 // but NOT machine-generated. ComponentType is a transparent string newtype
 // (not an enum) so that new types can be added via component_registry.toml alone.
 //
-// DO NOT run typify-cli codegen against this file — it would overwrite the
+// DO NOT run typify-cli codegen against this file - it would overwrite the
 // ComponentType newtype with an enum and break the data-driven registry design.
 // To add a new component type: see verifier/config/component_registry.toml.
 
@@ -36,13 +36,13 @@ pub struct Component {
     pub pins: std::collections::HashMap<String, String>,
 }
 
-/// A component type identifier — any lowercase snake_case string.
+/// A component type identifier - any lowercase snake_case string.
 ///
 /// Ohmatic is data-driven: the authoritative list of supported types lives in
 /// `verifier/config/component_registry.toml`.  To register a new component:
 ///   1. Add an entry to `component_registry.toml` (bbox, ref_prefix, description).
 ///   2. Optionally add a named constant to `ohmatic_types::component_types` for
-///      use in the rules engine — no other Rust change is required.
+///      use in the rules engine - no other Rust change is required.
 ///
 /// Unknown types (strings not present in the registry) pass serde but are
 /// rejected by the verifier as a T1-PARSE error.
@@ -51,7 +51,7 @@ pub struct Component {
 pub struct ComponentType(pub String);
 
 impl ComponentType {
-    /// Construct from any string (no validity check — registry is the authority).
+    /// Construct from any string (no validity check - registry is the authority).
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
     }
@@ -85,7 +85,7 @@ impl From<String> for ComponentType {
 /// Import with `use ohmatic_types::component_types as ct;` then use `ct::LED`,
 /// `ct::RESISTOR`, etc. in pattern matching and array slices.
 ///
-/// Adding a new type does NOT require adding a constant here — it only requires
+/// Adding a new type does NOT require adding a constant here - it only requires
 /// a registry entry.  Constants are provided as a convenience for the rules
 /// engine and are informational only.
 pub mod component_types {
@@ -136,7 +136,7 @@ pub mod component_types {
     pub const SEVEN_SEGMENT: &str = "seven_segment";
     pub const LCD: &str = "lcd";
 
-    // ── ICs — analog ──────────────────────────────────────────────────────────
+    // ── ICs - analog ──────────────────────────────────────────────────────────
     pub const IC_TIMER: &str = "ic_timer";
     pub const IC_OPAMP: &str = "ic_opamp";
     pub const IC_COMPARATOR: &str = "ic_comparator";
@@ -147,7 +147,7 @@ pub mod component_types {
     pub const IC_DAC: &str = "ic_dac";
     pub const IC_PLL: &str = "ic_pll";
 
-    // ── ICs — digital / mixed-signal ──────────────────────────────────────────
+    // ── ICs - digital / mixed-signal ──────────────────────────────────────────
     pub const IC_LOGIC: &str = "ic_logic";
     pub const IC_MCU: &str = "ic_mcu";
     pub const IC_DRIVER: &str = "ic_driver";
@@ -213,7 +213,7 @@ fn is_valid_pin_ref(pin_ref: &str) -> bool {
             !pin_name.is_empty()
                 && is_valid_component_id(comp_id)
                 // Pin names may include '+' and '-' for differential/signed pins
-                // (e.g. U1.IN+, U1.IN-, U1.V+) — must stay in sync with the
+                // (e.g. U1.IN+, U1.IN-, U1.V+) - must stay in sync with the
                 // JSON schema pattern: ^[A-Za-z0-9_+\-]+$
                 && pin_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '+' || c == '-')
         }
@@ -255,7 +255,7 @@ impl OhmaticCircuitV01 {
             }
         }
 
-        // --- components — two-pass: count IDs so comp_pins excludes all duplicate-ID
+        // --- components - two-pass: count IDs so comp_pins excludes all duplicate-ID
         // components (mirrors validate.py's comp_id_counts approach). Power-type flags
         // are only set from the first (non-duplicate) occurrence of each ID.
         let mut comp_pins: HashMap<&str, HashSet<&str>> = HashMap::new();
@@ -347,7 +347,7 @@ impl OhmaticCircuitV01 {
                         net.name,
                         net.pins.len()
                     ));
-                    // Don't skip — still validate pin refs to populate used_pins and
+                    // Don't skip - still validate pin refs to populate used_pins and
                     // avoid false "not connected" errors for pins only in this net.
                 }
                 let mut seen_in_net: HashSet<&str> = HashSet::new();

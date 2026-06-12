@@ -1,11 +1,11 @@
 """
-Stage 1 — GENERATE (the only stage that costs money).
+Stage 1 - GENERATE (the only stage that costs money).
 ======================================================
     python -m eval.benchmark.cross_model.generate --model star-r2-bf16 --suite forward
     python -m eval.benchmark.cross_model.generate --model fable-5 --suite realuser --n 20
 
 Append-only JSONL per model: results/{model}.jsonl. Rows are keyed
-(model, suite, prompt_id) — reruns SKIP completed keys, so any crash or
+(model, suite, prompt_id) - reruns SKIP completed keys, so any crash or
 rate-limit resumes without double-paying. Raw outputs are stored verbatim;
 verification happens in stage 2 (verify.py) for free, forever.
 """
@@ -65,7 +65,7 @@ def main() -> None:
     if args.dry_run or not pending:
         return
 
-    # System prompt: the SHARED single source — byte-identical for every leg.
+    # System prompt: the SHARED single source - byte-identical for every leg.
     from shared.prompt_builder import build_system_prompt
     system_prompt = build_system_prompt()
 
@@ -88,7 +88,7 @@ def main() -> None:
                 n_err += 1
                 print(f"  [{i}/{len(pending)}] {it['prompt_id']} ERROR: {exc}", flush=True)
                 if n_err >= 5:
-                    print("5 consecutive-ish errors — stopping (resume later).", flush=True)
+                    print("5 consecutive-ish errors - stopping (resume later).", flush=True)
                     break
                 time.sleep(10)
                 continue

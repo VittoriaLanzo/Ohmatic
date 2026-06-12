@@ -1,4 +1,4 @@
-"""Optocoupler, zener, and diode polarity ERC rules — T3-20 through T3-23."""
+"""Optocoupler, zener, and diode polarity ERC rules - T3-20 through T3-23."""
 from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
@@ -93,7 +93,7 @@ def _zener_anode_on_high_rail(ctx: "_Context") -> list[dict[str, Any]]:
         items.append(ctx.make_item(
             code="POLARITY_ZENER_ANODE_ON_HIGH_RAIL",
             path=f"$.nets[{ctx.net_index(net)}].pins",
-            message=f"{component_id}: zener_diode anode (A) is on a positive supply net '{net.get('name', '')}' — diode is forward-biased",
+            message=f"{component_id}: zener_diode anode (A) is on a positive supply net '{net.get('name', '')}' - diode is forward-biased",
             why_it_matters="A zener diode with its anode on VCC is forward-biased; it acts as a standard diode rather than a voltage clamp and will draw excessive current.",
             expected="zener cathode (K) on the positive rail and anode (A) on GND or the lower rail for proper reverse-bias clamping",
             actual=f"{pin_ref} on supply net '{net.get('name', '')}'",
@@ -134,7 +134,7 @@ def _diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
         items.append(ctx.make_item(
             code="POLARITY_DIODE_REVERSED",
             path=f"$.nets[{ctx.net_index(anode_net)}].pins",
-            message=f"{component_id}: {component.get('type')} anode (A) is on GND and cathode (K) is on VCC — diode is reversed",
+            message=f"{component_id}: {component.get('type')} anode (A) is on GND and cathode (K) is on VCC - diode is reversed",
             why_it_matters="A rectifier or protection diode installed backwards conducts in the wrong direction, clamping the supply rail or bypassing reverse-polarity protection.",
             expected="anode (A) toward the lower potential node, cathode (K) toward the higher potential node",
             actual=f"A on '{anode_net.get('name', '')}' (GND side), K on '{cathode_net.get('name', '')}' (VCC side)",
@@ -164,7 +164,7 @@ def _zener_missing_series_resistor(ctx: "_Context") -> list[dict[str, Any]]:
         # Only fire if cathode is directly on a supply rail.
         # When cathode IS on a supply rail, always fire: a valid series-R circuit would
         # place the zener cathode on an intermediate net (not the supply itself), so
-        # any resistor elsewhere on the supply net is unrelated — it does NOT protect
+        # any resistor elsewhere on the supply net is unrelated - it does NOT protect
         # the zener from overcurrent.
         cathode_on_supply = _net_is_supply(ctx, net)
         if not cathode_on_supply:
@@ -190,7 +190,7 @@ def _zener_missing_series_resistor(ctx: "_Context") -> list[dict[str, Any]]:
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def fixture_optocoupler_no_current_limit() -> dict[str, Any]:
-    """Optocoupler anode directly on VCC with no resistor — triggers T3-20."""
+    """Optocoupler anode directly on VCC with no resistor - triggers T3-20."""
     return {
         "metadata": {"title": "Bad Opto No Resistor", "description": "Optocoupler input LED driven without current limit.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -208,7 +208,7 @@ def fixture_optocoupler_no_current_limit() -> dict[str, Any]:
 
 
 def fixture_zener_anode_on_vcc() -> dict[str, Any]:
-    """Zener anode on VCC (forward-biased) — triggers T3-21."""
+    """Zener anode on VCC (forward-biased) - triggers T3-21."""
     return {
         "metadata": {"title": "Bad Zener Anode On VCC", "description": "Zener diode installed forward-biased.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -226,7 +226,7 @@ def fixture_zener_anode_on_vcc() -> dict[str, Any]:
 
 
 def fixture_diode_reversed() -> dict[str, Any]:
-    """Diode installed backwards (anode on GND, cathode on VCC) — triggers T3-22."""
+    """Diode installed backwards (anode on GND, cathode on VCC) - triggers T3-22."""
     return {
         "metadata": {"title": "Bad Diode Reversed", "description": "Rectifier diode installed backwards.", "version": "0.1", "tags": ["fixture"]},
         "components": [
@@ -242,7 +242,7 @@ def fixture_diode_reversed() -> dict[str, Any]:
 
 
 def fixture_zener_cathode_direct_on_vcc() -> dict[str, Any]:
-    """Zener cathode on VCC with no series resistor — triggers T3-23."""
+    """Zener cathode on VCC with no series resistor - triggers T3-23."""
     return {
         "metadata": {"title": "Bad Zener No Series R", "description": "Zener connected directly to VCC without series resistor.", "version": "0.1", "tags": ["fixture"]},
         "components": [

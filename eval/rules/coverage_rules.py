@@ -4,7 +4,7 @@ Compliance-first checks that close false-negative gaps in the core engine. Each 
 is tightly scoped to avoid flagging legitimate designs (false positives reject the
 model's correct outputs and shrink ERC-clean training data, so scoping matters).
 
-Entry point: coverage_diagnostics(ctx) — appended to _RULE_MODULES.
+Entry point: coverage_diagnostics(ctx) - appended to _RULE_MODULES.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ _RESET_PINS = {"RESET", "NRESET", "RST", "NRST", "RESETN", "RSTN", "MCLR", "NMCL
 
 def coverage_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
     # Only rules with verified-low false-positive rates on the corpus are enabled
-    # (T3-42/T3-43/T3-44 false-positived heavily and were removed — see git history).
+    # (T3-42/T3-43/T3-44 false-positived heavily and were removed - see git history).
     items: list[dict[str, Any]] = []
     for rule in (
         _ic_missing_ground_pin,        # T3-41
@@ -78,7 +78,7 @@ def _ic_missing_ground_pin(ctx: "_Context") -> list[dict[str, Any]]:
 
 def _reset_is_driven(ctx: "_Context", net: dict, mcu_id: str) -> bool:
     """True if the reset net is actively driven by another IC (supervisor/brownout) or
-    a debug connector (JTAG/SWD) — directly on the net, or through one series resistor.
+    a debug connector (JTAG/SWD) - directly on the net, or through one series resistor.
     Such resets are valid without a pull-up."""
     def _has_driver(n: dict) -> bool:
         for o in ctx.comps_on_net(n) - {mcu_id}:
@@ -121,7 +121,7 @@ def _mcu_reset_floating(ctx: "_Context") -> list[dict[str, Any]]:
                 continue
             # Actively DRIVEN reset needs no pull-up. Exempt when a reset supervisor /
             # brownout detector (another IC) or a debug connector (JTAG/SWD) drives the
-            # reset — either directly on the net OR through a series resistor.
+            # reset - either directly on the net OR through a series resistor.
             if _reset_is_driven(ctx, net, cid):
                 continue
             items.append(ctx.make_item(

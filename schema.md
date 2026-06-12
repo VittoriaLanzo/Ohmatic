@@ -31,13 +31,13 @@ A circuit is **one JSON object** with exactly three top-level keys:
 }
 ```
 
-### STAGE_1_TOPOLOGY — electrical connectivity
+### STAGE_1_TOPOLOGY: electrical connectivity
 - **components[]**: `id` (unique), `type` (must be a key in the component registry),
-  `value`, `part`, and `pins` — a map of `pin_name -> net_name`.
-- **nets[]**: `name` and `pins` — a list of `"<component_id>.<pin_name>"` references.
+  `value`, `part`, and `pins`, a map of `pin_name -> net_name`.
+- **nets[]**: `name` and `pins`, a list of `"<component_id>.<pin_name>"` references.
 
-### STAGE_2_LAYOUT — physical placement
-- **spatial_nodes[]**: exactly one `{id, x, y}` per component; canvas coordinates 0–300.
+### STAGE_2_LAYOUT: physical placement
+- **spatial_nodes[]**: exactly one `{id, x, y}` per component; canvas coordinates 0-300.
 
 ## Constraints
 1. Component `id`s are unique; every component has a matching `spatial_node`.
@@ -53,4 +53,4 @@ A circuit is **one JSON object** with exactly three top-level keys:
 ```
 
 ## Version History
-- **v0.1** — two-stage representation: STAGE_1_TOPOLOGY (electrical) + STAGE_2_LAYOUT (placement).
+- **v0.1**: two-stage representation: STAGE_1_TOPOLOGY (electrical) + STAGE_2_LAYOUT (placement).

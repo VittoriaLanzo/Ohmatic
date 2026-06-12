@@ -82,17 +82,17 @@ def analyze_schematic(circuit: dict[str, Any]) -> dict[str, Any]:
     """
     try:
         circuit = _normalize_component_types(circuit)
-    except Exception:  # noqa: BLE001 — robustness boundary
+    except Exception:  # noqa: BLE001 - robustness boundary
         circuit = circuit if isinstance(circuit, dict) else {}
     diagnostics: list[dict[str, Any]] = []
     for group in (_forbidden_field_diagnostics, _validator_diagnostics):
         try:
             diagnostics.extend(group(circuit))
-        except Exception as exc:  # noqa: BLE001 — robustness boundary
+        except Exception as exc:  # noqa: BLE001 - robustness boundary
             diagnostics.append(_analyzer_error_item(getattr(group, "__name__", "group"), exc))
     try:
         diagnostics.extend(diagnostic_rules.electrical_diagnostics(circuit, _base_item))
-    except Exception as exc:  # noqa: BLE001 — robustness boundary
+    except Exception as exc:  # noqa: BLE001 - robustness boundary
         diagnostics.append(_analyzer_error_item("electrical_diagnostics", exc))
     return {
         "valid": not diagnostics,
@@ -242,7 +242,7 @@ def _validator_diagnostics(circuit: dict[str, Any]) -> list[dict[str, Any]]:
 
 # ── Validator-error → diagnostic dispatch ─────────────────────────────────────
 # A flat, scannable table of (matcher, handler) pairs. _diagnostic_from_validator_error
-# walks it top-to-bottom and the FIRST matching entry wins — match order is load-bearing
+# walks it top-to-bottom and the FIRST matching entry wins - match order is load-bearing
 # (earlier patterns shadow later ones), so the order here MUST mirror the original ladder.
 #
 # matcher is either:
@@ -264,7 +264,7 @@ class _Ctx:
         self.comp_root = "$.STAGE_1_TOPOLOGY.components" if "STAGE_1_TOPOLOGY" in circuit else "$.components"
         self.net_root = "$.STAGE_1_TOPOLOGY.nets" if "STAGE_1_TOPOLOGY" in circuit else "$.nets"
 
-# Unknown component type — unknown types can't be constrained by registry, cards, grammar, or verifier.
+# Unknown component type - unknown types can't be constrained by registry, cards, grammar, or verifier.
 def _h_unknown_type(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id, component_type = m.groups()
     index = _component_index(ctx.circuit, component_id)
@@ -281,7 +281,7 @@ def _h_unknown_type(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-PARSE-REGISTRY",
     )
 
-# Unknown pin on a known component — a net pin ref must match a declared pin exactly.
+# Unknown pin on a known component - a net pin ref must match a declared pin exactly.
 def _h_unknown_pin(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name, pin_name, component_id = m.groups()
     net_index, pin_index, pin_ref = _net_pin_location(ctx.circuit, net_name, component_id, pin_name)
@@ -302,7 +302,7 @@ def _h_unknown_pin(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-07",
     )
 
-# Net references unknown component — an unresolved ref makes the netlist unroutable.
+# Net references unknown component - an unresolved ref makes the netlist unroutable.
 def _h_unknown_comp_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name, component_id = m.groups()
     component_id = component_id.strip()
@@ -323,7 +323,7 @@ def _h_unknown_comp_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# Spatial node has no matching topology component — orphan nodes break layout rendering.
+# Spatial node has no matching topology component - orphan nodes break layout rendering.
 def _h_spatial_no_topo(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     node_id = m.group(1)
     return dict(
@@ -342,7 +342,7 @@ def _h_spatial_no_topo(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-LAYOUT",
     )
 
-# Topology component missing spatial node — renderer needs coordinates for every component.
+# Topology component missing spatial node - renderer needs coordinates for every component.
 def _h_topo_no_spatial(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id = m.group(1)
     return dict(
@@ -360,7 +360,7 @@ def _h_topo_no_spatial(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-LAYOUT",
     )
 
-# Missing required power_vcc — without it ERC cannot verify IC power or voltage rails.
+# Missing required power_vcc - without it ERC cannot verify IC power or voltage rails.
 def _h_missing_vcc(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="MISSING_POWER_VCC",
@@ -378,7 +378,7 @@ def _h_missing_vcc(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-POWER",
     )
 
-# Missing required power_gnd — without it ERC cannot verify return paths.
+# Missing required power_gnd - without it ERC cannot verify return paths.
 def _h_missing_gnd(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="MISSING_POWER_GND",
@@ -396,7 +396,7 @@ def _h_missing_gnd(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-POWER",
     )
 
-# Missing 'metadata' — required block carrying title/description/version/tags for the pipeline.
+# Missing 'metadata' - required block carrying title/description/version/tags for the pipeline.
 def _h_missing_metadata(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="MISSING_METADATA",
@@ -413,7 +413,7 @@ def _h_missing_metadata(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-META",
     )
 
-# metadata missing required fields — incomplete metadata blocks the pipeline and data builder.
+# metadata missing required fields - incomplete metadata blocks the pipeline and data builder.
 def _h_meta_missing_fields(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     fields_str = m.group(1)
     return dict(
@@ -430,7 +430,7 @@ def _h_meta_missing_fields(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-META",
     )
 
-# version must be '0.1' — exact string required by validator and data builder.
+# version must be '0.1' - exact string required by validator and data builder.
 def _h_bad_version(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     actual_ver = m.group(1)
     return dict(
@@ -444,7 +444,7 @@ def _h_bad_version(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-META",
     )
 
-# component id violates pattern — ids must follow ^[A-Z][A-Za-z0-9_]*$ so pin refs parse.
+# component id violates pattern - ids must follow ^[A-Z][A-Za-z0-9_]*$ so pin refs parse.
 def _h_bad_id_pattern(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id = m.group(1)
     return dict(
@@ -463,7 +463,7 @@ def _h_bad_id_pattern(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# Duplicate component id — duplicate ids make pin refs ambiguous and fail validation.
+# Duplicate component id - duplicate ids make pin refs ambiguous and fail validation.
 def _h_dup_comp_id(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id = m.group(1).strip()
     return dict(
@@ -481,7 +481,7 @@ def _h_dup_comp_id(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# component[i] missing 'id' — every component needs a string id so nets can reference its pins.
+# component[i] missing 'id' - every component needs a string id so nets can reference its pins.
 def _h_comp_missing_id(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     index = int(m.group(1))
     return dict(
@@ -503,7 +503,7 @@ def _h_comp_missing_id(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# component 'X' missing 'field' — per-field repair hints for required component fields.
+# component 'X' missing 'field' - per-field repair hints for required component fields.
 def _h_comp_missing_field(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id, field_name = m.groups()
     field_hints = {
@@ -527,7 +527,7 @@ def _h_comp_missing_field(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# component 'X' has unexpected fields — strict schema rejects extras (may carry supplier/BOM data).
+# component 'X' has unexpected fields - strict schema rejects extras (may carry supplier/BOM data).
 def _h_comp_unexpected_fields(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id, fields_str = m.groups()
     return dict(
@@ -542,7 +542,7 @@ def _h_comp_unexpected_fields(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# component 'X' has x/y in STAGE_1_TOPOLOGY — coordinates belong only in STAGE_2_LAYOUT.
+# component 'X' has x/y in STAGE_1_TOPOLOGY - coordinates belong only in STAGE_2_LAYOUT.
 def _h_comp_xy_in_topo(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id = m.group(1)
     return dict(
@@ -561,7 +561,7 @@ def _h_comp_xy_in_topo(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-LAYOUT",
     )
 
-# component 'X' pins must be dict — pins map pin names to net names so nets can reference them.
+# component 'X' pins must be dict - pins map pin names to net names so nets can reference them.
 def _h_comp_pins_dict(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id = m.group(1)
     return dict(
@@ -576,7 +576,7 @@ def _h_comp_pins_dict(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# component 'X' pins must not be empty — a pin-less component is unreachable by the netlist.
+# component 'X' pins must not be empty - a pin-less component is unreachable by the netlist.
 def _h_comp_pins_empty(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     component_id = m.group(1)
     return dict(
@@ -594,7 +594,7 @@ def _h_comp_pins_empty(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# component pin not connected to any net — every declared pin must appear in exactly one net.
+# component pin not connected to any net - every declared pin must appear in exactly one net.
 def _h_pin_not_connected(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     pin_ref = m.group(1)
     component_id, _pin_name = pin_ref.split(".", 1)
@@ -614,7 +614,7 @@ def _h_pin_not_connected(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-CONNECTIVITY",
     )
 
-# pin ref appears in more than one net — a pin in two nets is an electrical short.
+# pin ref appears in more than one net - a pin in two nets is an electrical short.
 def _h_short_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     pin_ref = m.group(1)
     component_id, _pin_name = pin_ref.split(".", 1)
@@ -634,7 +634,7 @@ def _h_short_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-SHORT",
     )
 
-# net 'X' missing 'pins' field — a net without a pins list describes no connections.
+# net 'X' missing 'pins' field - a net without a pins list describes no connections.
 def _h_net_missing_pins(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name = m.group(1)
     return dict(
@@ -649,7 +649,7 @@ def _h_net_missing_pins(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# net 'X' fewer than 2 pins — a net with <2 pins connects nothing.
+# net 'X' fewer than 2 pins - a net with <2 pins connects nothing.
 def _h_net_too_few_pins(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name, count = m.groups()
     return dict(
@@ -667,7 +667,7 @@ def _h_net_too_few_pins(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# Duplicate net name — duplicate names are ambiguous and make the netlist unroutable.
+# Duplicate net name - duplicate names are ambiguous and make the netlist unroutable.
 def _h_net_dup_name(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name = m.group(1).strip()
     return dict(
@@ -685,7 +685,7 @@ def _h_net_dup_name(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# net 'X' invalid pin ref — pin refs must match ComponentId.pin so they can be split.
+# net 'X' invalid pin ref - pin refs must match ComponentId.pin so they can be split.
 def _h_invalid_pin_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name, bad_ref = m.groups()
     bad_ref = bad_ref.strip()
@@ -704,7 +704,7 @@ def _h_invalid_pin_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# net 'X' contains duplicate pin ref — a pin twice in one net is redundant (copy-paste error).
+# net 'X' contains duplicate pin ref - a pin twice in one net is redundant (copy-paste error).
 def _h_dup_pin_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name, pin_ref = m.groups()
     pin_ref = pin_ref.strip()
@@ -721,7 +721,7 @@ def _h_dup_pin_ref(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# spatial_nodes duplicate id — each component maps to exactly one position.
+# spatial_nodes duplicate id - each component maps to exactly one position.
 def _h_spatial_dup(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     node_id = m.group(1)
     return dict(
@@ -736,7 +736,7 @@ def _h_spatial_dup(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-LAYOUT",
     )
 
-# STAGE_1_TOPOLOGY must be a JSON object — must hold 'components' and 'nets' arrays.
+# STAGE_1_TOPOLOGY must be a JSON object - must hold 'components' and 'nets' arrays.
 def _h_stage1_not_object(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="STAGE1_NOT_OBJECT",
@@ -749,7 +749,7 @@ def _h_stage1_not_object(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-FORMAT",
     )
 
-# STAGE_2_LAYOUT must be a JSON object — must hold the 'spatial_nodes' array.
+# STAGE_2_LAYOUT must be a JSON object - must hold the 'spatial_nodes' array.
 def _h_stage2_not_object(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="STAGE2_NOT_OBJECT",
@@ -762,7 +762,7 @@ def _h_stage2_not_object(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-FORMAT",
     )
 
-# 'components' must be a non-empty list — a circuit with no components is meaningless.
+# 'components' must be a non-empty list - a circuit with no components is meaningless.
 def _h_components_empty(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="COMPONENTS_EMPTY_OR_MISSING",
@@ -778,7 +778,7 @@ def _h_components_empty(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-05",
     )
 
-# 'nets' must be a non-empty list — a circuit with no nets has no connections.
+# 'nets' must be a non-empty list - a circuit with no nets has no connections.
 def _h_nets_empty(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="NETS_EMPTY_OR_MISSING",
@@ -794,7 +794,7 @@ def _h_nets_empty(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# net 'X' has unexpected fields — strict schema rejects extras (nets allow only name, pins).
+# net 'X' has unexpected fields - strict schema rejects extras (nets allow only name, pins).
 def _h_net_unexpected(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     net_name, fields_str = m.groups()
     return dict(
@@ -809,7 +809,7 @@ def _h_net_unexpected(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-06",
     )
 
-# spatial_nodes 'X' has unexpected fields — strict schema rejects extras (only id, x, y).
+# spatial_nodes 'X' has unexpected fields - strict schema rejects extras (only id, x, y).
 def _h_spatial_unexpected(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     node_id, fields_str = m.groups()
     return dict(
@@ -824,7 +824,7 @@ def _h_spatial_unexpected(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1-LAYOUT",
     )
 
-# Forbidden supplier/BOM field — these must never appear in Step 2 circuit JSON.
+# Forbidden supplier/BOM field - these must never appear in Step 2 circuit JSON.
 def _h_forbidden_field(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
     field_path, field_name = m.groups()
     field_name = field_name.strip()
@@ -839,7 +839,7 @@ def _h_forbidden_field(m: "re.Match", ctx: _Ctx) -> dict[str, Any]:
         related_rule="STEP2-FORBID-SUPPLIER",
     )
 
-# Catch-all — fires when nothing above matched (should now rarely happen).
+# Catch-all - fires when nothing above matched (should now rarely happen).
 def _h_catch_all(m, ctx: _Ctx) -> dict[str, Any]:
     return dict(
         code="SCHEMA_VALIDATION_ERROR",
@@ -852,7 +852,7 @@ def _h_catch_all(m, ctx: _Ctx) -> dict[str, Any]:
         related_rule="T1",
     )
 
-# (matcher, handler) in original ladder ORDER — first match wins. A compiled regex
+# (matcher, handler) in original ladder ORDER - first match wins. A compiled regex
 # matches via .match(error); a literal str matches on exact equality.
 _VALIDATOR_HANDLERS: tuple[tuple[Any, Any], ...] = (
     (re.compile(r"component '([^']+)' invalid type: (.+)"), _h_unknown_type),
@@ -1022,7 +1022,7 @@ def _fixture_ic_not_on_literal_vcc() -> dict[str, Any]:
     # A genuinely UNPOWERED IC: its supply pin connects to a plain net ("PWR") that
     # carries no power-rail symbol (power_vcc/3v3/5v/12v). T3-06 now recognizes any
     # positive supply rail (not just a net literally named "VCC"), so the only way to
-    # trip it is a supply pin with no rail at all — which is what this fixture exercises.
+    # trip it is a supply pin with no rail at all - which is what this fixture exercises.
     return {
         "metadata": {"title": "Bad IC No Supply Rail", "description": "IC supply pin not on any power rail.", "version": "0.1", "tags": ["fixture"]},
         "components": [

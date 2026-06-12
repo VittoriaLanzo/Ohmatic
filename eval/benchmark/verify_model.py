@@ -1,5 +1,5 @@
 """
-verify_model.py — Marketing-grade verification of the Ohmatic fine-tune
+verify_model.py - Marketing-grade verification of the Ohmatic fine-tune
 ========================================================================
 Runs the FROZEN held-out benchmark (built by build_holdout.py) against BOTH the
 base Qwen3-8B-Instruct and the fine-tuned adapter, and emits a one-page report with
@@ -127,7 +127,7 @@ def _score(response: str) -> tuple[bool, bool]:
 
 def load_models(adapter: str, adapter_revision: str | None):
     """Load base Qwen3 and wrap the adapter. disable_adapter() yields the true base,
-    so base and fine-tune share identical base weights — a clean apples-to-apples test."""
+    so base and fine-tune share identical base weights - a clean apples-to-apples test."""
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from peft import PeftModel
@@ -296,7 +296,7 @@ def _write_report(report: dict):
         return f"| {name} | {_pct(bk)} | {_pct(fk)} | {_pct(fk-bk):>+7} |"
 
     lines = [
-        f"# Ohmatic verification report — {report['created_utc']}",
+        f"# Ohmatic verification report - {report['created_utc']}",
         "",
         f"- Base model: `{report['base_model']}`",
         f"- Adapter: `{report['adapter']}` (rev: `{report['adapter_revision']}`)",
@@ -311,7 +311,7 @@ def _write_report(report: dict):
         bp = b["by_partition"].get(part, {}).get("erc_pass_rate", 0.0)
         fp = f["by_partition"].get(part, {}).get("erc_pass_rate", 0.0)
         npart = f["by_partition"].get(part, {}).get("n", 0)
-        lines.append(row(f"ERC pass — {part} (n={npart})", bp, fp))
+        lines.append(row(f"ERC pass - {part} (n={npart})", bp, fp))
     lines.append(row("Loopback repair-rate",
                      b["loopback_repair"]["rate"], f["loopback_repair"]["rate"]))
     if "generalization_gap" in f:
