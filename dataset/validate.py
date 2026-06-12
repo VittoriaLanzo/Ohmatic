@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Validate circuit schematics against schema v0.1.
-"""
+"""Validate circuit schematics against schema v0.1."""
 import json
 import re
 import sys
@@ -48,12 +46,8 @@ ALLOWED_NET_FIELDS = {"name", "pins"}
 # ── Format resolver ───────────────────────────────────────────────────────────
 
 def resolve_circuit_topology(circuit: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize old flat format and new STAGE_1/STAGE_2 format into a common dict.
-
-    Returns a dict with keys: ``metadata``, ``components``, ``nets``,
-    ``spatial_nodes``, and ``_is_v2`` (bool).  Callers use this dict instead
-    of accessing circuit keys directly so both formats are handled identically.
-    """
+    """Normalize flat and STAGE_1/STAGE_2 formats into one dict (metadata,
+    components, nets, spatial_nodes, _is_v2) so callers handle both identically."""
     if "STAGE_1_TOPOLOGY" in circuit:
         topo   = circuit.get("STAGE_1_TOPOLOGY") or {}
         layout = circuit.get("STAGE_2_LAYOUT")   or {}
@@ -140,13 +134,8 @@ class SchemaValidator:
         )
 
     def validate_circuit(self, circuit: Dict[str, Any]) -> bool:
-        """Validate a complete circuit. Returns True if valid.
-
-        Accepts both the old flat format (``components``/``nets`` at circuit
-        root) and the new two-stage format (``STAGE_1_TOPOLOGY`` /
-        ``STAGE_2_LAYOUT``).  All sections are always checked so the caller
-        receives the full error set in a single pass.
-        """
+        """Validate a complete circuit (flat or two-stage format); return True if valid.
+        All sections are always checked, so the caller gets the full error set in one pass."""
         self.errors.clear()
 
         if not isinstance(circuit, dict):
