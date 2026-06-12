@@ -1,10 +1,7 @@
-"""Additional ERC coverage rules (T3-41 .. T3-45).
+"""ERC coverage rules (T3-41 .. T3-45). Entry point: coverage_diagnostics(ctx).
 
-Compliance-first checks that close false-negative gaps in the core engine. Each rule
-is tightly scoped to avoid flagging legitimate designs (false positives reject the
-model's correct outputs and shrink ERC-clean training data, so scoping matters).
-
-Entry point: coverage_diagnostics(ctx) - appended to _RULE_MODULES.
+Each rule is tightly scoped: false positives reject the model's correct outputs
+and shrink ERC-clean training data, so scoping matters.
 """
 
 from __future__ import annotations
@@ -77,9 +74,9 @@ def _ic_missing_ground_pin(ctx: "_Context") -> list[dict[str, Any]]:
 # ── T3-45: MCU reset pin with no pull-up ──────────────────────────────────────
 
 def _reset_is_driven(ctx: "_Context", net: dict, mcu_id: str) -> bool:
-    """True if the reset net is actively driven by another IC (supervisor/brownout) or
-    a debug connector (JTAG/SWD) - directly on the net, or through one series resistor.
-    Such resets are valid without a pull-up."""
+    """True if the reset net is driven by another IC (supervisor/brownout) or a
+    debug connector (JTAG/SWD), directly or through one series resistor. Such
+    resets are valid without a pull-up."""
     def _has_driver(n: dict) -> bool:
         for o in ctx.comps_on_net(n) - {mcu_id}:
             t = ctx.component_type(o)

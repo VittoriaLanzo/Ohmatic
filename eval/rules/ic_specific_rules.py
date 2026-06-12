@@ -25,11 +25,10 @@ def ic_specific_diagnostics(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _comparator_open_drain_missing_pull(ctx: "_Context") -> list[dict[str, Any]]:
-    """T3-26: ic_comparator output pin without a pull-up resistor to VCC.
+    """T3-26: ic_comparator OUT pin without a pull-up resistor to VCC.
 
-    Bug-proofed: only a resistor whose OTHER pin is on a VCC-type net counts
-    as a pull-up.  A hysteresis resistor (OUT→IN+), a pull-down (OUT→GND),
-    or a load resistor (OUT→signal) do NOT satisfy the rule.
+    Only a resistor whose OTHER pin is on a VCC-type net counts; hysteresis
+    (OUT->IN+), pull-down (OUT->GND), and load (OUT->signal) resistors do not.
     """
     from eval.diagnostic_rules import _net_has_resistor_to_vcc
     items = []

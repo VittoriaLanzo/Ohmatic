@@ -97,7 +97,7 @@ def _relay_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
             comp = ctx.by_id.get(cid, {})
             anode_net = ctx.net_for_pin(f"{cid}.A")
             if anode_net and ctx.net_has_type(anode_net, "power_vcc"):
-                # Anode on supply side → reversed
+                # Anode on supply side -> reversed
                 items.append(ctx.make_item(
                     code="INTERACTION_RELAY_FLYBACK_DIODE_REVERSED",
                     path=f"$.nets[{ctx.net_index(anode_net)}].pins",
@@ -182,7 +182,7 @@ def _motor_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
             comp = ctx.by_id.get(cid, {})
             anode_net = ctx.net_for_pin(f"{cid}.A")
             if anode_net and ctx.net_has_type(anode_net, "power_vcc"):
-                # Anode on supply side → reversed
+                # Anode on supply side -> reversed
                 items.append(ctx.make_item(
                     code="INTERACTION_MOTOR_FLYBACK_DIODE_REVERSED",
                     path=f"$.nets[{ctx.net_index(anode_net)}].pins",
@@ -202,12 +202,7 @@ def _motor_flyback_diode_reversed(ctx: "_Context") -> list[dict[str, Any]]:
 
 
 def _motor_dc_direct_logic_drive(ctx: "_Context") -> list[dict[str, Any]]:
-    """T3-18b: ic_logic or ic_mcu driving a DC motor directly without a driver stage.
-
-    Logic ICs (74HC series etc.) supply at most ~35 mA per pin. DC motors
-    draw hundreds of mA to several amps at stall.  Direct connection destroys
-    the logic IC output stages on every motor start.
-    """
+    """T3-18b: ic_logic/ic_mcu driving a DC motor directly without a driver stage."""
     items = []
     for component in ctx.components:
         if component.get("type") != "motor_dc":
