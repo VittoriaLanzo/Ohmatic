@@ -1,5 +1,4 @@
 import { GatewayClientError, GatewayHttpClient, normalizeJobError } from "./client";
-import { createMockGatewayApi } from "./mock";
 import type {
   GenerateAcceptedResponse,
   GenerateRequest,
@@ -46,8 +45,5 @@ export class HttpGatewayApi implements GatewayApi {
 }
 
 export function createGatewayApi(): GatewayApi {
-  if (import.meta.env.VITE_OHMATIC_USE_MOCK === "1") {
-    return createMockGatewayApi();
-  }
   return new HttpGatewayApi();
 }

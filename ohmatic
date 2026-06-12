@@ -2,7 +2,6 @@
 # ohmatic - one-command local launcher (Linux / macOS / Git Bash).
 #
 #   ./ohmatic start            Full stack: Python backend stubs + frontend (server mode).
-#   ./ohmatic start --mock     Frontend only, mock mode (no backend).
 #   ./ohmatic start --docker   Backend via docker compose instead of Python stubs.
 #   ./ohmatic stop             Stop everything ohmatic started.
 #   ./ohmatic status           Show what is running.
@@ -146,12 +145,11 @@ ensure_frontend_deps() {
   fi
 }
 
-start_frontend() { # $1 = "mock" | "server"
+start_frontend() {
   ensure_frontend_deps
   local npm; npm="$(npm_bin)"
   local port; port="$(find_port "$HOST" "$FRONTEND_PORT")"
-  if [ "$1" = "mock" ]; then export VITE_OHMATIC_USE_MOCK=1; step "Frontend: mock mode"
-  else unset VITE_OHMATIC_USE_MOCK; step "Frontend: server mode (proxying /v1 + /health -> gateway :8080)"; fi
+  step "Frontend: server mode (proxying /v1 + /health -> gateway :8080)"
   mkdir -p "$RUN_DIR"
   ( cd "$FRONTEND" && nohup "$npm" run dev -- --host "$HOST" --port "$port" >"$RUN_DIR/frontend.log" 2>&1 & echo $! > "$RUN_DIR/frontend.pid" )
   FRONTEND_URL="http://$HOST:$port"
@@ -163,7 +161,6 @@ start_frontend() { # $1 = "mock" | "server"
 cmd_start() {
   local mode="server" backend="stubs"
   for a in "$@"; do case "$a" in
-    --mock) mode="mock" ;;
     --docker) backend="docker" ;;
   esac; done
   step "Ohmatic starting"
@@ -173,17 +170,13 @@ cmd_start() {
   ok "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY}) -> $RUN_DIR/doctor.json"
   offer_deps_install
   offer_model_pull
-  if [ "$mode" = "mock" ]; then
-    warn "mock mode: backend not started"
-  else
-    if [ "$backend" = "docker" ]; then start_backend_docker; else step "Starting Python backend stubs"; start_backend_stubs; fi
-    wait_for_gateway
-  fi
-  start_frontend "$mode"
+  if [ "$backend" = "docker" ]; then start_backend_docker; else step "Starting Python backend stubs"; start_backend_stubs; fi
+  wait_for_gateway
+  start_frontend
   echo
   printf "%sOhmatic is up:%s\n" "$C_GREEN" "$C_OFF"
   echo "  Frontend : $FRONTEND_URL"
-  [ "$mode" = "mock" ] || echo "  Gateway  : http://$HOST:8080"
+  echo "  Gateway  : http://$HOST:8080"
   echo "  Stop     : ./ohmatic stop"
   echo "  Logs     : .ohmatic-run/*.log"
 }
@@ -397,7 +390,6 @@ usage() {
 ohmatic - local launcher
 
   ./ohmatic start          Full stack: Python backend stubs + frontend (server mode)
-  ./ohmatic start --mock   Frontend only, mock mode (no backend)
   ./ohmatic start --docker Backend via docker compose instead of Python stubs
   ./ohmatic stop           Stop everything ohmatic started
   ./ohmatic status         Show what is running

@@ -9,8 +9,5 @@ module.exports = {
     max_restarts: 100,
     restart_delay: 2000,
     min_uptime: "5s",
-    env: {
-      VITE_OHMATIC_USE_MOCK: "1"
-    }
   }]
 };
