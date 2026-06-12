@@ -111,7 +111,12 @@ def _run_real_job(job_id: str, prompt: str) -> None:
         gen = getattr(pipe, "generator", None)
         if gen is not None and hasattr(gen, "progress_cb"):
             def _cb(frac, _j=job_id):  # monotonic: retries never move the bar backward
-                JOBS[_j]["progress"] = max(JOBS[_j].get("progress", 0.0), frac)
+                j = JOBS[_j]
+                j.setdefault("decode_t0", time.time())
+                j["progress"] = max(j.get("progress", 0.0), frac)
+                p = j["progress"]
+                if p > 0.02:  # same-speed extrapolation: remaining = elapsed*(1-p)/p
+                    j["eta_s"] = int((time.time() - j["decode_t0"]) * (1 - p) / p)
             gen.progress_cb = _cb
         result = pipe.run(prompt)
         if result.ok:
@@ -243,7 +248,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(503, {"error": "insufficient_memory", "message": guard})
                     return
                 job_id = uuid.uuid4().hex[:12]
-                JOBS[job_id] = {"status": "running", "stage": "queued",
+                JOBS[job_id] = {"status": "running", "stage": "queued", "t0": time.time(),
                                 "progress": 0.0, "loops": 0, "result": None, "error": None}
                 threading.Thread(target=_run_real_job, args=(job_id, prompt),
                                  daemon=True).start()
@@ -266,6 +271,8 @@ class Handler(BaseHTTPRequestHandler):
                 j = JOBS[job_id]
                 self.send_json(200, {"status": j["status"], "stage": j["stage"],
                                      "progress": j.get("progress"), "loops": j.get("loops", 0),
+                                     "eta_s": j.get("eta_s"),
+                                     "elapsed_s": int(time.time() - j["t0"]) if "t0" in j else None,
                                      "result": j["result"], "error": j["error"]})
                 return
             self.send_json(404, {"error": "job_not_found"})

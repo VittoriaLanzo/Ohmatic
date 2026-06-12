@@ -2357,3 +2357,5 @@ body::after  { top: 14px; right: 14px; }
   color: var(--led-amber);
   text-shadow: 0 0 6px rgba(255, 177, 69, 0.45);
 }
+
+.stage-trace-pct.is-elapsed { color: var(--silk-dim); text-shadow: none; }

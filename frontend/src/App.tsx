@@ -241,7 +241,7 @@ export default function App() {
             </div>
           </div>
 
-          <StageRail stage={visualStage} phase={visualPhase} progress={job.progress ?? null} loops={job.loops ?? 0} />
+          <StageRail stage={visualStage} phase={visualPhase} progress={job.progress ?? null} loops={job.loops ?? 0} etaS={job.etaS ?? null} elapsedS={job.elapsedS ?? null} />
 
           {job.error && (
             <div className="error-box" role="alert">

@@ -21,6 +21,8 @@ export type GenerateJobState = {
   stage: JobStage | null;
   progress: number | null;
   loops: number;
+  etaS: number | null;
+  elapsedS: number | null;
   result: GenerateResult | null;
   error: NormalizedClientError | null;
 };
@@ -33,6 +35,8 @@ const initialState: GenerateJobState = {
   stage: null,
   progress: null,
   loops: 0,
+  etaS: null,
+  elapsedS: null,
   result: null,
   error: null
 };
@@ -155,6 +159,8 @@ async function pollUntilTerminal(
       stage: status.stage,
       progress: "progress" in status ? ((status as { progress?: number | null }).progress ?? null) : null,
       loops: "loops" in status ? ((status as { loops?: number }).loops ?? 0) : 0,
+      etaS: (status as { eta_s?: number | null }).eta_s ?? null,
+      elapsedS: (status as { elapsed_s?: number | null }).elapsed_s ?? null,
       error: null
     }));
 

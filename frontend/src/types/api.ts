@@ -82,6 +82,8 @@ export type JobRunning = {
   status: "running";
   progress?: number | null;
   loops?: number;
+  eta_s?: number | null;
+  elapsed_s?: number | null;
   stage: JobStage;
   result: null;
   error: null;

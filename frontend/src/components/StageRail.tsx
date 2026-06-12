@@ -6,7 +6,14 @@ type StageRailProps = {
   phase: "idle" | "submitting" | "polling" | "done" | "error";
   progress?: number | null;
   loops?: number;
+  etaS?: number | null;
+  elapsedS?: number | null;
 };
+
+function fmt(s: number): string {
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
 
 // PIPELINE UI ENTRY: stations are the REAL pipeline stages reported by the
 // gateway (t5 / generate / verify). The correction loop is the return bus
@@ -26,7 +33,7 @@ const STAGE_INDEX: Record<string, number> = {
   queued: 0, t5: 0, inference: 1, generate: 1, drc: 2, verify: 2, bom: 2
 };
 
-export function StageRail({ stage, phase, progress, loops = 0 }: StageRailProps) {
+export function StageRail({ stage, phase, progress, loops = 0, etaS = null, elapsedS = null }: StageRailProps) {
   const index = phase === "done" ? 3 : STAGE_INDEX[stage ?? "queued"] ?? 0;
   const busy = phase === "submitting" || phase === "polling";
   const real = typeof progress === "number" && progress > 0 ? progress : null;
@@ -66,11 +73,17 @@ export function StageRail({ stage, phase, progress, loops = 0 }: StageRailProps)
           ⟲ ×{loops}
         </span>
       )}
-      {(real !== null || phase === "done") && (
-        <span className="stage-trace-pct" aria-hidden="true">
-          {phase === "done" ? "100%" : `${(real! * 100).toFixed(1)}%`}
+      {phase === "done" ? (
+        <span className="stage-trace-pct">100%</span>
+      ) : real !== null ? (
+        <span className="stage-trace-pct">
+          {(real * 100).toFixed(1)}%{etaS !== null ? ` · ~${fmt(etaS)} left` : ""}
         </span>
-      )}
+      ) : busy && elapsedS !== null ? (
+        <span className="stage-trace-pct is-elapsed">
+          {STATIONS[index].label.toLowerCase()}… {fmt(elapsedS)}
+        </span>
+      ) : null}
       <div className="stage-trace-labels" aria-hidden="true">
         {STATIONS.map((s, i) => (
           <span key={s.id} className={i <= index && phase !== "idle" ? "is-lit" : ""} style={{ left: `${s.x / 10}%` }}>
