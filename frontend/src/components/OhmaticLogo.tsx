@@ -25,7 +25,7 @@ export function OhmaticLogo({ stage, phase, active, returning }: OhmaticLogoProp
           <feColorMatrix
             in="blur"
             type="matrix"
-            values="0 0 0 0 0.980 0 0 0 0 0.620 0 0 0 0 0.300 0 0 0 0.85 0"
+            values="0 0 0 0 0.290 0 0 0 0 0.870 0 0 0 0 0.500 0 0 0 0.86 0"
           />
           <feMerge>
             <feMergeNode />
@@ -33,10 +33,10 @@ export function OhmaticLogo({ stage, phase, active, returning }: OhmaticLogoProp
           </feMerge>
         </filter>
         <linearGradient id="logo-surge-gradient" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#f59e4d" stopOpacity="0" />
-          <stop offset="42%" stopColor="#f59e4d" stopOpacity="0.92" />
-          <stop offset="56%" stopColor="#ffd9a0" stopOpacity="1" />
-          <stop offset="100%" stopColor="#f59e4d" stopOpacity="0" />
+          <stop offset="0%" stopColor="#4ade80" stopOpacity="0" />
+          <stop offset="42%" stopColor="#4ade80" stopOpacity="0.92" />
+          <stop offset="56%" stopColor="#e8ede0" stopOpacity="1" />
+          <stop offset="100%" stopColor="#4ade80" stopOpacity="0" />
         </linearGradient>
       </defs>
       <rect width="100%" height="100%" rx="8" fill="#0d1117" />

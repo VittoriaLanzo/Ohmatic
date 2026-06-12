@@ -17,8 +17,7 @@ const examples = [
   "NPN low-side relay driver with base resistor and flyback diode"
 ];
 
-const defaultOptions: Required<Pick<GenerateOptions, "temperature" | "max_retries" | "max_components">> = {
-  temperature: 0.4,
+const defaultOptions: Required<Pick<GenerateOptions, "max_retries" | "max_components">> = {
   max_retries: 1,
   max_components: 30
 };
@@ -28,7 +27,6 @@ type CompletionMotion = "idle" | "burst" | "returning" | "settled";
 export default function App() {
   const job = useGenerateJob();
   const [prompt, setPrompt] = useState(examples[0]);
-  const [temperature, setTemperature] = useState(defaultOptions.temperature);
   const [maxComponents, setMaxComponents] = useState(defaultOptions.max_components);
   const [symbolStyle, setSymbolStyle] = useState<SymbolStyle>("ansi");
   const [schematicZoom, setSchematicZoom] = useState(1);
@@ -84,7 +82,6 @@ export default function App() {
     }
 
     await job.submit(prompt.trim(), {
-      temperature,
       max_retries: defaultOptions.max_retries,
       max_components: maxComponents
     });
@@ -116,11 +113,15 @@ export default function App() {
       </div>
       <header className="app-header">
         <h1 className="sr-only">Ohmatic</h1>
+        <div className="header-logo" aria-hidden="true">
+          <OhmaticLogo stage={logoStage} phase={logoPhase} active={job.isBusy} returning={logoReturning} />
+        </div>
         <nav className="top-nav" aria-label="Primary">
           <a href="#prompt">Input</a>
           <a href="#schematic-heading">Circuit</a>
           <a href="#inspector-heading">Output</a>
         </nav>
+        <span className="version-badge">v1.0</span>
         <div className={`health-pill is-${health}`} role="status" aria-live="polite">
           <Server size={16} aria-hidden="true" />
           Gateway {health}
@@ -128,82 +129,53 @@ export default function App() {
         <HardwareBadge />
       </header>
 
-      <section className="hero-workbench" aria-label="Circuit generation workspace">
-        <p className="version-badge">Version 1.0</p>
-        <div className="hero-logo">
-          <OhmaticLogo stage={logoStage} phase={logoPhase} active={job.isBusy} returning={logoReturning} />
-        </div>
-
-        <div className="hero-copy">
-          <p className="kicker">Describe. Generate. Review.</p>
-          <p>Turn circuit intent into a checked schematic, parts list, and JSON contract.</p>
-          <p>The first visible circuit is the verified one.</p>
-        </div>
-
-      </section>
-
       <form className={`prompt-panel command-dock ${job.isBusy ? "is-transmitting" : ""}`} onSubmit={handleSubmit}>
         <div className="command-heading">
           <div>
-            <span className="console-label">Gateway command</span>
+            <span className="console-label">Describe. Generate. Review.</span>
             <h2>What should the circuit do?</h2>
           </div>
-          <SlidersHorizontal size={20} aria-hidden="true" />
         </div>
 
-        <label htmlFor="prompt">Circuit intent</label>
+        <label className="sr-only" htmlFor="prompt">Circuit intent</label>
         <textarea
           id="prompt"
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          rows={6}
+          rows={3}
           placeholder="Example: 555 timer astable oscillator, 1 Hz LED blink, 5 V supply"
           disabled={job.isBusy}
         />
 
-        <div className="command-grid">
-          <fieldset>
-            <legend>Generation options</legend>
-            <label htmlFor="temperature">
-              Temperature <span>{temperature.toFixed(1)}</span>
-            </label>
-            <input
-              id="temperature"
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={temperature}
-              onChange={(event) => setTemperature(Number(event.target.value))}
-              disabled={job.isBusy}
-            />
-
-            <label htmlFor="max-components">
-              Max components <span>{maxComponents}</span>
-            </label>
-            <input
-              id="max-components"
-              type="number"
-              min="1"
-              max="120"
-              value={maxComponents}
-              onChange={(event) => setMaxComponents(Number(event.target.value))}
-              disabled={job.isBusy}
-            />
-
-          </fieldset>
-
-          <div className="example-list" aria-label="Example prompts">
-            <span className="console-label">Reference prompts</span>
-            {examples.map((example) => (
-              <button key={example} type="button" onClick={() => setPrompt(example)} disabled={job.isBusy}>
-                {example}
-              </button>
-            ))}
-          </div>
+        <div className="example-list" aria-label="Example prompts">
+          {examples.map((example) => (
+            <button key={example} type="button" onClick={() => setPrompt(example)} disabled={job.isBusy}>
+              {example}
+            </button>
+          ))}
         </div>
 
         <div className="form-actions">
+          <details className="options-disclosure">
+            <summary>
+              <SlidersHorizontal size={14} aria-hidden="true" />
+              Options
+            </summary>
+            <div className="options-body">
+              <label htmlFor="max-components">
+                Max components <span>{maxComponents}</span>
+              </label>
+              <input
+                id="max-components"
+                type="number"
+                min="1"
+                max="120"
+                value={maxComponents}
+                onChange={(event) => setMaxComponents(Number(event.target.value))}
+                disabled={job.isBusy}
+              />
+            </div>
+          </details>
           <button className="primary-button" type="submit" disabled={!prompt.trim() || job.isBusy}>
             <Send size={17} aria-hidden="true" />
             {job.isBusy ? "Generating" : "Generate"}
@@ -308,7 +280,7 @@ export default function App() {
             </div>
             <div>
               <dt>Parts</dt>
-              <dd>{job.result?.bom.length || job.result?.circuit.components.length || 0}</dd>
+              <dd>{job.result?.parts_list?.length || job.result?.bom?.length || job.result?.circuit.components.length || 0}</dd>
             </div>
           </dl>
         </section>

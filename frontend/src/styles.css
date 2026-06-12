@@ -1220,6 +1220,9 @@ th {
   animation: logo-board-glow 1.7s ease-in-out infinite;
 }
 
+.logo-current {
+  filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.82));
+}
 .spark {
   fill: none;
   stroke: var(--signal-color, #22c55e);
@@ -1228,9 +1231,10 @@ th {
   stroke-linejoin: round;
   stroke-dasharray: 0.08 0.92;
   stroke-dashoffset: 1;
-  filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.82));
+  will-change: stroke-dashoffset;
   animation: current-run var(--signal-speed, 2.8s) linear infinite;
 }
+.ohmatic-logo { transform: translateZ(0); }
 
 .ohmatic-logo.is-idle .spark {
   stroke-dasharray: 0.025 0.975;
@@ -1845,14 +1849,12 @@ th {
 /* The board itself: soldermask, copper pours, via field, board-edge vignette */
 html {
   background:
-    radial-gradient(circle at 12% 8%, rgba(196, 122, 61, 0.10), transparent 38%),
-    radial-gradient(circle at 88% 92%, rgba(196, 122, 61, 0.08), transparent 42%),
-    radial-gradient(circle at 30px 30px, rgba(255, 208, 114, 0.20) 0 2.2px, rgba(196,122,61,.28) 2.2px 3.4px, transparent 3.8px),
-    linear-gradient(90deg, transparent 0 29px, var(--copper-dim) 29px 31px, transparent 31px 160px),
-    linear-gradient(0deg, transparent 0 89px, rgba(196, 122, 61, 0.16) 89px 91px, transparent 91px 160px),
+    radial-gradient(ellipse at 16% 6%, rgba(255, 208, 114, 0.05), transparent 45%),
+    radial-gradient(ellipse at 84% 94%, rgba(196, 122, 61, 0.07), transparent 50%),
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='720' height='720'><g fill='none' stroke='%23c47a3d' stroke-opacity='.13' stroke-width='3'><path d='M-10 80 H170 L230 140 H400 L450 90 H660 L730 160'/><path d='M-10 110 H140 L200 170 V300 L260 360 H380'/><path d='M80 -10 V120 L140 180 V340 L80 400 V560 L150 630 H300'/><path d='M720 300 H560 L500 360 V480 L440 540 H300 L240 600 V730'/><path d='M380 -10 V90 L440 150 H560 L620 210 V340'/><path d='M-10 480 H90 L150 540 V650'/><path d='M620 480 L560 540 V640 L500 700'/><path d='M300 360 V440 L360 500 H440'/></g><g fill='none' stroke='%23c47a3d' stroke-opacity='.10' stroke-width='1.5'><path d='M-10 95 H160 L222 157 H395'/><path d='M95 -10 V115 L155 175 V335'/><path d='M720 315 H566 L508 373 V475'/></g><g fill='%230e231d' stroke='%23c47a3d' stroke-opacity='.30' stroke-width='2.5'><circle cx='170' cy='80' r='7'/><circle cx='400' cy='140' r='7'/><circle cx='80' cy='400' r='7'/><circle cx='560' cy='300' r='7'/><circle cx='300' cy='630' r='7'/><circle cx='620' cy='340' r='7'/><circle cx='380' cy='360' r='7'/><circle cx='150' cy='650' r='7'/></g><g fill='%23c47a3d' fill-opacity='.22'><circle cx='170' cy='80' r='2.5'/><circle cx='400' cy='140' r='2.5'/><circle cx='80' cy='400' r='2.5'/><circle cx='560' cy='300' r='2.5'/><circle cx='300' cy='630' r='2.5'/><circle cx='620' cy='340' r='2.5'/></g><g stroke='%23ffd072' stroke-opacity='.10'><rect x='480' y='560' width='90' height='56' rx='3' fill='none' stroke-width='2'/><g stroke-width='4'><line x1='486' y1='552' x2='486' y2='560'/><line x1='502' y1='552' x2='502' y2='560'/><line x1='518' y1='552' x2='518' y2='560'/><line x1='534' y1='552' x2='534' y2='560'/><line x1='550' y1='552' x2='550' y2='560'/><line x1='566' y1='552' x2='566' y2='560'/><line x1='486' y1='616' x2='486' y2='624'/><line x1='502' y1='616' x2='502' y2='624'/><line x1='518' y1='616' x2='518' y2='624'/><line x1='534' y1='616' x2='534' y2='624'/><line x1='550' y1='616' x2='550' y2='624'/><line x1='566' y1='616' x2='566' y2='624'/></g></g><g stroke='%23ffd072' stroke-opacity='.08'><rect x='60' y='200' width='56' height='34' rx='2' fill='none' stroke-width='2'/><line x1='52' y1='208' x2='60' y2='208' stroke-width='3'/><line x1='52' y1='220' x2='60' y2='220' stroke-width='3'/><line x1='116' y1='208' x2='124' y2='208' stroke-width='3'/><line x1='116' y1='220' x2='124' y2='220' stroke-width='3'/></g></svg>"),
     linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
     var(--board);
-  background-size: 100% 100%, 100% 100%, 160px 160px, 160px 160px, 160px 160px, 4px 4px;
+  background-size: 100% 100%, 100% 100%, 720px 720px, 4px 4px, auto;
 }
 
 /* Corner screws — the board is BOLTED to the viewport */
@@ -1925,14 +1927,36 @@ body::after  { top: 14px; right: 14px; }
 .ohmatic-logo .logo-base line[stroke-width="0.5"] { stroke: var(--copper-dim); }
 .ohmatic-logo { filter: drop-shadow(0 0 18px rgba(196, 122, 61, 0.25)); }
 
-/* Panels: board modules with silkscreen frames + part numbers */
+/* Panels: routed board modules - chamfered corners, corner vias, copper rail */
 .main-panel, .json-panel, .schematic-frame {
-  background: linear-gradient(160deg, rgba(255,255,255,0.02), transparent 40%), var(--board-dark);
-  border: 2px solid var(--mask-edge);
-  outline: 1px solid var(--copper-dim);
-  outline-offset: -6px;
-  border-radius: 4px;
-  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.5);
+  background: var(--board-dark);
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px),
+                     calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+  box-shadow: 0 0 0 2px var(--mask-edge), 0 16px 44px rgba(0, 0, 0, 0.55);
+  position: relative;
+}
+.main-panel::before, .json-panel::before, .schematic-frame::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  clip-path: polygon(11px 0, calc(100% - 11px) 0, 100% 11px, 100% calc(100% - 11px),
+                     calc(100% - 11px) 100%, 11px 100%, 0 calc(100% - 11px), 0 11px);
+  border: 1px solid var(--copper-dim);
+}
+.main-panel::after, .json-panel::after, .schematic-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 4px at 14px 14px, var(--board-dark) 1.5px, var(--copper) 1.6px 3px, transparent 3.4px),
+    radial-gradient(circle 4px at calc(100% - 14px) 14px, var(--board-dark) 1.5px, var(--copper) 1.6px 3px, transparent 3.4px),
+    radial-gradient(circle 4px at 14px calc(100% - 14px), var(--board-dark) 1.5px, var(--copper) 1.6px 3px, transparent 3.4px),
+    radial-gradient(circle 4px at calc(100% - 14px) calc(100% - 14px), var(--board-dark) 1.5px, var(--copper) 1.6px 3px, transparent 3.4px);
+  opacity: 0.85;
 }
 
 /* The DISPLAY MODULE: the schematic is an e-paper panel mounted on the board
@@ -2001,3 +2025,224 @@ body::after  { top: 14px; right: 14px; }
 
 .muted { color: var(--silk-dim); }
 .latency-strip, .metadata-grid { font-family: var(--font-mono); }
+
+
+/* Copper Cartridge motion pass */
+@media (prefers-reduced-motion: no-preference) {
+  .app-header { animation: board-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  .hero-workbench { animation: board-rise 0.6s 0.08s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  .main-panel { animation: board-rise 0.6s 0.16s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  .json-panel { animation: board-rise 0.6s 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  .schematic-frame { animation: module-power-on 0.7s 0.2s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+}
+@keyframes board-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes module-power-on {
+  0%   { opacity: 0; transform: translateY(14px); }
+  55%  { opacity: 1; transform: translateY(0); }
+  62%  { opacity: 0.55; }
+  70%  { opacity: 1; }
+  76%  { opacity: 0.8; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.primary-button { position: relative; overflow: hidden; }
+.primary-button::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 36%;
+  left: -45%;
+  background: linear-gradient(105deg, transparent, rgba(255, 235, 200, 0.5), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.45s ease;
+  pointer-events: none;
+}
+.primary-button:hover:not(:disabled)::after { left: 115%; }
+@keyframes gold-shimmer { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
+.schematic-viewport::after { animation: gold-shimmer 3.2s ease-in-out infinite; }
+.main-panel, .json-panel { transition: box-shadow 0.25s ease, transform 0.25s ease; }
+.main-panel:hover, .json-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--copper-dim), 0 22px 54px rgba(0, 0, 0, 0.6);
+}
+
+
+/* ── Architecture pass: command bar + workbench grid ─────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.header-logo { width: 132px; flex: 0 0 auto; display: flex; }
+.header-logo .ohmatic-logo { width: 100%; height: auto; }
+.top-nav { margin-right: auto; }
+.hero-logo, .hero-copy { display: none; }
+
+.command-dock textarea { min-height: 4.6rem; }
+.example-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+.example-list .console-label { display: none; }
+.example-list button {
+  font-size: 0.72rem;
+  padding: 0.28rem 0.66rem;
+  border: 1px solid var(--copper-dim);
+  background: transparent;
+  color: var(--silk-dim);
+  border-radius: 999px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.example-list button:hover:not(:disabled) { color: var(--gold); border-color: var(--gold); }
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+.options-disclosure { position: relative; margin-right: auto; }
+.options-disclosure summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-pixel);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+  border: 1px solid var(--copper-dim);
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+}
+.options-disclosure summary::-webkit-details-marker { display: none; }
+.options-disclosure[open] summary { color: var(--gold); border-color: var(--gold); }
+.options-body {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 230px;
+  background: var(--board-dark);
+  border: 1px solid var(--copper-dim);
+  border-radius: 6px;
+  padding: 0.8rem 0.9rem;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.options-body label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--silk-dim);
+  margin-bottom: 0.35rem;
+}
+.options-body input { width: 100%; }
+
+/* Workbench: the artifact owns the stage; inspector rides beside it */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 28vw, 400px);
+  gap: 1.1rem;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: 1fr; }
+}
+
+/* ── Stage HUD: transform-only, GPU-composited (no layout thrash) ────────── */
+.stage-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  padding: 0.55rem 0.4rem 0.5rem;
+  margin: 0.5rem 0 0.75rem;
+  list-style: none;
+  border: 1px solid var(--mask-edge);
+  border-radius: 6px;
+  background: var(--board-dark);
+  overflow: hidden;
+}
+.stage-bus, .stage-bus-charge, .stage-bus-packet {
+  position: absolute;
+  top: 50%;
+  left: 4%;
+  right: 4%;
+  height: 2px;
+  margin-top: -1px;
+  pointer-events: none;
+}
+.stage-bus { background: var(--copper-dim); }
+.stage-bus-charge {
+  background: linear-gradient(90deg, var(--copper-bright), var(--gold));
+  transform-origin: left center;
+  transform: scaleX(calc(var(--active-index) / 4));
+  transition: transform 0.6s cubic-bezier(0.3, 0.8, 0.3, 1);
+  will-change: transform;
+}
+.stage-bus-packet {
+  right: auto;
+  width: 26px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+  background: var(--phosphor);
+  box-shadow: 0 0 8px var(--phosphor);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.stage-rail.is-polling .stage-bus-packet,
+.stage-rail.is-submitting .stage-bus-packet {
+  opacity: 1;
+  animation: packet-run 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes packet-run {
+  0%   { transform: translateX(0); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(calc((100vw - 12rem) * var(--active-index) / 4 * 0.92)); opacity: 0; }
+}
+.stage-step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  font-family: var(--font-pixel);
+  font-size: 0.56rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--silk-dim);
+}
+.stage-step .stage-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--copper-dim);
+  background: var(--board);
+  transition: border-color 0.3s, color 0.3s, box-shadow 0.3s;
+}
+.stage-step.is-complete { color: var(--gold); }
+.stage-step.is-complete .stage-icon { border-color: var(--gold); color: var(--gold); }
+.stage-step.is-active { color: var(--phosphor); }
+.stage-step.is-active .stage-icon {
+  border-color: var(--phosphor);
+  color: var(--phosphor);
+  box-shadow: 0 0 10px rgba(81, 232, 138, 0.45);
+  animation: stage-led 1.1s ease-in-out infinite;
+}
+@keyframes stage-led {
+  0%, 100% { box-shadow: 0 0 4px rgba(81, 232, 138, 0.25); }
+  50%      { box-shadow: 0 0 13px rgba(81, 232, 138, 0.65); }
+}
+.stage-rail.is-done .stage-step { color: var(--gold); }
+.stage-rail.is-done .stage-step .stage-icon { border-color: var(--gold); color: var(--gold); animation: none; }
