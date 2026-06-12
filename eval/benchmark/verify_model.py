@@ -1,27 +1,12 @@
-"""
-verify_model.py - Marketing-grade verification of the Ohmatic fine-tune
-========================================================================
-Runs the FROZEN held-out benchmark (built by build_holdout.py) against BOTH the
-base Qwen3-8B-Instruct and the fine-tuned adapter, and emits a one-page report with
-every number traceable to a file. Run this on the pod after training (needs the GPU).
+"""Verify the Ohmatic fine-tune: run the FROZEN held-out benchmark against both
+base Qwen3-8B-Instruct and the fine-tuned adapter, emit a report with every number
+traceable to a file. Run on the pod after training (needs the GPU).
 
-Metrics (computed for base AND fine-tune):
-  parse_rate           response parses as a JSON object
-  erc_pass_rate        parses AND passes the Ohmatic ERC engine
-    - unseen_variant   pass-rate on unseen specs from trained families
-    - novel_family     pass-rate on ENTIRELY unseen topologies (the grokking proof)
-  generalization_gap   ERC pass on a trained-prompt sample minus held-out pass-rate
-  loopback_repair_rate given a broken circuit + ERC errors, does the fix pass ERC?
+Metrics (base AND fine-tune): parse_rate, erc_pass_rate (split unseen_variant /
+novel_family), generalization_gap (trained-sample pass minus held-out), and
+loopback_repair_rate. The base-vs-fine-tune delta on the same frozen set is the pitch.
 
-The base vs fine-tune DELTA on the same frozen set is the whole pitch, and anyone
-with the benchmark can reproduce it.
-
-Usage (on the pod, after training):
-    python eval/benchmark/verify_model.py \
-        --adapter /workspace/ohmatic-checkpoints/best-erc-adapter
-
-    # or pull the adapter from HF:
-    python eval/benchmark/verify_model.py --adapter VittoriaLanzo/ohmatic-qwen3-adapter --adapter-revision best-erc
+    python eval/benchmark/verify_model.py --adapter <local-dir-or-HF-repo> [--adapter-revision best-erc]
 """
 
 from __future__ import annotations

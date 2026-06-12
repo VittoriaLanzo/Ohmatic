@@ -1,26 +1,11 @@
-"""
-grokking_signature.py - Detect & quantify the grokking transition
-==================================================================
-Grokking, operationally, is: TRAIN LOSS plateaus, yet held-out generalization
-(here ERC pass-rate) keeps RISING after that plateau. That divergence is the
-evidence the model learned the rules rather than memorizing examples - and it is
-the single most defensible chart for a technical audience.
+"""Detect and quantify the grokking transition: train loss plateaus yet held-out
+ERC pass-rate keeps rising after, evidence the model learned rules not examples.
 
-This script reads the training run's logged history (train loss + ERC pass-rate),
-finds the loss-plateau step, and measures how much ERC pass-rate improved AFTER it.
+Reads a run's logged history (train loss + ERC pass-rate), finds the loss-plateau
+step, and measures the ERC rise after it. Writes grokking_<ts>.{json,md,csv,png}
+to eval/benchmark/reports/.
 
-Inputs (pick one):
-  --run ENTITY/PROJECT/RUN_ID   read history via the wandb API (default source)
-  --csv PATH                    a CSV with columns: step, train_loss, erc_pass_rate
-
-Outputs (eval/benchmark/reports/):
-  grokking_<ts>.json    the measured transition
-  grokking_<ts>.md      human-readable summary
-  grokking_<ts>.csv     step, train_loss, erc_pass_rate (for charting)
-  grokking_<ts>.png     loss-vs-ERC chart (if matplotlib is available)
-
-Usage:
-    python eval/benchmark/grokking_signature.py --run VittoriaLanzo/ohmatic-qwen3/<run_id>
+    python eval/benchmark/grokking_signature.py --run ENTITY/PROJECT/RUN_ID
     python eval/benchmark/grokking_signature.py --csv history.csv
 """
 
@@ -41,8 +26,8 @@ LOSS_KEYS = ["train/loss", "loss", "train_loss"]
 ERC_KEYS  = ["erc/pass_rate", "erc_pass_rate", "erc/best_pass_rate"]
 STEP_KEYS = ["train/global_step", "global_step", "_step", "step"]
 
-# Loss is considered "plateaued" once the smoothed loss falls within this fraction of
-# its total descent from start to best. 0.10 -> within 10% of the way to its minimum.
+# Loss "plateaued" once smoothed loss is within this fraction of its full descent
+# (start to best). 0.10 -> within 10% of the minimum.
 PLATEAU_TOL = 0.10
 # An ERC rise after the plateau bigger than this counts as a grokking signature.
 GROK_MIN_RISE = 0.05

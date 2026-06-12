@@ -1,30 +1,17 @@
-"""
-build_holdout.py - Freeze a marketing-grade held-out benchmark for Ohmatic
-===========================================================================
-Produces a FROZEN evaluation set that the model never trains on, so post-training
-ERC pass-rates are honest, verifiable, and reproducible by a third party.
+"""Freeze a held-out benchmark the model never trains on, so post-training ERC
+pass-rates are honest and third-party reproducible.
 
-Two partitions, two different (both honest) marketing claims:
+Two partitions: unseen_variant (held-out specs from trained families) and
+novel_family (entire families removed from training; the grokking proof).
 
-  unseen_variant : prompts from families the model DID train on, but these exact
-                   specs are held out. -> "X% ERC pass on unseen circuit specs."
-  novel_family   : ENTIRE circuit families removed from training. -> the grokking
-                   proof: "generates valid circuits for topologies never seen."
+Outputs (eval/benchmark/): holdout_v1.jsonl, holdout_exclude_hashes.txt,
+holdout_loopback_v1.jsonl, holdout_exclude_loopback.txt, holdout_manifest.json.
 
-Outputs (all under eval/benchmark/):
-  holdout_v1.jsonl            one benchmark item per line (prompt + ref + partition)
-  holdout_exclude_hashes.txt  sha1 of every prompt to EXCLUDE from forward training
-  holdout_loopback_v1.jsonl   held-out ERC-loopback repair cases
-  holdout_exclude_loopback.txt signatures of loopback rows to exclude from training
-  holdout_manifest.json       provenance: seed, source fingerprint, counts, date
+finetune_runpod.py reads the two exclude files and drops matching rows,
+GUARANTEEING zero overlap. Run this BEFORE training, commit the frozen files,
+and never regenerate for a given model release.
 
-The training script (finetune_runpod.py) reads the two exclude files and drops the
-matching rows, GUARANTEEING zero overlap. Run this BEFORE training, commit the
-frozen files, and never regenerate for a given model release.
-
-Usage:
-    python eval/benchmark/build_holdout.py
-    python eval/benchmark/build_holdout.py --verify-only   # re-check an existing set
+    python eval/benchmark/build_holdout.py [--verify-only]
 """
 
 from __future__ import annotations

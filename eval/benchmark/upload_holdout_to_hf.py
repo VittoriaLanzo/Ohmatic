@@ -1,23 +1,15 @@
-"""
-upload_holdout_to_hf.py - Push the frozen held-out benchmark to HF (PRIVATE)
-=============================================================================
-The benchmark data is moat: prompts + reference circuits derived from the private
-dataset. It is gitignored locally and lives ONLY on the private HF dataset repo,
-alongside the training data. The training pod pulls the exclude files from here to
-guarantee it never trains on benchmark prompts.
+"""Push the frozen held-out benchmark to the private HF dataset repo.
 
-Uploads (to data/ in VittoriaLanzo/Ohmatic, private):
-  holdout_v1.jsonl               benchmark prompts + reference circuits
-  holdout_exclude_hashes.txt     forward prompt hashes to exclude from training
-  holdout_loopback_v1.jsonl      ERC-repair holdout cases
-  holdout_exclude_loopback.txt   loopback row signatures to exclude
-  holdout_manifest.json          provenance
+The benchmark is moat (prompts + reference circuits from the private dataset):
+gitignored locally, lives ONLY on the private HF repo. The training pod pulls the
+exclude files from here to guarantee it never trains on benchmark prompts.
+
+Uploads holdout_v1.jsonl, holdout_exclude_hashes.txt, holdout_loopback_v1.jsonl,
+holdout_exclude_loopback.txt, holdout_manifest.json to data/ in VittoriaLanzo/Ohmatic.
 
 Run build_holdout.py FIRST. Repo stays PRIVATE - never set private=False.
 
-Usage:
-  python eval/benchmark/upload_holdout_to_hf.py
-  python eval/benchmark/upload_holdout_to_hf.py --dry-run
+    python eval/benchmark/upload_holdout_to_hf.py [--dry-run]
 """
 
 from __future__ import annotations

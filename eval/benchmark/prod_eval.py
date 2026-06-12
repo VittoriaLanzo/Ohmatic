@@ -1,21 +1,13 @@
-"""
-prod_eval.py - production-path evaluation (the REAL product metric).
+"""Production-path evaluation: drive the ACTUAL pipeline (OhmaticPipeline) on the
+held-out set, so eval == prod byte-for-byte (same prompt, ERC-feedback format, greedy
+decode), with no parallel re-implementation.
 
-Drives the ACTUAL production pipeline (inference.pipeline.OhmaticPipeline) on the held-out
-set - same code, same system prompt, same ERC-feedback format, same greedy decoding that
-serving uses. So eval == prod, byte-for-byte; there is no parallel re-implementation here.
+Pipeline runs generate -> ERC check -> feed errors back -> correct, up to max_shots.
+Reports pass@k by partition: pass@1 (single-shot) and the pass@1 -> pass@k lift from
+correction. Held-out prompts are already in normalized (T5-output) form, so the
+normalizer stage is a pass-through (no T5 loaded).
 
-The pipeline runs: generate -> ERC check -> (if invalid) feed errors back -> correct ...
-up to max_shots. We report pass@k by partition:
-    pass@1            = single-shot generation (comparable to the in-training ERC, the 50%)
-    pass@1 -> pass@k  = the lift from CORRECTION (the loopback scope; the "2 shots irl")
-
-Held-out prompts are already in the normalized (T5-output) form Qwen trains on, so the
-pipeline's normalizer stage is a pass-through (no T5 loaded).
-
-Usage (on a GPU pod):
-    python eval/benchmark/prod_eval.py --adapter VittoriaLanzo/ohmatic-qwen3-adapter \
-        --revision best-erc --n 96 --max-shots 3 --out results/prod_eval.json
+    python eval/benchmark/prod_eval.py --adapter <repo> --revision best-erc --n 96 --max-shots 3 --out results/prod_eval.json
 """
 from __future__ import annotations
 import os, sys, json, time, argparse
