@@ -1,6 +1,0 @@
-[workspace]
-members = [
-    "shared/ohmatic-types",
-    "verifier",
-]
-resolver = "2"
