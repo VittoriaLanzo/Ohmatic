@@ -63,6 +63,10 @@ def main():
     ap.add_argument("--dataset-repo", default="VittoriaLanzo/Ohmatic")
     ap.add_argument("--n", type=int, default=96)
     ap.add_argument("--max-shots", type=int, default=3, help="total attempts (1 generate + N-1 corrections)")
+    ap.add_argument("--retry-temperature", type=float, default=0.0,
+                    help="sampling temperature for CORRECTIONS only (attempt 1 stays greedy). "
+                         "Default 0.0 = fully deterministic/reproducible eval. Set >0 (e.g. 0.7, "
+                         "the prod default) to measure pass@k with the product's retry-sampling.")
     ap.add_argument("--out", default="results/prod_eval.json")
     ap.add_argument("--save-traces", action="store_true", default=False,
                     help="Harvest per-shot loop traces (broken->feedback->fixed) alongside the eval.")
@@ -83,6 +87,7 @@ def main():
         qwen_adapter_id=args.adapter,
         qwen_adapter_revision=args.revision,
         max_retries=max(0, args.max_shots - 1),
+        retry_temperature=args.retry_temperature,  # default 0.0: deterministic eval
     )
     pipeline = OhmaticPipeline.from_config(cfg)
 

@@ -47,8 +47,15 @@ class TextNormalizer(Protocol):
 
 
 class ChatModel(Protocol):
-    """Qwen stage: list[{role, content}] -> assistant response str."""
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
+    """Qwen stage: list[{role, content}] -> assistant response str.
+
+    temperature defaults to 0.0 (greedy): the first attempt is byte-identical to
+    train/eval/benchmark. The correction loop passes temperature>0 on RETRIES only
+    (see OhmaticPipeline.run) so a failed attempt is resampled instead of greedily
+    regenerated unchanged - greedy self-correction otherwise reproduces the same
+    broken circuit verbatim (Olausson et al., "Is Self-Repair a Silver Bullet for
+    Code Generation?", ICLR 2024: repair gains come from sample diversity)."""
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str: ...
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -67,8 +74,13 @@ class PipelineConfig:
     qwen_tokenizer_dir: str = ""           # GGUF path: HF tokenizer dir, builds the prompt with enable_thinking=False
     qwen_attn_implementation: str = "flash_attention_2"  # FA2 if available, else graceful fallback
 
-    # ERC retry loop - greedy decoding (set in HFChatModel) for deterministic JSON
+    # ERC retry loop. Attempt 1 is GREEDY (temperature=0.0) - byte-identical to the
+    # benchmark. Corrections (attempts 2..N) resample at retry_temperature>0: greedy
+    # regenerates the same ERC-failing circuit verbatim, so a retry needs sampling
+    # diversity to actually apply the feedback (Olausson et al., ICLR 2024). 0.0 here
+    # restores the old all-greedy behavior.
     max_retries: int = 3                   # 4 total attempts (1 generate + 3 corrections); pass@k plateaus at 4.
+    retry_temperature: float = 0.7         # sampling temp for corrections only; attempt 1 stays greedy
 
     # Generation backend:
     #   'llamacpp': qwen_model_id is a .gguf file; CPU/CUDA/Metal from one package.
@@ -235,7 +247,7 @@ class _MockQwen:
         },
     }
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
         return json.dumps(self._STUB, ensure_ascii=False)
 
 
@@ -289,9 +301,11 @@ class HFChatModel:
         print(f"[HFChatModel] loaded {model_id} (+adapter={adapter_id or 'none'}"
               f"@{adapter_revision or '-'})  attn={_impl}", file=sys.stderr, flush=True)
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
-        # GREEDY (do_sample=False) + enable_thinking=False - identical to train/eval.
-        # Sampling would drift serving from training and add nondeterminism to a JSON task.
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
+        # temperature=0.0 -> GREEDY (do_sample=False) + enable_thinking=False, identical
+        # to train/eval/benchmark. The retry loop passes temperature>0 to resample a failed
+        # attempt (greedy alone regenerates the same broken circuit verbatim); that path is
+        # NEVER taken on attempt 1, so first-attempt output stays byte-identical.
         try:
             text = self.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
@@ -299,13 +313,16 @@ class HFChatModel:
             text = self.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True)
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        gen_kwargs = dict(
+            max_new_tokens=self.max_new_tokens,
+            pad_token_id=self.tokenizer.eos_token_id,
+        )
+        if temperature and temperature > 0.0:
+            gen_kwargs.update(do_sample=True, temperature=temperature)
+        else:
+            gen_kwargs.update(do_sample=False)  # greedy - temperature intentionally absent
         with __import__("torch").no_grad():
-            output = self.model.generate(
-                **inputs,
-                max_new_tokens=self.max_new_tokens,
-                do_sample=False,            # greedy - temperature intentionally absent
-                pad_token_id=self.tokenizer.eos_token_id,
-            )
+            output = self.model.generate(**inputs, **gen_kwargs)
         n_input = inputs["input_ids"].shape[1]
         return self.tokenizer.decode(output[0][n_input:], skip_special_tokens=True).strip()
 
@@ -385,23 +402,27 @@ class LlamaCppChatModel:
                     self.progress_cb(min(0.99, n / self.max_new_tokens))
         return _strip_think("".join(parts).strip())
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
+        # temperature=0.0 -> greedy, byte-identical to the bf16 benchmark leg; the prefix
+        # KV cache stays on (proven output-neutral). The retry loop passes temperature>0 on
+        # corrections ONLY: greedy regenerates the same broken circuit verbatim, so a failed
+        # attempt must be resampled (Olausson et al., ICLR 2024 - diversity drives self-repair).
         prompt = self._prompt(messages)
         stream = self.progress_cb is not None
         if prompt is None:  # tokenizer missing: GGUF chat-template fallback (thinking on)
             if not stream:
                 out = self.llm.create_chat_completion(
-                    messages=messages, max_tokens=self.max_new_tokens, temperature=0.0)
+                    messages=messages, max_tokens=self.max_new_tokens, temperature=temperature)
                 return _strip_think((out["choices"][0]["message"]["content"] or "").strip())
             chunks = self.llm.create_chat_completion(
-                messages=messages, max_tokens=self.max_new_tokens, temperature=0.0, stream=True)
+                messages=messages, max_tokens=self.max_new_tokens, temperature=temperature, stream=True)
             return self._consume(chunks, lambda c: c["choices"][0]["delta"].get("content"))
         if not stream:
             out = self.llm.create_completion(
-                prompt=prompt, max_tokens=self.max_new_tokens, temperature=0.0)
+                prompt=prompt, max_tokens=self.max_new_tokens, temperature=temperature)
             return _strip_think((out["choices"][0]["text"] or "").strip())
         chunks = self.llm.create_completion(
-            prompt=prompt, max_tokens=self.max_new_tokens, temperature=0.0, stream=True)
+            prompt=prompt, max_tokens=self.max_new_tokens, temperature=temperature, stream=True)
         return self._consume(chunks, lambda c: c["choices"][0]["text"])
 
 
@@ -481,11 +502,16 @@ class OhmaticPipeline:
         generator: ChatModel,
         system_prompt: str,
         max_retries: int = 3,
+        retry_temperature: float = 0.7,
     ) -> None:
         self.normalizer = normalizer
         self.generator = generator
         self.system_prompt = system_prompt
         self.max_retries = max_retries
+        # Sampling temperature for CORRECTIONS only (attempts 2..N). Attempt 1 is always
+        # greedy. 0.0 reverts to the old all-greedy loop (which regenerates the same
+        # ERC-failing circuit on every retry).
+        self.retry_temperature = retry_temperature
         self.on_stage = None  # optional fn(stage: str, attempt: int) for live UIs
 
     @classmethod
@@ -533,7 +559,8 @@ class OhmaticPipeline:
         else:
             generator = _MockQwen()
 
-        return cls(normalizer, generator, system_prompt, max_retries=cfg.max_retries)
+        return cls(normalizer, generator, system_prompt, max_retries=cfg.max_retries,
+                   retry_temperature=cfg.retry_temperature)
 
     @classmethod
     def mock(cls, schema_path: Path | None = None) -> "OhmaticPipeline":
@@ -576,8 +603,12 @@ class OhmaticPipeline:
         for attempt in range(1, self.max_retries + 2):  # +1 for the initial attempt
             if self.on_stage:
                 self.on_stage("generate", attempt)
+            # Attempt 1: greedy (byte-identical to the benchmark). Corrections (attempt>1):
+            # sample at retry_temperature so a failed circuit is resampled, not greedily
+            # regenerated unchanged. See PipelineConfig.retry_temperature.
+            temperature = 0.0 if attempt == 1 else self.retry_temperature
             try:
-                response = self.generator.chat(messages)
+                response = self.generator.chat(messages, temperature=temperature)
             except Exception as exc:
                 # The user gets a friendly refusal; the operator gets the cause
                 # in the gateway log (.ohmatic-run/gateway.log).

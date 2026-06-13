@@ -228,8 +228,15 @@ class VLLMChatModel:
 
     # ── Drop-in for HFChatModel.chat (pipeline) ───────────────────────────────
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
-        """Single-prompt greedy single completion - drop-in for HFChatModel.chat
-        (used by OhmaticPipeline when backend='vllm')."""
-        completions = self(messages, do_sample=False, n=1)
+    def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
+        """Single-prompt single completion - drop-in for HFChatModel.chat (used by
+        OhmaticPipeline when backend='vllm').
+
+        temperature=0.0 -> greedy (byte-identical to the benchmark). The retry loop passes
+        temperature>0 on corrections only, so a failed attempt is resampled instead of
+        greedily regenerated unchanged (Olausson et al., ICLR 2024)."""
+        if temperature and temperature > 0.0:
+            completions = self(messages, do_sample=True, temperature=temperature, n=1)
+        else:
+            completions = self(messages, do_sample=False, n=1)
         return completions[0] if completions else ""

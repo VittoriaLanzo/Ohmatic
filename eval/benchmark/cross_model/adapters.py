@@ -127,16 +127,21 @@ class OhmaticAdapter:
             generator = HFChatModel(cfg["qwen_model"],
                                     max_new_tokens=C.MAX_TOKENS)
 
+        # retry_temperature pinned to C.TEMPERATURE (0.0): the benchmark must stay
+        # deterministic/reproducible. The PRODUCT default samples on corrections to escape
+        # greedy regeneration, but here we hold every attempt greedy so the numbers are a
+        # fixed, reproducible reference (the prod retry-sampling gain is measured separately).
         self.pipeline = OhmaticPipeline(
             normalizer, generator, _build_system_prompt(),
-            max_retries=C.PIPELINE_MAX_RETRIES)
+            max_retries=C.PIPELINE_MAX_RETRIES,
+            retry_temperature=C.TEMPERATURE)
 
     def chat_messages(self, messages: list[dict]) -> dict:
         """Correction suite: single-shot repair on the VERBATIM trained conversation.
         No T5, no retry loop (mirrors in-training correction_eval); output verified
         like any raw generation in stage 2."""
         t0 = time.time()
-        text = self.pipeline.generator.chat(messages)
+        text = self.pipeline.generator.chat(messages, temperature=C.TEMPERATURE)  # greedy, deterministic
         return {"raw_output": text,
                 "latency_s": round(time.time() - t0, 3),
                 "tokens_in": 0, "tokens_out": 0}
