@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 
 from dataset import validate
-from dataset.teacher_corpus import COMPONENT_CARDS
+from dataset.component_cards import COMPONENT_CARDS
 from eval import diagnostic_rules
 
 
