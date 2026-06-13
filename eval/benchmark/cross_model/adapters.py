@@ -94,21 +94,6 @@ class OpenAICompatAdapter:
 
 # ── Local: the full Ohmatic product pipeline ──────────────────────────────────
 
-class _LlamaCppChatModel:
-    """GGUF leg: llama-cpp-python implementing the pipeline's ChatModel protocol.
-    Greedy (temperature=0) to match the bf16 leg's decoding."""
-
-    def __init__(self, gguf_path: str, n_ctx: int = 16384):
-        from llama_cpp import Llama
-        self.llm = Llama(model_path=gguf_path, n_ctx=n_ctx,
-                         n_gpu_layers=-1, verbose=False)
-
-    def chat(self, messages: list[dict[str, str]]) -> str:
-        out = self.llm.create_chat_completion(
-            messages=messages, max_tokens=C.MAX_TOKENS, temperature=0.0)
-        return (out["choices"][0]["message"]["content"] or "").strip()
-
-
 class OhmaticAdapter:
     """End-to-end product (T5 -> Qwen -> ERC -> retries -> killswitch). Wraps
     OhmaticPipeline: same code prod serves, zero benchmark-special behavior."""
@@ -122,10 +107,21 @@ class OhmaticAdapter:
 
         backend = cfg.get("backend", "hf")
         if backend == "llamacpp":
-            from huggingface_hub import hf_hub_download
-            gguf = hf_hub_download(cfg["gguf_repo"], cfg["gguf_file"],
-                                   token=os.environ.get("HF_TOKEN"))
-            generator = _LlamaCppChatModel(gguf)
+            # Use the PRODUCT's LlamaCppChatModel so this leg is byte-identical to
+            # what ships: enable_thinking=False via the model tokenizer. The plain
+            # chat template defaults thinking ON, which underperformed (73.5% vs the
+            # bf16 leg's 93.3%) - that was a benchmark misconfiguration, now fixed.
+            from huggingface_hub import hf_hub_download, snapshot_download
+            from inference.pipeline import LlamaCppChatModel
+            token = os.environ.get("HF_TOKEN")
+            gguf = hf_hub_download(cfg["gguf_repo"], cfg["gguf_file"], token=token)
+            tok_dir = snapshot_download(
+                cfg["gguf_repo"], token=token,
+                allow_patterns=["tokenizer.json", "tokenizer_config.json", "vocab.json",
+                                "merges.txt", "special_tokens_map.json", "added_tokens.json",
+                                "chat_template.jinja", "generation_config.json"])
+            generator = LlamaCppChatModel(gguf, tokenizer_dir=tok_dir,
+                                          max_new_tokens=C.MAX_TOKENS)
         else:  # hf - fully-merged repo loads like any causal LM (no adapter)
             from inference.pipeline import HFChatModel
             generator = HFChatModel(cfg["qwen_model"],

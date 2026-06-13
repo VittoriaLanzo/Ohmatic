@@ -63,7 +63,8 @@ class PipelineConfig:
     qwen_model_id: str = "Qwen/Qwen3-8B"   # base model
     qwen_adapter_id: str = ""              # trained LoRA adapter (HF repo or local dir)
     qwen_adapter_revision: str = ""        # e.g. "best-erc" / "latest"
-    qwen_max_new_tokens: int = 2560        # matches training/eval; longest valid circuit ~2.2k
+    qwen_max_new_tokens: int = 4096        # the bf16 benchmark budget (MAX_TOKENS); headroom over the ~2.2k longest circuit
+    qwen_tokenizer_dir: str = ""           # GGUF path: HF tokenizer dir, builds the prompt with enable_thinking=False
     qwen_attn_implementation: str = "flash_attention_2"  # FA2 if available, else graceful fallback
 
     # ERC retry loop - greedy decoding (set in HFChatModel) for deterministic JSON
@@ -187,6 +188,12 @@ def _parse_circuit(text: str) -> tuple[dict | None, str]:
     return None, f"Model output is not valid JSON: {text[:200]!r}"
 
 
+def _strip_think(text: str) -> str:
+    """Drop a leading <think>...</think> block. enable_thinking=False normally puts
+    an empty marker in the PROMPT (not the output), but strip defensively so a stray
+    one never reaches the JSON parser - same as the training/eval post-processing."""
+    return re.sub(r"^\s*<think>.*?</think>\s*", "", text, flags=re.DOTALL).strip()
+
 
 # ── Mock adapters (for testing without loaded models) ─────────────────────────
 
@@ -304,10 +311,16 @@ class HFChatModel:
 
 
 class LlamaCppChatModel:
-    """GGUF inference via llama-cpp-python (CPU/CUDA/Metal). Greedy (temperature=0) to match training."""
+    """GGUF inference via llama-cpp-python (CPU/CUDA/Metal). Greedy (temperature=0)
+    with thinking suppressed (enable_thinking=False) - matches training and the bf16
+    benchmark leg (93.3%/0% broken). The model's own tokenizer builds the prompt, so
+    it is byte-faithful to that leg; the prefix KV cache is the one perf add kept.
+
+    No speculative decoding / forced flash_attn: both perturbed the greedy output
+    (not byte-identical to the benchmark) and were the source of the crash."""
 
     def __init__(self, gguf_path: str, n_ctx: int = 16384, n_gpu_layers: int = -1,
-                 max_new_tokens: int = 2560) -> None:
+                 max_new_tokens: int = 4096, tokenizer_dir: str = "") -> None:
         try:
             from llama_cpp import Llama
         except ImportError:
@@ -315,53 +328,81 @@ class LlamaCppChatModel:
                 "Install llama-cpp-python for GGUF inference: pip install llama-cpp-python "
                 "(prebuilt CUDA wheels: --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124)")
         import multiprocessing
-        # Prompt-lookup speculative decoding: drafts tokens by copying snippets
-        # already in the prompt. Our correction loop regenerates a circuit that is
-        # ~90% identical to the broken one in the prompt, so this is a large
-        # decode speedup with no extra model and no extra memory.
-        draft = None
-        try:
-            from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
-            draft = LlamaPromptLookupDecoding(num_pred_tokens=10)
-        except Exception:
-            pass
         self.llm = Llama(
             model_path=gguf_path,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
             n_threads=max(1, multiprocessing.cpu_count() - 1),
-            flash_attn=True,            # no-op on builds without it; big win where supported
-            draft_model=draft,
             verbose=False,
         )
         # Prefix KV cache: every request shares the ~6k-token system prompt; caching
-        # its KV skips minutes of CPU prefill on each job after the first.
+        # its KV skips re-prefilling it on each retry. Output-neutral under greedy.
         try:
             from llama_cpp import LlamaRAMCache
             self.llm.set_cache(LlamaRAMCache(capacity_bytes=2 << 30))
         except Exception:
             pass  # speedup, not a requirement
+        # The model tokenizer formats the prompt with enable_thinking=False, exactly
+        # as training/the bf16 leg did. Without it the GGUF template defaults to
+        # thinking ON, which wastes the budget and underperforms - so warn loudly.
+        self._tok = None
+        if tokenizer_dir:
+            try:
+                from transformers import AutoTokenizer
+                self._tok = AutoTokenizer.from_pretrained(tokenizer_dir)
+            except Exception as exc:
+                print(f"[LlamaCppChatModel] tokenizer load failed ({exc}); using the GGUF "
+                      f"chat template (thinking NOT suppressed).", file=sys.stderr, flush=True)
+        else:
+            print("[LlamaCppChatModel] no tokenizer_dir; using GGUF chat template "
+                  "(thinking NOT suppressed - re-run ./ohmatic fetch).", file=sys.stderr, flush=True)
         self.max_new_tokens = max_new_tokens
         self.progress_cb = None  # optional fn(frac 0..1), set per job by the caller
         print(f"[LlamaCppChatModel] loaded {gguf_path} (n_ctx={n_ctx}, "
-              f"n_gpu_layers={n_gpu_layers})", file=sys.stderr, flush=True)
+              f"n_gpu_layers={n_gpu_layers}, thinking={'off' if self._tok else 'template'})",
+              file=sys.stderr, flush=True)
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
-        if self.progress_cb is None:
-            out = self.llm.create_chat_completion(
-                messages=messages, max_tokens=self.max_new_tokens, temperature=0.0)
-            return (out["choices"][0]["message"]["content"] or "").strip()
+    def _prompt(self, messages: list[dict[str, str]]) -> str | None:
+        """Format with enable_thinking=False via the model tokenizer. None -> caller
+        falls back to the GGUF chat template (tokenizer missing)."""
+        if self._tok is None:
+            return None
+        try:
+            return self._tok.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        except TypeError:
+            return self._tok.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True)
+
+    def _consume(self, chunks, extract) -> str:
         parts, n = [], 0
-        for chunk in self.llm.create_chat_completion(
-                messages=messages, max_tokens=self.max_new_tokens,
-                temperature=0.0, stream=True):
-            delta = chunk["choices"][0]["delta"].get("content") or ""
+        for chunk in chunks:
+            delta = extract(chunk) or ""
             if delta:
                 parts.append(delta)
                 n += 1
-                if n % 5 == 0:  # per-token callbacks are pointless churn at a 500ms poll
+                if self.progress_cb and n % 5 == 0:  # per-token churn is pointless at a 500ms poll
                     self.progress_cb(min(0.99, n / self.max_new_tokens))
-        return "".join(parts).strip()
+        return _strip_think("".join(parts).strip())
+
+    def chat(self, messages: list[dict[str, str]]) -> str:
+        prompt = self._prompt(messages)
+        stream = self.progress_cb is not None
+        if prompt is None:  # tokenizer missing: GGUF chat-template fallback (thinking on)
+            if not stream:
+                out = self.llm.create_chat_completion(
+                    messages=messages, max_tokens=self.max_new_tokens, temperature=0.0)
+                return _strip_think((out["choices"][0]["message"]["content"] or "").strip())
+            chunks = self.llm.create_chat_completion(
+                messages=messages, max_tokens=self.max_new_tokens, temperature=0.0, stream=True)
+            return self._consume(chunks, lambda c: c["choices"][0]["delta"].get("content"))
+        if not stream:
+            out = self.llm.create_completion(
+                prompt=prompt, max_tokens=self.max_new_tokens, temperature=0.0)
+            return _strip_think((out["choices"][0]["text"] or "").strip())
+        chunks = self.llm.create_completion(
+            prompt=prompt, max_tokens=self.max_new_tokens, temperature=0.0, stream=True)
+        return self._consume(chunks, lambda c: c["choices"][0]["text"])
 
 
 class HFT5Normalizer:
@@ -470,6 +511,7 @@ class OhmaticPipeline:
                 n_ctx=cfg.llamacpp_n_ctx,
                 n_gpu_layers=cfg.llamacpp_n_gpu_layers,
                 max_new_tokens=cfg.qwen_max_new_tokens,
+                tokenizer_dir=cfg.qwen_tokenizer_dir,
             )
         elif cfg.backend == "vllm":
             # vLLM path - qwen_model_id must be a fully-merged local dir.

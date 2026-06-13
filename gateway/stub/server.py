@@ -84,7 +84,8 @@ def _get_pipeline():
             manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
             from inference.pipeline import OhmaticPipeline, PipelineConfig
             cfg = PipelineConfig(t5_model_id=manifest.get("t5_path") or "",
-                                 qwen_model_id=manifest["model_path"])
+                                 qwen_model_id=manifest["model_path"],
+                                 qwen_tokenizer_dir=manifest.get("tokenizer_path") or "")
             _PIPELINE = OhmaticPipeline.from_config(cfg)
         return _PIPELINE
 

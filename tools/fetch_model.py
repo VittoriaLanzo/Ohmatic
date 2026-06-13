@@ -17,6 +17,17 @@ import shutil
 import sys
 from pathlib import Path
 
+# Windows without admin/Developer Mode cannot create the HF cache symlinks
+# (WinError 1314). Copying files instead works everywhere.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+
+# The GGUF path builds its prompt with the model's HF tokenizer (enable_thinking=False),
+# so the GGUF tiers must fetch the tokenizer too - not just the .gguf.
+_TOKENIZER_FILES = ["tokenizer.json", "tokenizer_config.json", "vocab.json",
+                    "merges.txt", "special_tokens_map.json", "added_tokens.json",
+                    "chat_template.jinja", "generation_config.json"]
+
 ROOT = Path(__file__).resolve().parent.parent
 MODELS = ROOT / "models"
 DOCTOR = ROOT / ".ohmatic-run" / "doctor.json"
@@ -81,20 +92,28 @@ def main() -> int:
         return 1
 
     MODELS.mkdir(exist_ok=True)
+    tokenizer_path = ""
     if plan["kind"] == "file":
         path = hf_hub_download(REPO, plan["file"], token=token,
                                local_dir=MODELS, local_dir_use_symlinks=False)
+        # GGUF tiers ship only the .gguf - fetch the tokenizer for enable_thinking=False.
+        tok_dir = MODELS / "Ohmatic-Qwen3-8B-tokenizer"
+        snapshot_download(REPO, token=token, allow_patterns=_TOKENIZER_FILES,
+                          local_dir=tok_dir, local_dir_use_symlinks=False)
+        tokenizer_path = str(tok_dir)
     else:
         path = snapshot_download(REPO, token=token, ignore_patterns=plan["exclude"],
                                  local_dir=MODELS / "Ohmatic-Qwen3-8B",
                                  local_dir_use_symlinks=False)
+        tokenizer_path = str(path)  # full snapshot already includes the tokenizer
     t5_path = ""
     if args.with_t5:
         t5_path = snapshot_download(T5_REPO, token=token, local_dir=MODELS / "t5-normalizer",
                                     local_dir_use_symlinks=False)
 
     (MODELS / "active.json").write_text(json.dumps(
-        {"tier": tier, "model_path": str(path), "t5_path": t5_path, "repo": REPO},
+        {"tier": tier, "model_path": str(path), "t5_path": t5_path,
+         "tokenizer_path": tokenizer_path, "repo": REPO},
         indent=2), encoding="utf-8")
     print(f"\ninstalled -> {path}")
     print(f"manifest  -> {MODELS / 'active.json'}")
