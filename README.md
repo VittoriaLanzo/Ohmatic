@@ -37,22 +37,22 @@ full product pipeline. Verified by the same ERC engine that gates production.
 <table>
   <tr>
     <th>model</th><th>N</th><th>delivered clean</th><th>95% CI</th>
-    <th>blocked by killswitch</th><th><b>broken circuits delivered</b></th><th>latency</th>
+    <th>blocked by killswitch</th><th><b>broken circuits delivered</b></th>
   </tr>
   <tr>
     <td><b>Ohmatic bf16</b> (full pipeline, 8B)</td><td>75</td>
     <td><b>93.3%</b></td><td>85.3 - 97.1%</td><td>6.7%</td>
-    <td><b>0 (none)</b></td><td>122 s</td>
+    <td><b>0 (none)</b></td>
   </tr>
   <tr>
     <td>Claude Fable 5 (frontier, single-shot)</td><td>75</td>
     <td>76.0%</td><td>65.2 - 84.2%</td><td>n/a (no killswitch)</td>
-    <td><b>18 (24%)</b></td><td>~40 s</td>
+    <td><b>18 (24%)</b></td>
   </tr>
   <tr>
     <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>34</td>
     <td>73.5%</td><td>56.9 - 85.4%</td><td>26.5%</td>
-    <td><b>0 (none)</b></td><td>40 s</td>
+    <td><b>0 (none)</b></td>
   </tr>
 </table>
 
