@@ -31,7 +31,7 @@ product refuses and asks for clarification; an unverified circuit is never deliv
 full product pipeline. Verified by the same ERC engine that gates production.
 
 <p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 73.5% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
+  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 85.4% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
 </p>
 
 <table>
@@ -50,8 +50,8 @@ full product pipeline. Verified by the same ERC engine that gates production.
     <td><b>18 (24%)</b></td>
   </tr>
   <tr>
-    <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>34</td>
-    <td>73.5%</td><td>56.9 - 85.4%</td><td>26.5%</td>
+    <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>41</td>
+    <td>85.4%</td><td>71.6 - 93.1%</td><td>14.6%</td>
     <td><b>0 (none)</b></td>
   </tr>
 </table>
@@ -60,8 +60,10 @@ full product pipeline. Verified by the same ERC engine that gates production.
 fine-tune beats the frontier model it was benchmarked against</b>, paired McNemar on the same 75
 prompts: Ohmatic-only-clean 17 vs Fable-only-clean 4, exact p = 0.007, <b>while delivering zero
 broken circuits</b>; the frontier model, with no verification loop, handed the user 18.
-Quantization degrades the generator (killswitch fires 4× more) but still ships nothing broken:
-quality loss converts to reduced availability, never to bad output. Fable 5 was evaluated
+Quantization degrades the generator (killswitch fires ~2× more) but still ships nothing broken:
+quality loss converts to reduced availability, never to bad output. The Q4_K_M row is a partial,
+in-progress run (41 of 75 prompts) with the thinking-disabled fix; the remaining prompts complete
+on a separate machine. Fable 5 was evaluated
 zero-context (fresh instance per prompt, no repo or conversation access, default decoding,
 single-shot; the ERC feedback loop is proprietary and end users of a chat model wouldn't have it).
 OpenAI-model leg pending.</sub>
