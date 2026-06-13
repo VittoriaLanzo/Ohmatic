@@ -48,10 +48,17 @@ def main() -> None:
                     help="forward/realuser: cap items; correction: per-category cap")
     ap.add_argument("--dry-run", action="store_true",
                     help="list pending items, build nothing, spend nothing")
+    ap.add_argument("--shard", default="",
+                    help="run a contiguous slice 'I/N' for parallel runs (0/2 = first half, 1/2 = second half)")
     args = ap.parse_args()
 
     C.check_suite_allowed(args.model, args.suite)
     items = load_suite(args.suite, args.n)
+    if args.shard:                                  # parallel sharding: contiguous slice I of N
+        si, sn = (int(x) for x in args.shard.split("/"))
+        per = (len(items) + sn - 1) // sn
+        items = items[si * per:(si + 1) * per]
+        print(f"[shard {args.shard}] {len(items)} items", flush=True)
 
     C.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = C.RESULTS_DIR / f"{args.model}.jsonl"
