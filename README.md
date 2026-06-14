@@ -22,7 +22,7 @@ user prompt ──► T5 normalizer ──► Qwen3-8B (fine-tuned) ──► ER
 
 Every candidate design is validated by a deterministic **electrical rule checker** before it can
 reach the user. If the model can't produce a passing design within its correction budget, the
-product refuses and asks for clarification; an unverified circuit is never delivered.
+product refuses and asks for clarification; the unverified candidate is withheld.
 
 ## Benchmark
 
@@ -60,11 +60,10 @@ full product pipeline. Verified by the same ERC engine that gates production.
 fine-tune beats the frontier model it was benchmarked against</b>, paired McNemar on the same 75
 prompts: Ohmatic-only-clean 17 vs Fable-only-clean 4, exact p = 0.007, <b>while delivering zero
 broken circuits</b>; the frontier model, with no verification loop, handed the user 18.
-Quantization degrades the generator (killswitch fires ~4× more) but still ships nothing broken:
-quality loss converts to reduced availability, never to bad output. Fable 5 was evaluated
+Quantization degrades the generator (killswitch fires ~4× more); in this run the quality loss
+surfaced as more refusals, not broken deliveries. Fable 5 was evaluated
 zero-context (fresh instance per prompt, no repo or conversation access, default decoding,
-single-shot; the ERC feedback loop is proprietary and end users of a chat model wouldn't have it).
-OpenAI-model leg pending.</sub>
+single-shot; the ERC feedback loop is proprietary and end users of a chat model wouldn't have it).</sub>
 
 ### Reproduce
 
