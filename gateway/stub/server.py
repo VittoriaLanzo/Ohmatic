@@ -19,6 +19,12 @@ try:
 except Exception:
     VERIFY_AVAILABLE = False
 
+# BOM layer: deterministic local parts_list plus the disclosed procurement surface
+# (supplier link-outs + the credential-gated Jameco preflight). These are pure-Python
+# (stdlib only), so the imports never gate gateway startup the way the ERC stack can.
+from shared.parts_list import build_parts_list
+from shared.procurement import build_jameco_preflight_response, build_procurement_http_response
+
 # Real-model mode: when ./ohmatic fetch has installed weights, /v1/generate runs
 # the actual pipeline (T5 -> GGUF via llama.cpp -> ERC -> killswitch) in a
 # worker thread; the stub circuit is only the no-weights fallback.
@@ -101,6 +107,18 @@ def _flatten(circuit: dict) -> dict:
             "nets": topo.get("nets", [])}
 
 
+def _parts_list_for(circuit_flat: dict) -> tuple[list, int]:
+    """Deterministic local parts_list for a verified circuit, plus its build time in ms.
+    Never fails a finished job: an unknown component type or a missing registry yields an
+    empty list, and the UI falls back to circuit-derived rows."""
+    started = time.time()
+    try:
+        rows = build_parts_list(circuit_flat)
+    except Exception:
+        return [], 0
+    return rows, int((time.time() - started) * 1000)
+
+
 def _run_real_job(job_id: str, prompt: str) -> None:
     t0 = time.time()
     try:
@@ -136,11 +154,15 @@ def _run_real_job(job_id: str, prompt: str) -> None:
                 gen.progress_cb = _cb
             result = pipe.run(prompt)
         if result.ok:
+            circuit_flat = _flatten(result.circuit)
+            parts_list, parts_ms = _parts_list_for(circuit_flat)
             JOBS[job_id].update(status="done", stage=None, result={
-                "circuit": _flatten(result.circuit),
+                "circuit": circuit_flat,
                 "drc_warnings": [],
                 "bom": [],
-                "latency_ms": {"inference": int((time.time() - t0) * 1000), "drc": 0, "bom": 0},
+                "parts_list": parts_list,
+                "latency_ms": {"inference": int((time.time() - t0) * 1000), "drc": 0,
+                               "bom": 0, "parts_list": parts_ms},
             })
         else:
             # Contract (shared/docs/contracts.md): terminal failure is "failed".
@@ -193,6 +215,30 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _read_json_or_error(self):
+        """Read and parse a JSON request body. On any problem, send the matching error
+        response and return None; otherwise return the parsed value."""
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            self.send_json(400, {"error": "invalid Content-Length header"})
+            return None
+        if content_length < 0:
+            self.send_json(400, {"error": "invalid Content-Length header"})
+            return None
+        if content_length > MAX_BODY_BYTES:
+            self.send_json(413, {"error": "request body too large"})
+            return None
+        raw = self.rfile.read(content_length)
+        if not raw:
+            self.send_json(400, {"error": "request body is required"})
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            self.send_json(400, {"error": "invalid JSON body"})
+            return None
+
     def do_POST(self):
         path = self.path.split("?")[0]
         if path == "/v1/verify":
@@ -216,6 +262,16 @@ class Handler(BaseHTTPRequestHandler):
                 "diagnostics": diags,
                 "feedback": _format_erc_errors(diags) if diags else ""
             })
+            return
+        if path == "/v1/procurement/matches":
+            # BOM procurement: a deterministic parts_list maps to disclosed supplier
+            # link-outs. Jameco lookups stay credential-gated and inert until configured;
+            # build_procurement_http_response owns all validation and the status codes.
+            payload = self._read_json_or_error()
+            if payload is None:
+                return
+            status, body = build_procurement_http_response(payload)
+            self.send_json(status, body)
             return
         if path == "/v1/generate":
             try:
@@ -320,6 +376,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self.send_json(200, {"recommended_model": "stub", "mode": "stub",
                                      "reason": "doctor has not run yet - start via ./ohmatic start"})
+        elif path == "/v1/procurement/suppliers/jameco/preflight":
+            # Setup readiness only: reads env, makes no network call, redacts secrets.
+            self.send_json(200, build_jameco_preflight_response())
         elif path == "/health":
             self.send_json(200, {"status": "ok"})
         else:
