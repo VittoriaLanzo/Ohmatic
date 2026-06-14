@@ -130,6 +130,42 @@ def test_pipeline_exception_is_status_failed(gw, monkeypatch):
     assert "model file vanished" in body["error"]["message"]
 
 
+def test_progress_resets_when_leaving_generate(gw, monkeypatch):
+    """Regression: progress/eta describe token decode only. The decode callback
+    caps progress at 0.99, so once Generate ends it must not stay pinned there
+    through Verify - the UI read a stuck 0.99 as "99%" for the whole check phase.
+    """
+    at_verify = threading.Event()
+    release = threading.Event()
+
+    class _HoldingPipeline:
+        def __init__(self):
+            self.on_stage = None
+            self.generator = SimpleNamespace(progress_cb=None)
+
+        def run(self, prompt):
+            self.on_stage("t5", 1)
+            self.on_stage("generate", 1)
+            self.generator.progress_cb(0.99)  # decode climbs to the cap
+            self.on_stage("verify", 1)
+            at_verify.set()                    # hold in Verify so the test can poll
+            release.wait(timeout=5)
+            return SimpleNamespace(ok=True, circuit=_CIRCUIT, user_message="")
+
+    monkeypatch.setattr(server, "_get_pipeline", lambda: _HoldingPipeline())
+    _, accepted = _request(gw.base, "/v1/generate", {"prompt": "rc filter"})
+
+    assert at_verify.wait(timeout=5)
+    code, body = _request(gw.base, accepted["poll_url"])
+    assert code == 200
+    assert body["stage"] == "verify"
+    assert body["progress"] == 0.0  # cleared, not pinned at the 0.99 decode cap
+    assert body["eta_s"] is None
+
+    release.set()
+    assert _poll_terminal(gw.base, accepted["poll_url"])["status"] == "done"
+
+
 def test_second_gateway_on_same_port_fails_loudly(gw):
     with pytest.raises(OSError):
         server.GatewayServer(("127.0.0.1", gw.srv.server_address[1]), server.Handler)

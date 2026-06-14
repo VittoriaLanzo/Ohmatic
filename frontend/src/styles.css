@@ -2319,6 +2319,15 @@ body::after  { top: 14px; right: 14px; }
   text-shadow: 0 0 8px rgba(255, 208, 114, 0.4);
 }
 .stage-trace.is-done .stage-trace-pct { color: var(--phosphor); }
+/* Secondary readout (ETA / stage + elapsed) trails the headline percent, muted
+   so the percentage done stays the focal number. */
+.stage-trace-pct-sub {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--silk-dim);
+  letter-spacing: 0.02em;
+  text-shadow: none;
+}
 
 /* correction loopback: return bus + counter */
 .stage-loop-base {
@@ -2354,5 +2363,3 @@ body::after  { top: 14px; right: 14px; }
   color: var(--led-amber);
   text-shadow: 0 0 6px rgba(255, 177, 69, 0.45);
 }
-
-.stage-trace-pct.is-elapsed { color: var(--silk-dim); text-shadow: none; }

@@ -52,6 +52,12 @@ export function StageRail({ stage, phase, progress, loops = 0, etaS = null, elap
   if (phase === "idle") high.current = 0;
   const lit = Math.max(computed, phase === "idle" ? 0 : high.current);
   high.current = lit;
+  // The headline percentage tracks the bar fill (lit), not the raw token
+  // fraction (real). real is only meaningful during Generate and the gateway
+  // leaves it pinned at 0.99 through Verify - reading it directly stuck the
+  // number at "99%" while the bar sat at 86%. Sharing lit keeps the number and
+  // the copper bar advancing together across every stage.
+  const pct = Math.round(lit * 100);
   const seconds = phase === "done" ? 1.4 : index === 1 && real !== null ? 0.55 : busy ? 9 : 0.4;
   const looping = busy && loops > 0;
 
@@ -62,7 +68,7 @@ export function StageRail({ stage, phase, progress, loops = 0, etaS = null, elap
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={Math.round(lit * 100)}
+      aria-valuenow={pct}
       aria-label="Generation pipeline"
     >
       <svg viewBox="0 0 1000 72" preserveAspectRatio="none" aria-hidden="true">
@@ -83,15 +89,19 @@ export function StageRail({ stage, phase, progress, loops = 0, etaS = null, elap
           ⟲ ×{loops}
         </span>
       )}
-      {phase === "done" ? (
-        <span className="stage-trace-pct">100%</span>
-      ) : real !== null ? (
+      {busy || phase === "done" ? (
         <span className="stage-trace-pct">
-          {(real * 100).toFixed(1)}%{etaS !== null ? ` · ~${fmt(etaS)} left` : ""}
-        </span>
-      ) : busy && elapsedS !== null ? (
-        <span className="stage-trace-pct is-elapsed">
-          {STATIONS[index].label.toLowerCase()}… {fmt(elapsedS)}
+          {pct}%
+          {phase !== "done" ? (
+            <span className="stage-trace-pct-sub">
+              {" · "}
+              {real !== null && etaS !== null
+                ? `~${fmt(etaS)} left`
+                : elapsedS !== null
+                ? `${STATIONS[index].label.toLowerCase()} ${fmt(elapsedS)}`
+                : `${STATIONS[index].label.toLowerCase()}…`}
+            </span>
+          ) : null}
         </span>
       ) : null}
       <div className="stage-trace-labels" aria-hidden="true">

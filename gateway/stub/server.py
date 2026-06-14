@@ -115,11 +115,20 @@ def _run_real_job(job_id: str, prompt: str) -> None:
                 j["loops"] = max(j.get("loops", 0), attempt - 1)
                 if stage == "generate":  # rate clock restarts per attempt: retries are
                     j.pop("decode_t0", None)  # ~90% prompt-lookup hits, much faster
+                else:
+                    # progress/eta describe token decode only. The cb caps progress
+                    # at 0.99, so without this it stays pinned there through Verify
+                    # and reads as "stuck at 99%". Clear it so the API reports decode
+                    # progress only while decoding; the frontend's high-water bar
+                    # guard keeps the rail from rewinding when a retry re-enters generate.
+                    j["progress"] = 0.0
+                    j.pop("eta_s", None)
+                    j.pop("decode_t0", None)
             pipe.on_stage = _stage
             gen = getattr(pipe, "generator", None)
             if gen is not None and hasattr(gen, "progress_cb"):
-                def _cb(frac, _j=job_id):  # display is monotonic: retries never move the bar backward
-                    j = JOBS[_j]
+                def _cb(frac, _j=job_id):  # frac is monotonic within an attempt; cross-stage
+                    j = JOBS[_j]           # bar monotonicity is the frontend's job now
                     j.setdefault("decode_t0", time.time())
                     j["progress"] = max(j.get("progress", 0.0), frac)
                     if frac > 0.02:  # same-speed extrapolation on THIS attempt's rate

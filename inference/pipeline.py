@@ -336,6 +336,13 @@ class LlamaCppChatModel:
     No speculative decoding / forced flash_attn: both perturbed the greedy output
     (not byte-identical to the benchmark) and were the source of the crash."""
 
+    # Progress is token-based (n / max_new_tokens). This only throttles HOW OFTEN
+    # that fraction is pushed to progress_cb: every 0.2% of the token budget.
+    # Finer churn is wasted behind the gateway's 500ms poll. (The old "every 5
+    # tokens" throttle was also token-based, but its step in percent drifted with
+    # max_new_tokens - ~0.12% at 4096, ~0.20% at 2560; a fraction step is stable.)
+    PROGRESS_STEP_FRAC = 0.002
+
     def __init__(self, gguf_path: str, n_ctx: int = 16384, n_gpu_layers: int = -1,
                  max_new_tokens: int = 4096, tokenizer_dir: str = "") -> None:
         try:
@@ -393,13 +400,17 @@ class LlamaCppChatModel:
 
     def _consume(self, chunks, extract) -> str:
         parts, n = [], 0
+        reported = 0.0
         for chunk in chunks:
             delta = extract(chunk) or ""
             if delta:
                 parts.append(delta)
                 n += 1
-                if self.progress_cb and n % 5 == 0:  # per-token churn is pointless at a 500ms poll
-                    self.progress_cb(min(0.99, n / self.max_new_tokens))
+                if self.progress_cb:
+                    frac = min(0.99, n / self.max_new_tokens)
+                    if frac - reported >= self.PROGRESS_STEP_FRAC:  # 0.2% steps
+                        self.progress_cb(frac)
+                        reported = frac
         return _strip_think("".join(parts).strip())
 
     def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
