@@ -259,21 +259,28 @@ cmd_stats() {
 }
 
 cmd_update() {
-  step "Ohmatic update - pulling the latest from GitHub"
-  if ! git -C "$ROOT" diff --quiet 2>/dev/null; then
-    warn "local changes detected - they are preserved (ff-only pull)"
+  step "Ohmatic update - syncing this clone to the latest GitHub main"
+  command -v git >/dev/null 2>&1 || { fail "git not found - install Git, then re-run './ohmatic update'"; return 1; }
+  git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || { fail "not a git checkout - clone with 'git clone' to use update"; return 1; }
+  # Hard reset to origin/main: this clone tracks the published main, not your
+  # working copy. Local commits and tracked edits here are discarded (untracked
+  # files survive). Meant for a consumer clone, NOT a dev checkout with WIP.
+  if ! git -C "$ROOT" diff --quiet 2>/dev/null || ! git -C "$ROOT" diff --cached --quiet 2>/dev/null; then
+    warn "local changes will be discarded (hard reset to origin/main)"
   fi
   git -C "$ROOT" fetch origin || { fail "fetch failed - check network/remote"; return 1; }
-  if git -C "$ROOT" pull --ff-only origin "$(git -C "$ROOT" branch --show-current)"; then
-    ok "repo updated to $(git -C "$ROOT" rev-parse --short HEAD)"
+  local before after; before="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null)"
+  git -C "$ROOT" reset --hard origin/main || { fail "reset failed - is 'main' on origin? (git status)"; return 1; }
+  after="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null)"
+  if [ "$before" = "$after" ]; then
+    ok "already current at $after"
   else
-    fail "non-fast-forward (local commits or rewritten history) - resolve manually: git status"
-    return 1
-  fi
-  if git -C "$ROOT" diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -q "frontend/package.json"; then
-    step "frontend dependencies changed - reinstalling"
-    local npm; npm="$(npm_bin)"
-    [ -n "$npm" ] && (cd "$ROOT/frontend" && "$npm" install)
+    ok "reset $before -> $after (origin/main)"
+    if git -C "$ROOT" diff --name-only "$before" "$after" 2>/dev/null | grep -q "frontend/package.json"; then
+      step "frontend dependencies changed - reinstalling"
+      local npm; npm="$(npm_bin)"
+      [ -n "$npm" ] && (cd "$ROOT/frontend" && "$npm" install)
+    fi
   fi
   ok "done. Restart with: ./ohmatic stop && ./ohmatic start"
 }
@@ -434,7 +441,7 @@ usage() {
   ./ohmatic doctor         Diagnose the system (Node, Python, ports, RAM/GPU -> model tier)
   ./ohmatic stats          Adoption stats (HF model downloads, GitHub stars)
   ./ohmatic fetch          Download the doctor-recommended model weights (resumable)
-  ./ohmatic update         Update this clone to the latest GitHub commit (ff-only, safe)
+  ./ohmatic update         Reset this clone to the latest GitHub main (discards local edits)
 
   Fresh clone -> './ohmatic start' -> open the printed URL.
 EOF

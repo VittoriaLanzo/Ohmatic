@@ -93,7 +93,7 @@ function Show-Usage {
   Write-Host "  ohmatic stop           Stop everything ohmatic started"
   Write-Host "  ohmatic status         Show what is running"
   Write-Host "  ohmatic doctor         Diagnose the system (Node, Python, Docker, ports)"
-  Write-Host "  ohmatic update         Pull the latest commit from GitHub (fast-forward only)"
+  Write-Host "  ohmatic update         Reset this clone to the latest GitHub main (discards local edits)"
   Write-Host "  ohmatic help           Show this help"
   Write-Host ""
   Write-Host "  Fresh clone -> 'ohmatic start' -> open the printed URL." -ForegroundColor DarkGray
@@ -484,29 +484,34 @@ function Invoke-Status {
 }
 
 function Invoke-Update {
-  Write-Step "Ohmatic update: pulling the latest from GitHub"
+  Write-Step "Ohmatic update: syncing this clone to the latest GitHub main"
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Fail "git not found on PATH. Install Git, then re-run 'ohmatic update'."
     exit 1
   }
 
-  $branch = (& git -C $root rev-parse --abbrev-ref HEAD 2>$null)
-  if ($LASTEXITCODE -ne 0 -or -not $branch) {
-    Write-Fail "not a git checkout. Use 'git clone' so update has a remote to pull from."
+  & git -C $root rev-parse --git-dir 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Fail "not a git checkout. Use 'git clone' so update has a remote to sync from."
     exit 1
   }
 
-  # A dirty tree is fine: fast-forward-only never rewrites or discards local work.
+  # Hard reset to origin/main: this clone tracks the published main, not your
+  # working copy. Local commits and tracked edits are discarded (untracked
+  # files survive). Built for a consumer clone, not a dev checkout with WIP.
   & git -C $root diff --quiet 2>$null
-  if ($LASTEXITCODE -ne 0) { Write-Warn2 "local changes detected: preserved (fast-forward-only pull)" }
+  $dirtyTree = ($LASTEXITCODE -ne 0)
+  & git -C $root diff --cached --quiet 2>$null
+  $dirtyIndex = ($LASTEXITCODE -ne 0)
+  if ($dirtyTree -or $dirtyIndex) { Write-Warn2 "local changes will be discarded (hard reset to origin/main)" }
 
   & git -C $root fetch origin
   if ($LASTEXITCODE -ne 0) { Write-Fail "fetch failed: check the network or the remote."; exit 1 }
 
   $before = (& git -C $root rev-parse --short HEAD 2>$null)
-  & git -C $root pull --ff-only origin $branch
+  & git -C $root reset --hard origin/main
   if ($LASTEXITCODE -ne 0) {
-    Write-Fail "non-fast-forward (local commits or rewritten history). Resolve manually: git status"
+    Write-Fail "reset failed: is 'main' on origin? Check 'git status'."
     exit 1
   }
   $after = (& git -C $root rev-parse --short HEAD 2>$null)
@@ -514,9 +519,9 @@ function Invoke-Update {
   if ($before -eq $after) {
     Write-Ok "already current at $after"
   } else {
-    Write-Ok "updated $before $($Glyph.Arrow) $after"
-    # Reinstall only when the pull actually moved package.json; otherwise a no-op.
-    $changed = (& git -C $root diff --name-only "HEAD@{1}" HEAD 2>$null)
+    Write-Ok "reset $before $($Glyph.Arrow) $after (origin/main)"
+    # Reinstall only when the reset actually moved package.json; otherwise a no-op.
+    $changed = (& git -C $root diff --name-only $before $after 2>$null)
     if ($changed -match "frontend/package\.json") {
       Write-Step "frontend dependencies changed: reinstalling"
       $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
