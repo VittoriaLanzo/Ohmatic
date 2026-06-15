@@ -109,7 +109,30 @@ export type HealthResponse = {
   status: "ok";
 };
 
-export type ClientErrorSource = "submit" | "poll" | "job" | "health";
+export type ClientErrorSource = "submit" | "poll" | "job" | "health" | "procurement";
+
+export type ProcurementLinkAction = {
+  type: string;
+  part_id: string;
+  supplier: string;
+  quantity: number;
+  url: string;
+  label: string;
+  disclosure?: string;
+};
+
+export type ProcurementResponse = {
+  procurement_status: string;
+  link_actions: ProcurementLinkAction[];
+  eligibility_disclosures: string[];
+  supplier?: string;
+};
+
+export type ProcurementRequest = {
+  parts_list: PartsListRow[];
+  supplier?: string;
+  quantity?: number;
+};
 
 export type NormalizedClientError = {
   code: string;

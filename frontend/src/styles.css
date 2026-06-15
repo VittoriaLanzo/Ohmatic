@@ -1151,6 +1151,204 @@ th {
   color: var(--steel);
 }
 
+/* ---- procurement opt-in lever (Parts tab) ---- */
+.proc-lever {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.5);
+}
+
+.proc-lever__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.proc-switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 58px;
+  border: 0;
+  padding: 0;
+  border-radius: 32px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #05070b, #161c27);
+  box-shadow:
+    inset 0 4px 9px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px rgba(232, 237, 224, 0.08);
+  perspective: 520px;
+  transition: box-shadow 420ms cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+.proc-knob {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 60px;
+  height: 48px;
+  border-radius: 28px;
+  transform-style: preserve-3d;
+  transform: translateX(0) rotateX(14deg) rotateZ(-2.5deg);
+  background: linear-gradient(155deg, #ffd79a 0%, #f2b35d 30%, #c97f2e 64%, #9a5a1d 100%);
+  box-shadow:
+    0 10px 14px rgba(0, 0, 0, 0.55),
+    inset 0 2px 1px rgba(255, 240, 214, 0.85),
+    inset 0 -6px 10px rgba(120, 60, 12, 0.6);
+  transition:
+    transform 460ms cubic-bezier(0.34, 1.56, 0.5, 1),
+    box-shadow 460ms cubic-bezier(0.34, 1.56, 0.5, 1);
+}
+
+.proc-knob::before {
+  content: "";
+  position: absolute;
+  inset: 9px 11px;
+  border-radius: 20px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(120, 60, 12, 0.42) 0 2px,
+    rgba(255, 233, 196, 0.32) 2px 4px
+  );
+  opacity: 0.5;
+  mask-image: radial-gradient(ellipse at center, #000 40%, transparent 78%);
+}
+
+.proc-knob::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #8a4f18, #4f2c0c);
+  transform: translateZ(-14px) translateY(5px);
+  z-index: -1;
+  filter: brightness(0.8);
+}
+
+.proc-lever.is-on .proc-switch {
+  background: linear-gradient(180deg, #06170d, #0c2c1a);
+  box-shadow:
+    inset 0 4px 9px rgba(0, 0, 0, 0.7),
+    inset 0 0 18px rgba(74, 222, 128, 0.35),
+    inset 0 0 0 1px rgba(74, 222, 128, 0.45);
+}
+
+.proc-lever.is-on .proc-knob {
+  transform: translateX(64px) rotateX(14deg) rotateZ(2.5deg);
+  box-shadow:
+    0 10px 16px rgba(0, 0, 0, 0.5),
+    0 0 18px rgba(74, 222, 128, 0.5),
+    inset 0 2px 1px rgba(255, 240, 214, 0.85),
+    inset 0 -6px 10px rgba(120, 60, 12, 0.6),
+    inset 0 0 0 1.5px rgba(74, 222, 128, 0.55);
+}
+
+.proc-switch:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 4px 9px rgba(0, 0, 0, 0.8),
+    0 0 0 3px rgba(74, 222, 128, 0.6);
+}
+
+.proc-readout {
+  display: grid;
+  gap: 1px;
+}
+
+.proc-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-bottom: 4px;
+  background: #3a4048;
+  transition: background 300ms ease, box-shadow 300ms ease;
+}
+
+.proc-lever.is-on .proc-led {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green), 0 0 18px rgba(74, 222, 128, 0.5);
+  animation: proc-led 2.4s ease-in-out infinite;
+}
+
+.proc-state {
+  font: 800 0.72rem "Silkscreen", ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  color: var(--steel);
+  transition: color 300ms ease;
+}
+
+.proc-lever.is-on .proc-state {
+  color: var(--green);
+}
+
+.proc-sub {
+  font: 0.7rem "Fragment Mono", ui-monospace, monospace;
+  color: var(--muted);
+}
+
+.proc-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.proc-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.proc-links {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.proc-link-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.proc-link-list li {
+  display: grid;
+  gap: 3px;
+}
+
+.proc-link-list a {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.proc-disclosure {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+@keyframes proc-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proc-switch,
+  .proc-knob,
+  .proc-led {
+    transition: none;
+    animation: none;
+  }
+}
+
 .inspector-panel.is-done tbody tr {
   animation: bom-row-in 360ms ease-out both;
   animation-delay: calc(var(--row-order) * 46ms);

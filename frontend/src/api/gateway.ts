@@ -3,13 +3,16 @@ import type {
   GenerateAcceptedResponse,
   GenerateRequest,
   HealthResponse,
-  JobStatusResponse
+  JobStatusResponse,
+  ProcurementRequest,
+  ProcurementResponse
 } from "../types/api";
 
 export interface GatewayApi {
   createGeneration(request: GenerateRequest): Promise<GenerateAcceptedResponse>;
   getJobStatus(jobIdOrPollUrl: string): Promise<JobStatusResponse>;
   checkHealth(): Promise<HealthResponse>;
+  getProcurementMatches(request: ProcurementRequest): Promise<ProcurementResponse>;
 }
 
 export class HttpGatewayApi implements GatewayApi {
@@ -45,6 +48,13 @@ export class HttpGatewayApi implements GatewayApi {
   // BACKEND ENTRY: gateway liveness probe. Keep /health unauthenticated in local and server mode.
   checkHealth(): Promise<HealthResponse> {
     return this.client.get<HealthResponse>("/health", "health");
+  }
+
+  // BACKEND ENTRY: post-design procurement. The deterministic parts_list becomes disclosed
+  // supplier link-outs (Jameco lookups stay credential-gated server-side). Contract:
+  // POST /v1/procurement/matches (source: shared/procurement.py).
+  getProcurementMatches(request: ProcurementRequest): Promise<ProcurementResponse> {
+    return this.client.post<ProcurementResponse>("/v1/procurement/matches", request, "procurement");
   }
 }
 

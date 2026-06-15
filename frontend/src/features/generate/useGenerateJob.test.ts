@@ -35,7 +35,12 @@ function makeApi(getJobStatus: GatewayApi["getJobStatus"]): GatewayApi {
   return {
     createGeneration: vi.fn(async () => ({ job_id: "job-1", poll_url: "/v1/jobs/job-1/status" })),
     getJobStatus,
-    checkHealth: vi.fn(async () => ({ status: "ok" as const }))
+    checkHealth: vi.fn(async () => ({ status: "ok" as const })),
+    getProcurementMatches: vi.fn(async () => ({
+      procurement_status: "credentials_required",
+      link_actions: [],
+      eligibility_disclosures: []
+    }))
   };
 }
 

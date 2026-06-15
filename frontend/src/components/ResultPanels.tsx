@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { formatCurrency, formatMs } from "../lib/format";
 import type { GenerateResult } from "../types/api";
+import { ProcurementLever } from "./ProcurementLever";
+import { useProcurement } from "../features/procurement/useProcurement";
 
 type ResultPanelsProps = {
   result: GenerateResult | null;
@@ -11,8 +13,26 @@ type ResultPanelsProps = {
 
 type TabId = "warnings" | "bom" | "json";
 
+const PROC_KEY = "ohmatic.procurement-online";
+
 export function ResultPanels({ result, phase }: ResultPanelsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("warnings");
+  const [online, setOnline] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(PROC_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const handleOnline = (next: boolean) => {
+    setOnline(next);
+    try {
+      window.localStorage.setItem(PROC_KEY, next ? "1" : "0");
+    } catch {
+      // storage unavailable: the opt-in resets to off on next load, which is the safe default
+    }
+  };
+  const procurement = useProcurement(result?.parts_list, online);
   // JSON VISUALIZATION TODO: Contract tab pretty-prints result.circuit as read-only
   // JSON. Replace with a schema-aware tree/editor (collapsible nodes, validation,
   // copy/download, large-payload safeguards) before production depends on it.
@@ -110,6 +130,7 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
 
       {activeTab === "bom" && (
         <div className="tab-panel" role="tabpanel">
+          <ProcurementLever online={online} onChange={handleOnline} />
           {!result ? (
             <p className="muted">Parts appear here when the circuit artifact is ready.</p>
           ) : (result.parts_list?.length ?? 0) > 0 ? (
@@ -162,6 +183,37 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
                 ))}
               </tbody>
             </table>
+          )}
+          {online && procurement.status !== "idle" && (
+            <div className="proc-links">
+              {procurement.status === "loading" && <p className="muted">Looking up suppliers.</p>}
+              {procurement.status === "error" && <p className="muted">{procurement.message}</p>}
+              {procurement.status === "ready" &&
+                (procurement.data.link_actions.length > 0 ? (
+                  <>
+                    <p className="eyebrow">Buy links</p>
+                    <ul className="proc-link-list">
+                      {procurement.data.link_actions.map((action) => (
+                        <li key={`${action.part_id}-${action.url}`}>
+                          <a href={action.url} target="_blank" rel="noopener noreferrer">
+                            {action.label}
+                          </a>
+                          {action.disclosure && (
+                            <span className="proc-disclosure">{action.disclosure}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {procurement.data.eligibility_disclosures.map((disclosure) => (
+                      <p key={disclosure} className="proc-disclosure">
+                        {disclosure}
+                      </p>
+                    ))}
+                  </>
+                ) : (
+                  <p className="muted">No buyable parts to look up.</p>
+                ))}
+            </div>
           )}
         </div>
       )}
