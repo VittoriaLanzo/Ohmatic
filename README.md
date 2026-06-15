@@ -40,15 +40,6 @@ than handing you a guess.
 
 ## How it works
 
-```
-user prompt ──► T5 normalizer ──► Qwen3-8B (fine-tuned) ──► ERC verification
-                                        ▲                        │
-                                        └── self-correction ◄────┘  (up to 3 rounds)
-                                                                 │
-                                              pass ──► schematic JSON (topology + layout)
-                                              fail ──► killswitch: ask the user to clarify
-```
-
 Every candidate design is validated by a deterministic **electrical rule checker** before it can
 reach the user. If the model can't produce a passing design within its correction budget, the
 product refuses and asks for clarification; the unverified candidate is withheld.
@@ -90,11 +81,12 @@ surfaced as more refusals, not broken deliveries. Fable 5 was evaluated
 zero-context (fresh instance per prompt, no repo or conversation access, default decoding,
 single-shot; the ERC feedback loop is proprietary and end users of a chat model wouldn't have it).</sub>
 
-### Reproduce
+<details>
+<summary><b>Reproduce</b></summary>
 
 ```bash
 # stage 1: generate (per model leg; append-only, crash-resumable)
-python -m eval.benchmark.cross_model.generate --model star-r2-bf16 --suite realuser
+python -m eval.benchmark.cross_model.generate --model ohmatic-bf16 --suite realuser
 # stage 2: verify every output through the identical extract -> ERC path (free, rerunnable)
 python -m eval.benchmark.cross_model.verify
 # stage 3: tables (Wilson CI, precision vs availability, per-category)
@@ -104,6 +96,7 @@ python -m eval.benchmark.cross_model.report --by-category
 Hosted legs need `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; local legs need a GPU and `HF_TOKEN`.
 All pins, the model matrix, and the fairness contract live in
 [`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md).
+</details>
 
 ## Quick start
 
@@ -116,7 +109,8 @@ Boots the local stack (gateway, service stubs, frontend) and prints a URL. No GP
 stub inference returns a fixed valid circuit so the whole loop is explorable. `./ohmatic stop`
 shuts it down. To pull the published weights first, run `./ohmatic fetch`.
 
-Run the real pipeline against local weights (GPU):
+<details>
+<summary><b>Run the real pipeline against local weights (GPU)</b></summary>
 
 ```bash
 python -m inference.cli "5V to 3.3V LDO with reverse-polarity protection" --local
@@ -131,8 +125,13 @@ python -m inference.cli "5V to 3.3V LDO with reverse-polarity protection" \
 ```
 
 Model weights (bf16 + GGUF Q8_0 / Q4_K_M) live on Hugging Face, private during evaluation.
+</details>
 
 ## Architecture
+
+<p align="center">
+  <img src="assets/architecture.svg" alt="Ohmatic pipeline as a PCB board: Normalize (T5), Generate (Qwen3-8B), Verify (ERC), Deliver (schematic JSON), with an amber self-correction loop from Verify back to Generate and a red killswitch branch that refuses and asks the user to clarify when retries are exhausted" width="900" />
+</p>
 
 | Stage | Component | What it does |
 |---|---|---|
@@ -145,15 +144,6 @@ Model weights (bf16 + GGUF Q8_0 / Q4_K_M) live on Hugging Face, private during e
 
 The system prompt the model is served is byte-identical to the one it trained on
 (`shared/prompt_builder.py`, single source of truth).
-
-## Tests
-
-```bash
-pytest tests/ -q
-```
-
-ERC behavior is pinned by a 182-circuit golden regression (`tests/test_erc_golden.py`); the fixture
-derives from private held-out data and is built locally, so the test skips without it.
 
 ## A note on verification
 
