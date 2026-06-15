@@ -209,7 +209,7 @@ def _run_real_job(job_id: str, prompt: str) -> None:
             # Anything else keeps the frontend polling forever on a finished job.
             JOBS[job_id].update(status="failed", stage=None, error={
                 "code": "blocked_by_verification",
-                "message": result.user_message or "Verification did not pass.",
+                "message": result.user_message or "Verification did not pass. Nothing was delivered.",
             })
     except Exception as exc:
         JOBS[job_id].update(status="failed", stage=None,
