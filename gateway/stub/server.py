@@ -43,13 +43,25 @@ def _real_available() -> bool:
     return _MANIFEST.exists()
 
 
-def _available_ram_mb() -> int | None:
-    """Best effort; None = unknown (guard skipped)."""
+def _total_ram_mb() -> int | None:
+    """Total physical RAM in MB; None = unknown (guard skipped).
+
+    The guard sizes against TOTAL (not momentary free) RAM on purpose: the GGUF
+    weights are mmap'd, so the OS pages them in on demand and backs them with the
+    file - they never all need to be resident at once, and they are evictable
+    rather than charged to the commit/pagefile. Gating on free RAM made a 16 GB
+    machine refuse whenever a browser happened to be open. Total RAM is also the
+    basis hw_assess used to pick this tier in the first place (ohmatic:374)."""
     try:
         if sys.platform.startswith("linux"):
             for line in open("/proc/meminfo", encoding="utf-8"):
-                if line.startswith("MemAvailable"):
+                if line.startswith("MemTotal"):
                     return int(line.split()[1]) // 1024
+        if sys.platform == "darwin":
+            import subprocess
+            out = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                                 capture_output=True, text=True, timeout=2)
+            return int(out.stdout.strip()) // (1024 * 1024)
         if sys.platform == "win32":
             import ctypes
             class MEMORYSTATUSEX(ctypes.Structure):
@@ -60,26 +72,54 @@ def _available_ram_mb() -> int | None:
                             ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
             st = MEMORYSTATUSEX(); st.dwLength = ctypes.sizeof(st)
             ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
-            return int(st.ullAvailPhys) // (1024 * 1024)
+            return int(st.ullTotalPhys) // (1024 * 1024)
     except Exception:
         pass
     return None
 
 
+# Headroom over the weights for the KV cache (n_ctx=16384 ~ 2.3 GB for Qwen3-8B
+# GQA), compute buffers, and the prefix RAM cache. These are the anonymous, truly
+# committed allocations; the weights themselves are file-backed and evictable, so
+# counting the full weights file below already builds in a large hidden cushion.
+_RAM_HEADROOM_MB = 2048
+# Left free for the OS and other apps. Only the headroom above is hard-committed,
+# so a 2 GB reserve keeps the machine responsive without refusing on a machine the
+# doctor already deemed big enough (it only recommends a CPU tier at >=12 GB).
+_RAM_OS_RESERVE_MB = 2048
+
+
 def _ram_guard() -> str | None:
-    """Refusal message when the model + headroom cannot fit in available RAM."""
-    avail = _available_ram_mb()
-    if avail is None or _PIPELINE is not None:  # loaded model needs no new budget
+    """Refusal message only when this machine is genuinely too small for the
+    installed tier - sized against TOTAL physical RAM, not momentary free RAM.
+
+    A failed allocation does not crash the process: llama.cpp raises, _run_real_job
+    catches it, and the user gets a friendly 'pipeline_error'. This guard is the
+    earlier, clearer signal for a machine that can never fit the tier at all."""
+    total = _total_ram_mb()
+    if total is None or _PIPELINE is not None:  # loaded model needs no new budget
         return None
     try:
-        need = json.loads(_MANIFEST.read_text(encoding="utf-8"))["model_path"]
-        need_mb = Path(need).stat().st_size // (1024 * 1024) + 2048  # weights + ctx headroom
+        manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+        model_path = manifest["model_path"]
     except Exception:
         return None
-    if avail < need_mb:
-        return (f"Not enough free RAM to load the model safely: need ~{need_mb} MB, "
-                f"{avail} MB available. Close applications or fetch a smaller tier "
-                f"(./ohmatic fetch --tier q4_k_m_cpu).")
+    # The gate only applies to GGUF CPU inference, where the mmap'd weights occupy
+    # system RAM. GPU/HF tiers (bf16 snapshot dir, merged vLLM dir) keep weights in
+    # VRAM and manage their own budget, so skip them outright rather than stat a
+    # directory and gate on a meaningless size.
+    if not str(model_path).endswith(".gguf"):
+        return None
+    try:
+        weights_mb = Path(model_path).stat().st_size // (1024 * 1024)
+    except OSError:
+        return None
+    tier = manifest.get("tier", "installed")
+    need_mb = weights_mb + _RAM_HEADROOM_MB
+    if total - _RAM_OS_RESERVE_MB < need_mb:
+        return (f"This machine has ~{total} MB total RAM, but the '{tier}' tier needs "
+                f"~{need_mb} MB plus an OS reserve. Re-run ./ohmatic doctor and fetch "
+                f"the recommended tier, or use stub/cloud mode.")
     return None
 
 
