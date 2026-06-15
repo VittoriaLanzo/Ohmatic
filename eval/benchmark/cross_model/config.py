@@ -47,6 +47,8 @@ PRICES = {
 #   "openai"    - OpenAI-compatible client (hosted Codex OR any base_url)
 #   "ohmatic"   - the FULL product pipeline (T5 -> Qwen -> ERC -> retries ->
 #                 killswitch), via inference.pipeline.OhmaticPipeline. Needs GPU.
+#   "local1shot"- a local HF model run SINGLE-SHOT via vLLM (pass@1, no pipeline):
+#                 the untrained-base control, same harness as the hosted legs.
 # t5: realuser suite only - forward/correction holdout prompts are already
 #     normalized, so the pipeline runs with a pass-through normalizer there
 #     (same convention as eval/benchmark/prod_eval.py).
@@ -65,6 +67,10 @@ MODELS: dict[str, dict] = {
     "qwen3-base": dict(                      # untrained base in the SAME shell
         adapter="ohmatic", qwen_model=QWEN_BASE, backend="hf",
         suites=["forward", "realuser", "correction"],
+    ),
+    "qwen3-base-1shot": dict(                # untrained base, SINGLE-SHOT (pass@1):
+        adapter="local1shot", qwen_model=QWEN_BASE,   # same harness as the hosted
+        suites=["realuser"],                # legs - isolates the base from training
     ),
     "star-r2-bf16": dict(                    # the trained model, bf16
         adapter="ohmatic", qwen_model=OHMATIC_FINAL_REPO, backend="hf",

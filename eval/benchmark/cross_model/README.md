@@ -26,14 +26,22 @@ revisions, decoding, prompt sets) is pinned in `config.py`.
 |---|---|---|
 | `fable-5` | any machine w/ Anthropic key | `... generate --model fable-5 --suite forward` |
 | `codex-5.5` | any machine w/ OpenAI key | `... generate --model codex-5.5 --suite forward` |
-| `qwen3-base` | GPU box (A40+) | `... generate --model qwen3-base --suite forward` |
 | `star-r2-bf16` | GPU box | `... generate --model star-r2-bf16 --suite forward` |
 | `star-r2-q4` | GPU box (llama-cpp-python) | `... generate --model star-r2-q4 --suite forward` |
 | `star-r2-noT5` | GPU box (ablation) | `... generate --model star-r2-noT5 --suite realuser` |
+| `qwen3-base` | GPU box (A40+) | `... generate --model qwen3-base --suite forward` |
+| `qwen3-base-1shot` | A40+ or 2x T4 | `... generate --model qwen3-base-1shot --suite realuser` |
 
 GPU legs: `pip install transformers peft accelerate safetensors sentencepiece
 llama-cpp-python`. The Ohmatic legs import `inference.pipeline` (the literal
 production code; no benchmark-special path).
+
+The single-shot base leg (`qwen3-base-1shot`) needs vLLM instead: `pip install
+vllm==0.9.2 transformers==4.51.3`. That transformers window is required (5.x breaks
+vLLM 0.9.2's config import; >=4.54 collides on the `aimv2` config name). It runs the
+base model pass@1 through vLLM in fp16 (Turing GPUs have no bf16), tensor-parallel
+auto-scaled to the visible GPUs, with no T5/ERC/killswitch: the base-vs-trained
+control that isolates the lift as training, not the 8B base.
 
 ## Suites
 
