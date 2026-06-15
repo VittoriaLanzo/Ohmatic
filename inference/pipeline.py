@@ -157,21 +157,19 @@ def _build_system_prompt(
 def _killswitch_message(erc_errors: list[dict], parse_error: str) -> str:
     """User-facing refusal when no attempt passed verification.
 
-    Never exposes the broken circuit or the internal rule taxonomy - just an
-    honest 'not delivering unverified work' plus a concrete ask for clarification.
+    Never exposes the broken circuit or the internal rule taxonomy: just a plain
+    'not delivering unverified work' plus a concrete ask for clarification.
     """
     if parse_error and not erc_errors:
         return (
-            "I wasn't able to produce a well-formed design for this request. "
-            "Could you rephrase it with a bit more detail about what the circuit "
-            "should do (inputs, outputs, supply voltage)?"
+            "I couldn't compile a well-formed design from that. Give me a bit more "
+            "to work with: what the circuit should do, plus inputs, outputs, and "
+            "supply voltage."
         )
     return (
-        "I generated several candidate designs, but none passed my electrical "
-        "verification - and I don't deliver circuits I can't verify. Could you "
-        "clarify the requirements? The most helpful details: supply voltage, the "
-        "key components you expect, and what the circuit should do. I'll try again "
-        "with that."
+        "I generated several candidates. None passed electrical verification, and "
+        "I don't ship circuits I can't verify. Tell me the supply voltage, the key "
+        "components you expect, and what the circuit should do. I'll recompile."
     )
 
 

@@ -1,13 +1,42 @@
+<h1 align="center">Ohmatic</h1>
+
 <p align="center">
-  <img src="assets/ohmaticanim.gif" alt="Ohmatic" width="760" />
+  <b>LLMs generate text. Ohmatic compiles circuits.</b><br/>
+  A local model drafts the design. A deterministic electrical rule checker decides whether you
+  ever see it. Three retries, then it refuses and asks a question. A circuit that fails ERC isn't
+  a circuit, it's a bug report.<br/>
+  <b>Compiles clean, or it doesn't ship.</b>
 </p>
 
 <p align="center">
-  Describe a circuit in plain language. Get a schematic that passed automated rule checks, or an honest request to clarify.<br/>
-  <b>If it can't verify it, it won't deliver it.</b>
+  <img alt="License: Source-Available" src="https://img.shields.io/badge/license-source--available-2563eb">
+  <img alt="Local-first, no telemetry" src="https://img.shields.io/badge/local--first-no%20telemetry-16a34a">
+  <a href="https://huggingface.co/VittoriaLanzo"><img alt="Weights on Hugging Face" src="https://img.shields.io/badge/weights-Hugging%20Face-f59e0b"></a>
+</p>
+
+<p align="center">
+  <img src="assets/ohmaticanim.gif" alt="Ohmatic generating a schematic from a typed prompt and validating it through the rule checker" width="760" />
 </p>
 
 ---
+
+## Why
+
+Ask a chat model for a circuit and you get one back, working or not. Nothing stands between a
+confident-looking answer and a broken board. Ohmatic puts a deterministic verifier in that gap:
+every candidate design has to pass an electrical rule checker before it reaches you, and if the
+model can't get there within its retry budget, the product refuses and asks you to clarify rather
+than handing you a guess.
+
+<p align="center">
+  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 72.0% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
+</p>
+
+> Across a 75-prompt benchmark run end-to-end through the full pipeline, the 8B fine-tune delivered
+> **0 broken circuits** (93.3% verified-clean; the rest withheld as clarification requests). Claude
+> Fable 5, evaluated on the identical prompts zero-context and single-shot, delivered **18 broken
+> circuits (24%)**. Methodology, the full table, and reproduce steps are in
+> [Benchmark](#benchmark) below.
 
 ## How it works
 
@@ -29,10 +58,6 @@ product refuses and asks for clarification; the unverified candidate is withheld
 75 novel "real-user" prompts (messy, underspecified, typo-ridden, authored by a model that is
 **not** in the evaluation, overlap-checked against all training data), run end-to-end through the
 full product pipeline. Verified by the same ERC engine that gates production.
-
-<p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 72.0% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
-</p>
 
 <table>
   <tr>

@@ -132,7 +132,7 @@ export default function App() {
       <form className={`prompt-panel command-dock ${job.isBusy ? "is-transmitting" : ""}`} onSubmit={handleSubmit}>
         <div className="command-heading">
           <div>
-            <span className="console-label">Describe. Generate. Review.</span>
+            <span className="console-label">Describe. Compile. Review.</span>
             <h2>What should the circuit do?</h2>
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function App() {
           </details>
           <button className="primary-button" type="submit" disabled={!prompt.trim() || job.isBusy}>
             <Send size={17} aria-hidden="true" />
-            {job.isBusy ? "Generating" : "Generate"}
+            {job.isBusy ? "Compiling" : "Compile"}
           </button>
           <button className="secondary-button" type="button" onClick={job.reset} disabled={job.phase === "idle"}>
             <RotateCcw size={17} aria-hidden="true" />

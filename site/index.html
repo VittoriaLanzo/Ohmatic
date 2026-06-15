@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ohmatic: verified circuits from plain language</title>
+    <title>Ohmatic: a compiler for circuits</title>
     <meta
       name="description"
-      content="Ohmatic is a local-first tool that turns a plain-language circuit description into a schematic that passed automated electrical rule checks, or a request to clarify. If it can't verify it, it won't deliver it."
+      content="Ohmatic compiles a plain-language circuit request into a schematic that passed a deterministic electrical rule checker, or it refuses and asks you to clarify. Local-first, source-available."
     />
     <link rel="canonical" href="https://vittorialanzo.github.io/Ohmatic/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Ohmatic: verified circuits from plain language" />
+    <meta property="og:title" content="Ohmatic: a compiler for circuits" />
     <meta
       property="og:description"
-      content="Local-first AI circuit generation, gated by a deterministic electrical rule checker. An unverified circuit is never delivered."
+      content="LLMs generate text. Ohmatic compiles circuits. Local-first generation gated by a deterministic electrical rule checker: an unverified circuit is never delivered."
     />
     <meta property="og:image" content="https://vittorialanzo.github.io/Ohmatic/assets/benchmark.png" />
     <meta name="theme-color" content="#0d1117" />
@@ -43,12 +43,13 @@
       <section class="hero">
         <div class="shell">
           <span class="badge"><span class="live" aria-hidden="true"></span> Local-first · source-available</span>
-          <h1>Describe a circuit. Get one that passed the rule checks.</h1>
+          <h1>LLMs generate text. Ohmatic compiles circuits.</h1>
           <p class="tagline">
-            Plain language in. A schematic that cleared automated electrical rule checks out, or a
-            request to clarify. Never a broken circuit dressed up as a finished one.
+            A local model drafts the design. A deterministic electrical rule checker decides whether
+            you ever see it. Three retries, then it refuses and asks a question. A circuit that fails
+            ERC isn't a circuit, it's a bug report.
           </p>
-          <p class="kicker">If it can't verify it, it won't deliver it.</p>
+          <p class="kicker">Compiles clean, or it doesn't ship.</p>
           <div class="cta-row">
             <a class="btn btn--primary" href="https://github.com/VittoriaLanzo/Ohmatic">
               View on GitHub
@@ -91,7 +92,7 @@
         <div class="shell grid-2">
           <div>
             <span class="eyebrow">Benchmark</span>
-            <h2>An 8B fine-tune that ships nothing broken</h2>
+            <h2>An 8B fine-tune. Zero broken across 75 prompts.</h2>
             <p>
               75 messy, underspecified, real-user prompts, authored by a model that is not in the
               evaluation, run end-to-end through the full pipeline and verified by the same engine
@@ -111,7 +112,7 @@
             <img
               class="bench-img"
               src="assets/benchmark.png"
-              alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 85.4% verified-clean with zero broken deliveries, versus Claude Fable 5 at 76.0% with 24% broken circuits delivered"
+              alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries, versus Claude Fable 5 at 76.0% with 24% broken circuits delivered"
               loading="lazy"
               decoding="async"
             />
