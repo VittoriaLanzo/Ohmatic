@@ -28,11 +28,24 @@ SERVICES=(
 # colours (disabled when not a TTY)
 if [ -t 1 ]; then C_CYAN=$'\033[36m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'; C_DIM=$'\033[90m'; C_OFF=$'\033[0m'
 else C_CYAN=""; C_GREEN=""; C_YELLOW=""; C_RED=""; C_DIM=""; C_OFF=""; fi
-step() { printf "%s==> %s%s\n" "$C_CYAN" "$1" "$C_OFF"; }
-ok()   { printf "  %sok%s  %s\n" "$C_GREEN" "$C_OFF" "$1"; }
-warn() { printf "  %s!%s   %s\n" "$C_YELLOW" "$C_OFF" "$1"; }
-fail() { printf "  %sFAIL%s %s\n" "$C_RED" "$C_OFF" "$1"; }
-dim()  { printf "  %s--  %s%s\n" "$C_DIM" "$1" "$C_OFF"; }
+# Circuit glyphs: ▸ signal in, ● lit pad / exit 0, ▲ amber, ✕ blown, · not energised.
+step() { printf "%s▸ %s%s\n" "$C_CYAN" "$1" "$C_OFF"; }
+ok()   { printf "  %s●%s  %s\n" "$C_GREEN" "$C_OFF" "$1"; }
+warn() { printf "  %s▲%s  %s\n" "$C_YELLOW" "$C_OFF" "$1"; }
+fail() { printf "  %s✕%s  %s\n" "$C_RED" "$C_OFF" "$1"; }
+dim()  { printf "  %s·  %s%s\n" "$C_DIM" "$1" "$C_OFF"; }
+
+# Masthead: the product pipeline as a PCB trace, lit pads at each stage and the
+# signal flowing left to right. Same rail the frontend animates during a job.
+banner() {
+  printf "\n  %sΩ%s ohmatic    %sa compiler for circuits%s\n" "$C_GREEN" "$C_OFF" "$C_DIM" "$C_OFF"
+  printf "  %s●%s" "$C_GREEN" "$C_OFF"
+  local s
+  for s in normalize generate verify deliver; do
+    printf "━━ %s ━━%s●%s" "$s" "$C_GREEN" "$C_OFF"
+  done
+  printf " %s▸%s\n\n" "$C_GREEN" "$C_OFF"
+}
 
 # --- helpers ---------------------------------------------------------------
 
@@ -187,6 +200,7 @@ cmd_start() {
   for a in "$@"; do case "$a" in
     --docker) backend="docker" ;;
   esac; done
+  banner
   step "Ohmatic starting"
   # anaconda MKL and pip torch both ship libiomp; without this the worker dies (OMP #15)
   export KMP_DUPLICATE_LIB_OK=TRUE
@@ -203,6 +217,7 @@ cmd_start() {
   echo "  Gateway  : http://$HOST:8080"
   echo "  Stop     : ./ohmatic stop"
   echo "  Logs     : .ohmatic-run/*.log"
+  printf "\n  %sCompiles clean, or it doesn't ship.%s\n" "$C_DIM" "$C_OFF"
 }
 
 cmd_stop() {
@@ -410,10 +425,8 @@ cmd_doctor() {
 }
 
 usage() {
+  banner
   cat <<'EOF'
-
-ohmatic - local launcher
-
   ./ohmatic start          Full stack: Python backend stubs + frontend (server mode)
   ./ohmatic start --docker Backend via docker compose instead of Python stubs
   ./ohmatic stop           Stop everything ohmatic started

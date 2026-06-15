@@ -27,6 +27,22 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Circuit glyphs are built from code points, not pasted into the source: PS 5.1
+# may read this file as ANSI, which would mangle raw box-drawing into mojibake.
+# Pushing the console to UTF-8 lets the pads and traces render instead of '?'.
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+$Glyph = @{
+  Step  = [char]0x25B8   # signal entering a stage
+  Pad   = [char]0x25CF   # lit pad / exit 0
+  Warn  = [char]0x25B2   # amber flag
+  Fail  = [char]0x2715   # blown pad
+  Skip  = [char]0x00B7   # not energised
+  Trace = [char]0x2501   # the rail
+  Omega = [char]0x03A9   # the mark
+  Arrow = [char]0x2192   # before -> after
+}
+
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $frontend = Join-Path $root "frontend"
 $runDir = Join-Path $root ".ohmatic-run"
@@ -44,20 +60,40 @@ $Services = @(
 # helpers
 # ---------------------------------------------------------------------------
 
-function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
-function Write-Ok([string]$Message)   { Write-Host "  ok  $Message" -ForegroundColor Green }
-function Write-Warn2([string]$Message) { Write-Host "  !   $Message" -ForegroundColor Yellow }
+function Write-Step([string]$Message) { Write-Host "$($Glyph.Step) $Message" -ForegroundColor Cyan }
+function Write-Ok([string]$Message)   { Write-Host "  $($Glyph.Pad)  $Message" -ForegroundColor Green }
+function Write-Warn2([string]$Message) { Write-Host "  $($Glyph.Warn)  $Message" -ForegroundColor Yellow }
+function Write-Fail([string]$Message)  { Write-Host "  $($Glyph.Fail)  $Message" -ForegroundColor Red }
+function Write-Dim([string]$Message)   { Write-Host "  $($Glyph.Skip)  $Message" -ForegroundColor DarkGray }
+
+# The masthead is the product pipeline drawn as a PCB trace: lit pads at each
+# stage, signal flowing left to right. Same Normalize/Generate/Verify/Deliver
+# rail the frontend lights up while a job runs.
+function Show-Banner {
+  $seg = [string]$Glyph.Trace * 2
+  Write-Host ""
+  Write-Host "  $($Glyph.Omega) " -ForegroundColor Green -NoNewline
+  Write-Host "ohmatic" -ForegroundColor White -NoNewline
+  Write-Host "    a compiler for circuits" -ForegroundColor DarkGray
+  Write-Host "  " -NoNewline
+  Write-Host $Glyph.Pad -ForegroundColor Green -NoNewline
+  foreach ($station in @("normalize", "generate", "verify", "deliver")) {
+    Write-Host "$seg $station $seg" -ForegroundColor Gray -NoNewline
+    Write-Host $Glyph.Pad -ForegroundColor Green -NoNewline
+  }
+  Write-Host " $($Glyph.Step)" -ForegroundColor Green
+  Write-Host ""
+}
 
 function Show-Usage {
-  Write-Host ""
-  Write-Host "ohmatic - local launcher" -ForegroundColor White
-  Write-Host ""
+  Show-Banner
   Write-Host "  ohmatic start          Full stack: Python backend stubs + frontend (server mode)"
   Write-Host "  ohmatic start -Mock    Frontend only, mock mode (no backend)"
   Write-Host "  ohmatic start -Docker  Backend via docker compose instead of Python stubs"
   Write-Host "  ohmatic stop           Stop everything ohmatic started"
   Write-Host "  ohmatic status         Show what is running"
   Write-Host "  ohmatic doctor         Diagnose the system (Node, Python, Docker, ports)"
+  Write-Host "  ohmatic update         Pull the latest commit from GitHub (fast-forward only)"
   Write-Host "  ohmatic help           Show this help"
   Write-Host ""
   Write-Host "  Fresh clone -> 'ohmatic start' -> open the printed URL." -ForegroundColor DarkGray
@@ -318,6 +354,7 @@ function Start-Frontend([bool]$UseMock) {
 # ---------------------------------------------------------------------------
 
 function Invoke-Start {
+  Show-Banner
   Write-Step "Ohmatic starting"
   $gatewayPort = 8080
   if (-not $Mock) {
@@ -340,6 +377,8 @@ function Invoke-Start {
   if (-not $Mock) { Write-Host "  Gateway  : http://$HostName`:$gatewayPort" -ForegroundColor Green }
   Write-Host "  Stop     : ohmatic stop" -ForegroundColor DarkGray
   Write-Host "  Logs     : .ohmatic-run\*.log" -ForegroundColor DarkGray
+  Write-Host ""
+  Write-Host "  Compiles clean, or it doesn't ship." -ForegroundColor DarkGray
 }
 
 function Invoke-Stop {
@@ -363,7 +402,7 @@ function Invoke-Doctor {
   $okBackend = $false
 
   # --- OS / shell ---
-  Write-Host "  os        Windows ($([System.Environment]::OSVersion.Version)), PowerShell $($PSVersionTable.PSVersion)" -ForegroundColor Gray
+  Write-Dim "os        Windows ($([System.Environment]::OSVersion.Version)), PowerShell $($PSVersionTable.PSVersion)"
 
   # --- Node + npm (required for the frontend) ---
   $node = Get-Command node -ErrorAction SilentlyContinue
@@ -371,7 +410,7 @@ function Invoke-Doctor {
     $nodeVer = (& $node.Source --version) 2>$null
     Write-Ok "node      $nodeVer  ($($node.Source))"
   } else {
-    Write-Host "  FAIL node      not found - install Node.js 18+ (https://nodejs.org)" -ForegroundColor Red
+    Write-Fail "node      not found - install Node.js 18+ (https://nodejs.org)"
     $okFrontend = $false
   }
   $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -380,7 +419,7 @@ function Invoke-Doctor {
     $npmVer = (& $npm.Source --version) 2>$null
     Write-Ok "npm       $npmVer"
   } else {
-    Write-Host "  FAIL npm       not found - ships with Node.js" -ForegroundColor Red
+    Write-Fail "npm       not found - ships with Node.js"
     $okFrontend = $false
   }
 
@@ -401,7 +440,7 @@ function Invoke-Doctor {
     Write-Ok "docker    $dockerVer  (enables: ohmatic start -Docker)"
     $okBackend = $true
   } else {
-    Write-Host "  --  docker    not found (optional - only needed for -Docker)" -ForegroundColor DarkGray
+    Write-Dim "docker    not found (optional - only needed for -Docker)"
   }
 
   # --- Ports ---
@@ -429,7 +468,7 @@ function Invoke-Status {
     $p = if ($ports.ContainsKey($svc.Name)) { $ports[$svc.Name] } else { $svc.Port }
     $ok = Test-HttpOk "http://$HostName`:$p/health"
     if ($ok) { Write-Ok "$($svc.Name.PadRight(10)) listening on :$p" }
-    else { Write-Host "  --  $($svc.Name.PadRight(10)) not running (:$p)" -ForegroundColor DarkGray }
+    else { Write-Dim "$($svc.Name.PadRight(10)) not running (:$p)" }
   }
   $fePid = Join-Path $runDir "frontend.pid"
   if (Test-Path -LiteralPath $fePid) {
@@ -437,11 +476,60 @@ function Invoke-Status {
     if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
       Write-Ok "frontend    running (pid $processId)"
     } else {
-      Write-Host "  --  frontend    not running" -ForegroundColor DarkGray
+      Write-Dim "frontend    not running"
     }
   } else {
-    Write-Host "  --  frontend    not running" -ForegroundColor DarkGray
+    Write-Dim "frontend    not running"
   }
+}
+
+function Invoke-Update {
+  Write-Step "Ohmatic update: pulling the latest from GitHub"
+  if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Fail "git not found on PATH. Install Git, then re-run 'ohmatic update'."
+    exit 1
+  }
+
+  $branch = (& git -C $root rev-parse --abbrev-ref HEAD 2>$null)
+  if ($LASTEXITCODE -ne 0 -or -not $branch) {
+    Write-Fail "not a git checkout. Use 'git clone' so update has a remote to pull from."
+    exit 1
+  }
+
+  # A dirty tree is fine: fast-forward-only never rewrites or discards local work.
+  & git -C $root diff --quiet 2>$null
+  if ($LASTEXITCODE -ne 0) { Write-Warn2 "local changes detected: preserved (fast-forward-only pull)" }
+
+  & git -C $root fetch origin
+  if ($LASTEXITCODE -ne 0) { Write-Fail "fetch failed: check the network or the remote."; exit 1 }
+
+  $before = (& git -C $root rev-parse --short HEAD 2>$null)
+  & git -C $root pull --ff-only origin $branch
+  if ($LASTEXITCODE -ne 0) {
+    Write-Fail "non-fast-forward (local commits or rewritten history). Resolve manually: git status"
+    exit 1
+  }
+  $after = (& git -C $root rev-parse --short HEAD 2>$null)
+
+  if ($before -eq $after) {
+    Write-Ok "already current at $after"
+  } else {
+    Write-Ok "updated $before $($Glyph.Arrow) $after"
+    # Reinstall only when the pull actually moved package.json; otherwise a no-op.
+    $changed = (& git -C $root diff --name-only "HEAD@{1}" HEAD 2>$null)
+    if ($changed -match "frontend/package\.json") {
+      Write-Step "frontend dependencies changed: reinstalling"
+      $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+      if (-not $npm) { $npm = Get-Command npm -ErrorAction SilentlyContinue }
+      if ($npm) {
+        Push-Location $frontend
+        try { & $npm.Source install } finally { Pop-Location }
+      } else {
+        Write-Warn2 "npm not found: run 'npm install' in frontend/ before the next start"
+      }
+    }
+  }
+  Write-Ok "done. Restart with: ohmatic stop ; ohmatic start"
 }
 
 # ---------------------------------------------------------------------------
@@ -461,6 +549,7 @@ switch ($Command.ToLowerInvariant()) {
   "stop"   { Invoke-Stop }
   "status" { Invoke-Status }
   "doctor" { Invoke-Doctor }
+  "update" { Invoke-Update }
   "help"   { Show-Usage }
   default  { Show-Usage; exit 2 }
 }
