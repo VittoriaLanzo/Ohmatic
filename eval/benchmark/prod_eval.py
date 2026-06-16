@@ -119,6 +119,9 @@ def main():
         def rate(d, k): return round(d[f"pass@{k}"] / d["total"], 4) if d["total"] else None
         return {
             "adapter": args.adapter, "revision": args.revision or "main",
+            # pipeline provenance: keep eval JSONs self-describing about how they were produced
+            "model_track": "qwen3_parser", "prompt_helper": "t5_normalized",
+            "decoder_constraint": "none",
             "n": agg["total"], "n_target": len(items), "done": done,
             "complete": done >= len(items),
             "max_shots": max_shots, "elapsed_min": round((time.time() - t0) / 60, 1),

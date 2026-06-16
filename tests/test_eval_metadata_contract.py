@@ -17,7 +17,7 @@ def test_prod_eval_summary_metadata_names_parser_helper_and_constraint(tmp_path,
         def from_config(cls, _cfg):
             return cls()
 
-        def run(self, _prompt):
+        def run(self, _prompt, return_trace=False):
             return FakeResult()
 
     out_path = tmp_path / "prod_eval.json"
