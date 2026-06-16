@@ -11,10 +11,12 @@ import { humanizeStage } from "./lib/format";
 import type { GenerateOptions } from "./types/api";
 import type { SymbolStyle } from "./components/schematic/symbols";
 
+// These three prompts are wired to the gateway's instant demo circuits (the
+// dataset's ERC-verified examples); clicking one renders immediately, no model run.
 const examples = [
   "555 timer astable oscillator, 1 Hz LED blink, 5 V supply",
-  "Passive RC low-pass filter, 1 kHz cutoff, 0603 passives",
-  "NPN low-side relay driver with base resistor and flyback diode"
+  "Single-supply audio amplifier, op-amp gain stage, 5 V",
+  "Precision half-wave rectifier, op-amp, ±15 V"
 ];
 
 const defaultOptions: Required<Pick<GenerateOptions, "max_retries" | "max_components">> = {

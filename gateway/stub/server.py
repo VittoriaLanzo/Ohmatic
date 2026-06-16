@@ -147,6 +147,48 @@ def _flatten(circuit: dict) -> dict:
             "nets": topo.get("nets", [])}
 
 
+# Demo mode: three ERC-verified example circuits served instantly (no model), keyed
+# by their example-prompt text and by the aliases "example 1/2/3". The circuits are
+# the dataset's own verified examples, so the demo renders exactly what ships.
+_DEMO_TITLES = [
+    "555 Timer Astable Oscillator",
+    "Single-Supply Audio Amplifier",
+    "Precision Half-Wave Rectifier",
+]
+_DEMO_PROMPTS = {
+    "555 timer astable oscillator, 1 Hz LED blink, 5 V supply": _DEMO_TITLES[0],
+    "Single-supply audio amplifier, op-amp gain stage, 5 V": _DEMO_TITLES[1],
+    "Precision half-wave rectifier, op-amp, ±15 V": _DEMO_TITLES[2],
+}
+_DEMO_CACHE: dict | None = None
+
+
+def _demo_examples() -> dict:
+    """Title -> flat circuit, loaded once from the checked-in example set."""
+    global _DEMO_CACHE
+    if _DEMO_CACHE is None:
+        path = Path(_ROOT) / "dataset" / "examples.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        _DEMO_CACHE = {c["metadata"]["title"]: c for c in data}
+    return _DEMO_CACHE
+
+
+def _demo_circuit(prompt: str) -> dict | None:
+    """The canned circuit for an example prompt or an 'example N' alias, else None."""
+    text = prompt.strip()
+    title = _DEMO_PROMPTS.get(text)
+    if title is None:
+        m = re.fullmatch(r"example\s*([123])", text, re.IGNORECASE)
+        if m:
+            title = _DEMO_TITLES[int(m.group(1)) - 1]
+    if title is None:
+        return None
+    try:
+        return _demo_examples().get(title)
+    except Exception:
+        return None
+
+
 def _parts_list_for(circuit_flat: dict) -> tuple[list, int]:
     """Deterministic local parts_list for a verified circuit, plus its build time in ms.
     Never fails a finished job: an unknown component type or a missing registry yields an
@@ -357,6 +399,21 @@ class Handler(BaseHTTPRequestHandler):
                 if not (0.0 <= temperature <= 1.0):
                     self.send_json(400, {"error": "options.temperature must be in [0, 1]"})
                     return
+            # Demo mode: a canned, ERC-verified example renders instantly, no model
+            # required (works even with no weights installed).
+            demo = _demo_circuit(prompt)
+            if demo is not None:
+                job_id = uuid.uuid4().hex[:12]
+                parts_list, parts_ms = _parts_list_for(demo)
+                JOBS[job_id] = {
+                    "status": "done", "stage": None, "t0": time.time(),
+                    "progress": 1.0, "loops": 0, "error": None,
+                    "result": {"circuit": demo, "drc_warnings": [], "bom": [],
+                               "parts_list": parts_list,
+                               "latency_ms": {"inference": 0, "drc": 0, "bom": 0, "parts_list": parts_ms}},
+                }
+                self.send_json(202, {"job_id": job_id, "poll_url": f"/v1/jobs/{job_id}/status"})
+                return
             if _real_available():
                 guard = _ram_guard()
                 if guard:
