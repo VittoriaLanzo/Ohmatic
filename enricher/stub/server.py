@@ -1,7 +1,23 @@
 #!/usr/bin/env python3
-"""Stub server for enricher. Returns hardcoded valid responses. Replace with production implementation in Stage 1. See shared/docs/contracts.md for the contract."""
+"""Stub server for enricher. Builds the deterministic local parts list for a verified
+circuit via the canonical shared.parts_list builder (the single source of truth, shared
+with the gateway). See shared/docs/contracts.md section 6 for the contract."""
 import json
+import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
+
+# The launcher runs this with cwd=enricher/stub, so put the repo root on sys.path to
+# import the shared parts_list builder. Guarded: a missing repo root (e.g. a narrow
+# container mount) degrades /enrich to 503 instead of crashing startup.
+_ROOT = str(Path(__file__).resolve().parents[2])
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+try:
+    from shared.parts_list import build_parts_list
+    BUILD_AVAILABLE = True
+except Exception:
+    BUILD_AVAILABLE = False
 
 MAX_BODY_BYTES = 1 * 1024 * 1024
 
@@ -60,22 +76,15 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(components, list):
                 self.send_json(400, {"error": "'components' must be a list"})
                 return
-            bom = []
-            for c in components:
-                if not isinstance(c, dict):
-                    continue
-                cid = c.get("id")
-                if not isinstance(cid, str) or not cid:
-                    continue
-                bom.append({
-                    "id": cid,
-                    "mpn": None,
-                    "description": f"{c.get('type', 'unknown')} {c.get('value', '')}".strip(),
-                    "price_usd": None,
-                    "url": None,
-                    "mpn_found": False
-                })
-            self.send_json(200, bom)
+            if not BUILD_AVAILABLE:
+                self.send_json(503, {"error": "enricher_unavailable"})
+                return
+            try:
+                rows = build_parts_list(circuit)
+            except ValueError as exc:
+                self.send_json(422, {"error": str(exc)})
+                return
+            self.send_json(200, rows)
         else:
             self.send_json(404, {"error": "not_found"})
 

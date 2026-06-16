@@ -60,9 +60,9 @@ within a service.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `supplier` | string | BOM supplier queried, e.g. `"local"`, `"octopart"`. |
-| `bom_entries` | integer | Number of BOM lines returned. |
-| `mpn_hit_rate` | number | Fraction of components with `mpn_found: true`. |
+| `parts_list_entries` | integer | Number of rows in the deterministic local parts list (one per component). |
+| `buyable_parts` | integer | Rows flagged `buyable: true` (physical, orderable components). |
+| `non_physical_symbols` | integer | Rows flagged `is_physical: false` (power, ground, and other schematic-only symbols). |
 
 ---
 
@@ -83,9 +83,9 @@ within a service.
 {"timestamp":"2026-05-23T14:32:03.901Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"verifier","level":"warn","message":"Tier 3 DRC warning: missing bypass capacitor near U1","tier":3,"warnings_count":1,"errors_count":0,"circuit_id":"555 Timer Astable Oscillator"}
 ```
 
-**enricher**, BOM resolved:
+**enricher**, parts list built:
 ```json
-{"timestamp":"2026-05-23T14:32:04.210Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"enricher","level":"info","message":"BOM enrichment complete","supplier":"local","bom_entries":8,"mpn_hit_rate":0.875}
+{"timestamp":"2026-05-23T14:32:04.210Z","request_id":"01HWABCDE1234567890ABCDEF0","service":"enricher","level":"info","message":"Parts list built","parts_list_entries":8,"buyable_parts":6,"non_physical_symbols":2}
 ```
 
 ---

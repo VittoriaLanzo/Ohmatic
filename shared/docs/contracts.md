@@ -96,27 +96,32 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
   "result": {
     "circuit": { "...": "OhmaticCircuitV01 object" },
     "drc_warnings": ["Missing bypass capacitor near U1"],
-    "bom": [
+    "bom": [],
+    "parts_list": [
       {
         "id": "R1",
-        "mpn": "RC0603FR-0710KL",
-        "description": "Resistor 10kΩ 1% 0603",
-        "price_usd": 0.01,
-        "url": "https://octopart.com/...",
-        "mpn_found": true
+        "type": "resistor",
+        "parts_list_part": "resistor",
+        "value": "10k",
+        "package": "0603",
+        "description": "resistor 10k 0603",
+        "is_physical": true,
+        "buyable": true,
+        "match_status": "local_only"
       }
     ],
     "latency_ms": {
       "inference": 2708,
       "drc": 42,
-      "bom": 180
+      "bom": 0,
+      "parts_list": 1
     }
   },
   "error": null
 }
 ```
 
-The `latency_ms` sub-fields (`inference`, `drc`, `bom`) are **integer milliseconds**.
+`parts_list` is the deterministic local parts list (see §6 for the `PartsListRow` schema). `bom` is retained as an always-empty field for backward compatibility; supplier resolution is a separate, opt-in step (§6.1) and never populates the job result. The `latency_ms` sub-fields (`inference`, `drc`, `bom`, `parts_list`) are **integer milliseconds**.
 
 ### Response 200: Failed
 
@@ -286,52 +291,78 @@ Two sub-cases, distinguished by rule ID prefix:
 
 **Service:** enricher (internal, port 8003)
 
-Resolves MPNs and pricing for every component in a circuit.
+Builds a deterministic local parts list for a verified circuit: one row per component,
+derived entirely from `verifier/config/component_registry.toml`. No network calls, no
+supplier lookups, no pricing. The output is byte-stable for a given circuit, so it can be
+cached and diffed.
 
 ### Request
 
 ```json
 {
-  "circuit": { "...": "OhmaticCircuitV01 object" },
-  "supplier": "local"
+  "circuit": { "...": "OhmaticCircuitV01 object" }
 }
 ```
 
 ### Response 200: OK
 
-Returns one `BomEntry` per component in the same order as `circuit.components`.
+Returns one `PartsListRow` per component in the same order as `circuit.components`.
 
 ```json
 [
   {
     "id": "R1",
-    "mpn": "RC0603FR-0710KL",
-    "description": "Resistor 10kΩ 1% 0603",
-    "price_usd": 0.01,
-    "url": "https://octopart.com/rc0603fr-0710kl-yageo-20756462",
-    "mpn_found": true
+    "type": "resistor",
+    "parts_list_part": "resistor",
+    "value": "10k",
+    "package": "0603",
+    "description": "resistor 10k 0603",
+    "is_physical": true,
+    "buyable": true,
+    "match_status": "local_only"
   },
   {
     "id": "VCC1",
-    "mpn": null,
-    "description": "Power symbol, no physical part",
-    "price_usd": null,
-    "url": null,
-    "mpn_found": false
+    "type": "power_vcc",
+    "parts_list_part": "power_vcc",
+    "value": "5V",
+    "package": "VCC",
+    "description": "power_vcc 5V VCC",
+    "is_physical": false,
+    "buyable": false,
+    "match_status": "local_only"
   }
 ]
 ```
 
-### BomEntry Schema
+### PartsListRow Schema
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string | Component ID (e.g. `"R1"`). |
-| `mpn` | string \| null | Manufacturer part number; `null` if not found. |
-| `description` | string | Human-readable part description. |
-| `price_usd` | float \| null | Unit price in USD; `null` if unavailable. |
-| `url` | string \| null | Datasheet or supplier URL; `null` if unavailable. |
-| `mpn_found` | boolean | `true` if an MPN was resolved. |
+| `type` | string | Component type from the circuit (e.g. `"resistor"`). |
+| `parts_list_part` | string | Canonical part category from the component registry. |
+| `value` | string | Component value (e.g. `"10k"`); `""` when not set. |
+| `package` | string | Package/footprint from the component `part` field; `""` when not set. |
+| `description` | string | Human-readable summary: `parts_list_part value package`, space-joined, blanks dropped. |
+| `is_physical` | boolean | `true` for orderable parts; `false` for schematic-only symbols (power, ground). |
+| `buyable` | boolean | Whether the row can be ordered. Equal to `is_physical` in Stage 0. |
+| `match_status` | string | Resolution state. Always `"local_only"` from the registry-only enricher. |
+
+### Response 422: Unknown component type
+
+Returned when a component `type` has no entry in the component registry.
+
+```json
+{ "error": "unknown component type for parts_list: 'frobnicator'" }
+```
+
+### 6.1 Supplier resolution (separate step)
+
+Supplier matching, referral links, and any pricing are handled by the procurement layer
+(`POST /v1/procurement/matches`), which consumes a parts list and returns disclosed
+link-outs. By design the enricher never writes `supplier`, `mpn`, `price`, `url`, or any
+affiliate field onto parts-list rows or circuit JSON.
 
 ---
 
