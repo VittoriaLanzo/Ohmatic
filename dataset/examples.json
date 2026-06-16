@@ -370,18 +370,19 @@
       {"id": "VCC2", "type": "power_vcc", "part": "VCC_LOGIC", "value": "5V", "pins": {"1": "1"}, "x": 10, "y": 230},
       {"id": "U1", "type": "ic_driver", "part": "L298N", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7", "8": "8"}, "x": 60, "y": 225},
       {"id": "C_bypass", "type": "capacitor", "part": "0805", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 60, "y": 215},
+      {"id": "C_byp2", "type": "capacitor", "part": "0805", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 40, "y": 235},
       {"id": "J_ctrl", "type": "connector", "part": "CTRL", "value": "", "pins": {"1": "1", "2": "2"}, "x": 10, "y": 225},
       {"id": "MOT1", "type": "connector", "part": "MOTOR", "value": "", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 225},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 170, "y": 225}
     ],
     "nets": [
       {"name": "VCC", "pins": ["VCC1.1", "U1.4", "C_bypass.1"]},
-      {"name": "VCC_LOGIC", "pins": ["VCC2.1", "U1.1", "U1.7"]},
+      {"name": "VCC_LOGIC", "pins": ["VCC2.1", "U1.1", "U1.7", "C_byp2.1"]},
       {"name": "NET_IN1", "pins": ["J_ctrl.1", "U1.2"]},
       {"name": "NET_IN2", "pins": ["J_ctrl.2", "U1.3"]},
       {"name": "NET_OUT1", "pins": ["U1.5", "MOT1.1"]},
       {"name": "NET_OUT2", "pins": ["U1.6", "MOT1.2"]},
-      {"name": "GND", "pins": ["U1.8", "GND1.1", "C_bypass.2"]}
+      {"name": "GND", "pins": ["U1.8", "GND1.1", "C_bypass.2", "C_byp2.2"]}
     ],
     "tier3_reviewed": true
   },
@@ -450,7 +451,7 @@
       {"id": "R2", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 130, "y": 260},
       {"id": "R3", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 50, "y": 270},
       {"id": "R4", "type": "resistor", "part": "1/4W", "value": "10kΩ", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 275},
-      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "7": "7"}, "x": 90, "y": 265},
+      {"id": "U1", "type": "ic_opamp", "part": "LM358", "value": "", "pins": {"1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "7": "7"}, "x": 90, "y": 265},
       {"id": "C_bypass", "type": "capacitor", "part": "0402", "value": "100nF", "pins": {"1": "1", "2": "2"}, "x": 90, "y": 258},
       {"id": "J_out", "type": "connector", "part": "OUT", "value": "", "pins": {"1": "1"}, "x": 170, "y": 265},
       {"id": "GND1", "type": "power_gnd", "part": "GND", "value": "", "pins": {"1": "1"}, "x": 130, "y": 275}
@@ -463,7 +464,7 @@
       {"name": "NET_OUT", "pins": ["U1.1", "R2.2", "J_out.1"]},
       {"name": "NET_IN2", "pins": ["J_in2.1", "R3.1"]},
       {"name": "NET_NON_INV", "pins": ["R3.2", "R4.1", "U1.3"]},
-      {"name": "GND", "pins": ["R4.2", "GND1.1", "C_bypass.2"]}
+      {"name": "GND", "pins": ["R4.2", "GND1.1", "C_bypass.2", "U1.5"]}
     ],
     "tier3_reviewed": true
   },
