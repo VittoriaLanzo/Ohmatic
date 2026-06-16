@@ -23,11 +23,17 @@ export function SchematicSvg({ circuit, phase, symbolStyle = "ansi", zoom = 1 }:
 
   const model = buildSchematicModel(circuit);
   const desc = [circuit.metadata.description, model.accessibleDiagnostics].filter(Boolean).join("; ");
+  // Canvas is sized to the grid the model laid out, so the schematic scales to the
+  // circuit instead of cramming every component into a fixed 360x210 box.
+  const w = model.width;
+  const h = model.height;
+  const cx = w / 2;
+  const cy = h / 2;
 
   return (
     <svg
       className={`schematic-svg is-${phase}`}
-      viewBox="0 0 360 210"
+      viewBox={`0 0 ${w} ${h}`}
       role="img"
       aria-label={circuit.metadata.title}
       aria-describedby="schematic-desc schematic-diagnostics"
@@ -39,10 +45,10 @@ export function SchematicSvg({ circuit, phase, symbolStyle = "ansi", zoom = 1 }:
           <path d="M 18 0 L 0 0 0 18" fill="none" stroke="rgba(26, 26, 20, 0.08)" strokeWidth="1" />
         </pattern>
       </defs>
-      <rect width="360" height="210" rx="6" fill="#f9f8f1" />
-      <rect x="10" y="10" width="340" height="190" rx="4" fill="url(#grid)" />
+      <rect width={w} height={h} rx="6" fill="#f9f8f1" />
+      <rect x="10" y="10" width={w - 20} height={h - 20} rx="4" fill="url(#grid)" />
 
-      <g className="schematic-viewport" transform={`translate(180 105) scale(${zoom}) translate(-180 -105)`}>
+      <g className="schematic-viewport" transform={`translate(${cx} ${cy}) scale(${zoom}) translate(${-cx} ${-cy})`}>
         <g className="schematic-nets">
           {model.routes.map((route, index) => (
             <g key={route.name} data-route-kind={route.kind}>
@@ -78,6 +84,9 @@ export function SchematicSvg({ circuit, phase, symbolStyle = "ansi", zoom = 1 }:
               style={{ "--draw-order": index } as CSSProperties}
             >
               <title>{componentTitle(component)}</title>
+              {/* Opaque backing: any net routed behind a component is masked by its
+                  body, so a passing wire never reads as a false connection through it. */}
+              <rect className="component-backing" x="-27" y="-21" width="54" height="42" rx="4" fill="#f9f8f1" />
               {renderSchematicSymbol(component.type, symbolStyle)}
               {Object.entries(component.anchors).map(([pinName, anchor]) => (
                 <g key={`${component.id}.${pinName}`} data-pin-anchor={`${component.id}.${pinName}`}>
@@ -122,8 +131,8 @@ export function SchematicSvg({ circuit, phase, symbolStyle = "ansi", zoom = 1 }:
 
       {model.diagnostics.length > 0 && (
         <g className="schematic-diagnostic-summary">
-          <rect x="14" y="176" width="150" height="20" rx="4" />
-          <text x="22" y="190">
+          <rect x="14" y={h - 34} width="150" height="20" rx="4" />
+          <text x="22" y={h - 20}>
             Pin ref issue
           </text>
         </g>

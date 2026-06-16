@@ -37,6 +37,9 @@ export type SchematicModel = {
   routes: SchematicRoute[];
   diagnostics: SchematicDiagnostic[];
   accessibleDiagnostics: string;
+  // Canvas grows with the circuit so components are never squeezed into one band.
+  width: number;
+  height: number;
 };
 
 const ANCHOR_POINTS: Record<AnchorSpec, Point> = {
@@ -50,17 +53,33 @@ const ANCHOR_POINTS: Record<AnchorSpec, Point> = {
   "right-bottom": { x: 31, y: 10 },
 };
 
+// Grid + inter-cell routing lattice. Components sit at cell centres; the boundary
+// lines between cells are guaranteed clear of every component body, so a wire that
+// only ever rides those lines cannot cross a component. (Orthogonal channel routing
+// in the spirit of Adaptagrams/dagre/maxGraph -- our own implementation.)
+const CELL_W = 140;
+const CELL_H = 120;
+const MARGIN = 48;
+const TRACKS = 6;
+const TRACK_GAP = 4;
+
+type Placement = { point: Point; col: number; row: number };
+type Layout = { byId: Map<string, Placement>; cols: number; rows: number; width: number; height: number };
+
 export function buildSchematicModel(circuit: OhmaticCircuitV01): SchematicModel {
-  const positions = normalizePositions(circuit);
+  const layout = computeLayout(circuit);
   const componentById = new Map(circuit.components.map((component) => [component.id, component]));
-  const components = circuit.components.map((component) => buildComponentModel(component, positions.get(component.id) ?? { x: 0, y: 0 }));
+  const components = circuit.components.map((component) =>
+    buildComponentModel(component, layout.byId.get(component.id)?.point ?? { x: 0, y: 0 })
+  );
   const modelById = new Map(components.map((component) => [component.id, component]));
   const diagnostics: SchematicDiagnostic[] = [];
   const routes: SchematicRoute[] = [];
+  let trackIndex = 0;
 
   for (const net of circuit.nets) {
     const seenRefs = new Set<string>();
-    const anchors: Array<{ ref: string; point: Point }> = [];
+    const pins: Array<{ ref: string; point: Point; place: Placement }> = [];
 
     for (const ref of net.pins) {
       if (seenRefs.has(ref)) {
@@ -77,7 +96,8 @@ export function buildSchematicModel(circuit: OhmaticCircuitV01): SchematicModel 
 
       const component = componentById.get(parsed.componentId);
       const componentModel = modelById.get(parsed.componentId);
-      if (!component || !componentModel) {
+      const place = layout.byId.get(parsed.componentId);
+      if (!component || !componentModel || !place) {
         diagnostics.push(makeDiagnostic("unknown_component", ref, net.name, modelById, `unknown component ${ref}`));
         continue;
       }
@@ -86,14 +106,18 @@ export function buildSchematicModel(circuit: OhmaticCircuitV01): SchematicModel 
         continue;
       }
 
-      anchors.push({
+      pins.push({
         ref,
-        point: componentModel.anchors[parsed.pinName] ?? distributePinAnchor(componentModel.point, Object.keys(component.pins), parsed.pinName),
+        point:
+          componentModel.anchors[parsed.pinName] ??
+          distributePinAnchor(componentModel.point, Object.keys(component.pins), parsed.pinName),
+        place,
       });
     }
 
-    if (anchors.length >= 2) {
-      routes.push(buildRoute(net.name, anchors));
+    if (pins.length >= 2) {
+      routes.push(routeNet(net.name, pins, layout.rows, trackIndex));
+      trackIndex += 1;
     }
   }
 
@@ -102,7 +126,46 @@ export function buildSchematicModel(circuit: OhmaticCircuitV01): SchematicModel 
     routes,
     diagnostics,
     accessibleDiagnostics: diagnostics.map((diagnostic) => diagnostic.message).join("; "),
+    width: layout.width,
+    height: layout.height,
   };
+}
+
+function computeLayout(circuit: OhmaticCircuitV01): Layout {
+  const comps = circuit.components;
+  const n = comps.length;
+  if (n === 0) {
+    return { byId: new Map(), cols: 0, rows: 0, width: 360, height: 210 };
+  }
+  // Slightly-wide grid reads better than a tall one for schematics.
+  const cols = Math.max(1, Math.round(Math.sqrt(n * 1.7)));
+  const rows = Math.ceil(n / cols);
+
+  // Finite-guard the model coordinates (a partial layout stage can emit NaN/null),
+  // then order top-to-bottom, left-to-right so the grid loosely preserves intent.
+  const items = comps.map((component, index) => ({
+    id: component.id,
+    index,
+    x: Number.isFinite(component.x) ? component.x : 0,
+    y: Number.isFinite(component.y) ? component.y : 0,
+  }));
+  items.sort((a, b) => a.y - b.y || a.x - b.x || a.index - b.index);
+
+  const byId = new Map<string, Placement>();
+  for (let row = 0; row < rows; row += 1) {
+    const rowItems = items
+      .slice(row * cols, (row + 1) * cols)
+      .sort((a, b) => a.x - b.x || a.index - b.index);
+    rowItems.forEach((item, col) => {
+      byId.set(item.id, {
+        point: { x: MARGIN + col * CELL_W + CELL_W / 2, y: MARGIN + row * CELL_H + CELL_H / 2 },
+        col,
+        row,
+      });
+    });
+  }
+
+  return { byId, cols, rows, width: MARGIN * 2 + cols * CELL_W, height: MARGIN * 2 + rows * CELL_H };
 }
 
 function buildComponentModel(component: CircuitComponent, point: Point): SchematicComponentModel {
@@ -148,32 +211,88 @@ function buildComponentModel(component: CircuitComponent, point: Point): Schemat
   };
 }
 
-function buildRoute(name: string, anchors: Array<{ ref: string; point: Point }>): SchematicRoute {
-  if (anchors.length === 2) {
-    const [a, b] = anchors;
-    const midX = (a.point.x + b.point.x) / 2;
-    return {
-      name,
-      kind: "wire",
-      anchorRefs: anchors.map((anchor) => anchor.ref),
-      segments: [`M ${a.point.x} ${a.point.y} H ${midX} V ${b.point.y} H ${b.point.x}`],
-      label: { x: midX + 4, y: Math.min(a.point.y, b.point.y) - 8 },
-    };
+// ---- routing -------------------------------------------------------------
+
+function latticeY(j: number): number {
+  return MARGIN + j * CELL_H;
+}
+
+// Each pin turns onto a vertical riser just outside its own body (RISER_OFFSET from
+// the component centre), not at the far cell edge -- so the visible pin lead is
+// short instead of overflowing across the cell. The riser sits in the gap between
+// columns, which is clear of every body top-to-bottom, so it can run to any trunk
+// row without crossing a component. The trunk rides a row-boundary gap, clear
+// across every column. `off` shifts this net onto its own track to avoid overdraw.
+// Must stay clear of the outermost pin anchor (31) even after the largest negative
+// track offset, so the lead always points outward; and inside the cell half (70).
+const RISER_OFFSET = 46;
+
+function routeNet(
+  name: string,
+  pins: Array<{ ref: string; point: Point; place: Placement }>,
+  rows: number,
+  trackIndex: number
+): SchematicRoute {
+  const off = (trackIndex % TRACKS) * TRACK_GAP - ((TRACKS - 1) * TRACK_GAP) / 2;
+  const centroidX = pins.reduce((sum, pin) => sum + pin.place.point.x, 0) / pins.length;
+
+  // Trunk on the row-boundary nearest the pins; each riser runs to it.
+  const avgY = pins.reduce((sum, pin) => sum + pin.point.y, 0) / pins.length;
+  const jt = clamp(Math.round((avgY - MARGIN) / CELL_H), 0, rows);
+  const yt = latticeY(jt) + off;
+
+  // Where each pin turns onto its vertical riser:
+  //  - a side pin (left/right anchor) turns just outside its own body;
+  //  - a top/bottom pin drops STRAIGHT down its own centre when the trunk is on the
+  //    side it points (no sideways jog), else falls back to a side riser.
+  const risers = pins.map((pin) => {
+    const dx = pin.point.x - pin.place.point.x;
+    const dy = pin.point.y - pin.place.point.y;
+    if (Math.abs(dx) >= 12) {
+      return { x: pin.place.point.x + Math.sign(dx) * RISER_OFFSET + off, y: pin.point.y, anchor: pin.point };
+    }
+    // Straight drop only to the pin's own adjacent cell boundary stays inside the
+    // cell and is therefore clear; a farther trunk would cross same-column bodies,
+    // so route it out to a side riser in the clear inter-column gap instead. A
+    // straight drop aligns exactly to the pin (no track offset) so the wire leaves
+    // the symbol dead-centre rather than jogging a few px sideways.
+    const adjacentBoundary = dy < 0 ? pin.place.row : pin.place.row + 1;
+    const side = centroidX >= pin.place.point.x ? 1 : -1;
+    const x = jt === adjacentBoundary ? pin.point.x : pin.place.point.x + side * RISER_OFFSET + off;
+    return { x, y: pin.point.y, anchor: pin.point };
+  });
+
+  const segments: string[] = risers
+    .filter((riser) => Math.abs(riser.anchor.x - riser.x) > 0.5)
+    .map((riser) => `M ${r(riser.anchor.x)} ${r(riser.anchor.y)} H ${r(riser.x)}`);
+
+  const xs = risers.map((riser) => riser.x);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  if (maxX > minX) {
+    segments.push(`M ${r(minX)} ${r(yt)} H ${r(maxX)}`);
+  }
+  for (const riser of risers) {
+    if (Math.abs(riser.y - yt) > 0.5) {
+      segments.push(`M ${r(riser.x)} ${r(riser.y)} V ${r(yt)}`);
+    }
   }
 
-  const minX = Math.min(...anchors.map((anchor) => anchor.point.x));
-  const maxX = Math.max(...anchors.map((anchor) => anchor.point.x));
-  const trunkY = Math.round(anchors.reduce((sum, anchor) => sum + anchor.point.y, 0) / anchors.length) - 18;
   return {
     name,
-    kind: "bus",
-    anchorRefs: anchors.map((anchor) => anchor.ref),
-    segments: [
-      `M ${minX} ${trunkY} H ${maxX}`,
-      ...anchors.map((anchor) => `M ${anchor.point.x} ${anchor.point.y} V ${trunkY}`),
-    ],
-    label: { x: minX + 4, y: trunkY - 8 },
+    kind: pins.length > 2 ? "bus" : "wire",
+    anchorRefs: pins.map((pin) => pin.ref),
+    segments,
+    label: { x: r(minX + 4), y: r(yt - 6) },
   };
+}
+
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+function r(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function parsePinRef(ref: string): { componentId: string; pinName: string } | null {
@@ -194,42 +313,6 @@ function makeDiagnostic(
   const componentId = ref.includes(".") ? ref.split(".")[0] : "";
   const point = modelById.get(componentId)?.point ?? { x: 24, y: 24 };
   return { kind, ref, net, visible: true, point, message };
-}
-
-function normalizePositions(circuit: OhmaticCircuitV01): Map<string, Point> {
-  // Coerce non-finite coordinates (a half-finished layout stage can emit NaN/null)
-  // to 0 so they never leak into "M NaN ..." paths that silently drop a component.
-  const coords = circuit.components.map((component) => ({
-    id: component.id,
-    x: Number.isFinite(component.x) ? component.x : 0,
-    y: Number.isFinite(component.y) ? component.y : 0,
-  }));
-  const xs = coords.map((c) => c.x);
-  const ys = coords.map((c) => c.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  // Every component at one coordinate (e.g. all-zero layout) would collapse onto a
-  // single point; lay them out in a readable row by index instead of one pile.
-  if (coords.length > 1 && maxX === minX && maxY === minY) {
-    const span = Math.max(coords.length - 1, 1);
-    return new Map(coords.map((c, index) => [c.id, { x: 52 + (index / span) * 256, y: 107 }]));
-  }
-
-  const spanX = Math.max(maxX - minX, 1);
-  const spanY = Math.max(maxY - minY, 1);
-
-  return new Map(
-    coords.map((c) => [
-      c.id,
-      {
-        x: 52 + ((c.x - minX) / spanX) * 256,
-        y: 64 + ((c.y - minY) / spanY) * 86,
-      },
-    ])
-  );
 }
 
 function distributePinAnchor(point: Point, pinNames: string[], pinName: string): Point {
