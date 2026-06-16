@@ -110,9 +110,32 @@ function buildComponentModel(component: CircuitComponent, point: Point): Schemat
   const pinNames = Object.keys(component.pins);
   const anchors: Record<string, Point> = {};
 
+  // Track occupied anchor offsets so a distributed (unmapped) pin can never land on
+  // a mapped pin's anchor: two pins at one point would overlap two different nets.
+  const occupied = new Set<string>();
+  const slot = (p: Point) => `${Math.round(p.x - point.x)},${Math.round(p.y - point.y)}`;
+
+  const unmapped: string[] = [];
   pinNames.forEach((pinName) => {
     const spec = entry.anchors[pinName] ?? entry.anchors[pinName.toUpperCase()] ?? entry.anchors[pinName.toLowerCase()];
-    anchors[pinName] = spec ? offset(point, ANCHOR_POINTS[spec]) : distributePinAnchor(point, pinNames, pinName);
+    if (spec) {
+      const anchor = offset(point, ANCHOR_POINTS[spec]);
+      anchors[pinName] = anchor;
+      occupied.add(slot(anchor));
+    } else {
+      unmapped.push(pinName);
+    }
+  });
+
+  unmapped.forEach((pinName) => {
+    let anchor = distributePinAnchor(point, pinNames, pinName);
+    // Nudge down a row at a time until the slot is free (keeps the column, avoids
+    // overlap). Bounded so a pathological pin count can never spin.
+    for (let guard = 0; occupied.has(slot(anchor)) && guard < 16; guard += 1) {
+      anchor = { x: anchor.x, y: anchor.y + 12 };
+    }
+    anchors[pinName] = anchor;
+    occupied.add(slot(anchor));
   });
 
   return {
@@ -174,21 +197,36 @@ function makeDiagnostic(
 }
 
 function normalizePositions(circuit: OhmaticCircuitV01): Map<string, Point> {
-  const xs = circuit.components.map((component) => component.x);
-  const ys = circuit.components.map((component) => component.y);
+  // Coerce non-finite coordinates (a half-finished layout stage can emit NaN/null)
+  // to 0 so they never leak into "M NaN ..." paths that silently drop a component.
+  const coords = circuit.components.map((component) => ({
+    id: component.id,
+    x: Number.isFinite(component.x) ? component.x : 0,
+    y: Number.isFinite(component.y) ? component.y : 0,
+  }));
+  const xs = coords.map((c) => c.x);
+  const ys = coords.map((c) => c.y);
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
+
+  // Every component at one coordinate (e.g. all-zero layout) would collapse onto a
+  // single point; lay them out in a readable row by index instead of one pile.
+  if (coords.length > 1 && maxX === minX && maxY === minY) {
+    const span = Math.max(coords.length - 1, 1);
+    return new Map(coords.map((c, index) => [c.id, { x: 52 + (index / span) * 256, y: 107 }]));
+  }
+
   const spanX = Math.max(maxX - minX, 1);
   const spanY = Math.max(maxY - minY, 1);
 
   return new Map(
-    circuit.components.map((component) => [
-      component.id,
+    coords.map((c) => [
+      c.id,
       {
-        x: 52 + ((component.x - minX) / spanX) * 256,
-        y: 64 + ((component.y - minY) / spanY) * 86,
+        x: 52 + ((c.x - minX) / spanX) * 256,
+        y: 64 + ((c.y - minY) / spanY) * 86,
       },
     ])
   );

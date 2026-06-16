@@ -25,6 +25,8 @@ const unknownSvg = {
 } satisfies Record<SymbolStyle, string>;
 
 const anchorOverrides: Partial<Record<KnownComponentType, Record<string, AnchorSpec>>> = {
+  // A/1 and B/2 are alias names for the same two terminals (letter vs numeric
+  // netlists), never both present at once, so they intentionally share a side.
   potentiometer: { A: "left", W: "top", B: "right", ...twoPin },
   led_rgb: { R: "left-top", G: "left", B: "left-bottom", COM: "right" },
   diode_bridge: { AC1: "left", AC2: "right", "+": "top", "-": "bottom" },
@@ -40,11 +42,15 @@ const anchorOverrides: Partial<Record<KnownComponentType, Record<string, AnchorS
   relay: { A1: "left-top", A2: "left-bottom", COM: "right", NO: "right-top", NC: "right-bottom" },
   relay_solid_state: { "IN+": "left-top", "IN-": "left-bottom", "OUT+": "right-top", "OUT-": "right-bottom" },
   transformer: { P1: "left-top", P2: "left-bottom", S1: "right-top", S2: "right-bottom" },
-  ic_opamp: { "IN+": "left-bottom", "IN-": "left-top", OUT: "right", VCC: "top", VEE: "bottom", GND: "bottom" },
+  // VEE and GND are distinct rails on a split-supply op-amp, so they need distinct
+  // sides: two pins on one anchor would stack two different nets at one point.
+  ic_opamp: { "IN+": "left-bottom", "IN-": "left-top", OUT: "right", VCC: "top", VEE: "bottom", GND: "right-bottom" },
   ic_comparator: { "IN+": "left-bottom", "IN-": "left-top", OUT: "right", VCC: "top", GND: "bottom" },
   ic_regulator: { VIN: "left", VOUT: "right", GND: "bottom", ADJ: "right-bottom" },
   ic_battery_charger: { VIN: "left", VBAT: "right", GND: "bottom", ISET: "left-bottom", STAT: "right-bottom", EN: "left-top" },
   ic_protection: { VDD: "top", GND: "bottom", SENSE: "left", GATE: "right" },
+  // +/1 and -/2 are alias names for the same two terminals; mutually exclusive in
+  // a netlist, so the shared sides are intentional rather than an overlap.
   battery: { "+": "top", "-": "bottom", "1": "top", "2": "bottom" },
   power_gnd: { "1": "top" },
   power_vee: { "1": "top" },
@@ -56,7 +62,9 @@ const anchorOverrides: Partial<Record<KnownComponentType, Record<string, AnchorS
   servo: { VCC: "left-top", GND: "left-bottom", SIG: "right" },
   antenna: { RF: "bottom", GND: "left-bottom" },
   microphone: { OUT: "right", GND: "bottom", VCC: "top" },
-  sensor: { VCC: "top", GND: "bottom", OUT: "right", SIG: "right" },
+  // OUT (analog) and SIG (digital) are separate pins on many sensors; keep them on
+  // distinct sides so each routes to its own anchor instead of overlapping.
+  sensor: { VCC: "top", GND: "bottom", OUT: "right", SIG: "right-bottom" },
 };
 
 function defaultAnchors(type: KnownComponentType): Record<string, AnchorSpec> {
