@@ -837,6 +837,16 @@ textarea:disabled {
 .empty-schematic {
   display: block;
   width: 100%;
+}
+
+/* Size to the circuit's own canvas (intrinsic viewBox aspect) so every schematic
+   fills its width with its natural height -- no letterboxing into a fixed box. */
+.schematic-svg {
+  height: auto;
+}
+
+/* The placeholder has no viewBox, so it keeps a fixed shape. */
+.empty-schematic {
   aspect-ratio: 12 / 7;
 }
 
@@ -2336,8 +2346,8 @@ body::after  { top: 14px; right: 14px; }
   grid-template-columns: 1fr;
   gap: 1.1rem;
 }
-.schematic-frame { min-height: clamp(380px, 52vh, 640px); display: flex; }
-.schematic-frame > * { flex: 1; }
+.schematic-frame { min-height: clamp(380px, 52vh, 640px); display: grid; place-items: center; }
+.schematic-frame > * { width: 100%; }
 .inspector-panel .tab-panel { max-width: 100%; }
 .inspector-panel table { width: 100%; max-width: 980px; }
 .inspector-panel .json-panel pre { max-height: 420px; }
@@ -2517,15 +2527,6 @@ body::after  { top: 14px; right: 14px; }
   text-shadow: 0 0 8px rgba(255, 208, 114, 0.4);
 }
 .stage-trace.is-done .stage-trace-pct { color: var(--phosphor); }
-/* Secondary readout (ETA / stage + elapsed) trails the headline percent, muted
-   so the percentage done stays the focal number. */
-.stage-trace-pct-sub {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--silk-dim);
-  letter-spacing: 0.02em;
-  text-shadow: none;
-}
 
 /* correction loopback: return bus + counter */
 .stage-loop-base {
@@ -2561,3 +2562,5 @@ body::after  { top: 14px; right: 14px; }
   color: var(--led-amber);
   text-shadow: 0 0 6px rgba(255, 177, 69, 0.45);
 }
+
+.stage-trace-pct.is-elapsed { color: var(--silk-dim); text-shadow: none; }
