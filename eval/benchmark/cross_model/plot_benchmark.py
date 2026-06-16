@@ -6,7 +6,7 @@ Horizontal stacked bars: green = delivered & passes ERC, gold = killswitch refus
     python -m eval.benchmark.cross_model.plot_benchmark
 
 Numbers are the verified-clean counts per leg (full 75-prompt realuser suite):
-  bf16  70/75   Fable5 57/75   Q4_K_M 54/75   (Q4 from the T4/llama.cpp leg).
+  bf16  70/75   Fable5 57/75   Q4_K_M 54/75   base 3/75   (Q4 from the T4/llama.cpp leg).
 """
 from __future__ import annotations
 import math
@@ -25,6 +25,7 @@ MODELS = [
     ("Ohmatic bf16\nfull pipeline · 8B",      70, 75, "blocked"),
     ("Claude Fable 5\nfrontier · single-shot", 57, 75, "broken"),
     ("Ohmatic Q4_K_M\nGGUF quant",                 54, 75, "blocked"),
+    ("Qwen3-8B base\nuntrained · single-shot",  3, 75, "broken"),
 ]
 
 
@@ -36,7 +37,7 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return (c - h) * 100, (c + h) * 100
 
 
-fig, ax = plt.subplots(figsize=(14.2, 5.6), dpi=150)
+fig, ax = plt.subplots(figsize=(14.2, 7.0), dpi=150)
 fig.patch.set_facecolor(BG); ax.set_facecolor(BG)
 ys = list(range(len(MODELS)))[::-1]   # first model on top
 
@@ -46,8 +47,13 @@ for y, (label, clean, total, kind) in zip(ys, MODELS):
     rest_color = RED if kind == "broken" else GOLD
     ax.barh(y, pct, color=GREEN, height=0.62, zorder=2)
     ax.barh(y, rest, left=pct, color=rest_color, height=0.62, zorder=2)
-    ax.text(pct / 2, y, f"{pct:.1f}% verified-clean", ha="center", va="center",
-            color="#0d1117" if pct > 40 else FG, fontsize=15, fontweight="bold", zorder=4)
+    lo, hi = wilson(clean, total)
+    if pct >= 25:
+        ax.text(pct / 2, y, f"{pct:.1f}% verified-clean", ha="center", va="center",
+                color="#0d1117" if pct > 40 else FG, fontsize=15, fontweight="bold", zorder=6)
+    else:                                  # green sliver too small for the label - place it past the CI whisker
+        ax.text(hi + 2.5, y, f"{pct:.1f}% verified-clean", ha="left", va="center",
+                color="#ffffff", fontsize=13.5, fontweight="bold", zorder=6)
     if kind == "broken":
         ax.text(pct + rest / 2, y, f"{rest:.0f}% BROKEN\ndelivered to user", ha="center",
                 va="center", color="#ffffff", fontsize=11.5, fontweight="bold", zorder=4)
@@ -55,7 +61,6 @@ for y, (label, clean, total, kind) in zip(ys, MODELS):
         ax.text(pct + rest / 2, y, f"{rest:.0f}%\nblocked", ha="center", va="center",
                 color="#0d1117", fontsize=11.5, fontweight="bold", zorder=4)
     ax.text(101.5, y, f"n={total}", ha="left", va="center", color=MUTED, fontsize=12)
-    lo, hi = wilson(clean, total)
     ax.errorbar(pct, y, xerr=[[pct - lo], [hi - pct]], fmt="none", ecolor="#ffffff",
                 elinewidth=2, capsize=6, capthick=2, zorder=5)
 

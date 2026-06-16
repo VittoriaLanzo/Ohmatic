@@ -29,13 +29,13 @@ model can't get there within its retry budget, the product refuses and asks you 
 than handing you a guess.
 
 <p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 72.0% verified-clean, both with zero broken deliveries (killswitch refusals instead) vs Claude Fable 5 76.0% with 24% broken circuits delivered to the user" width="900" />
+  <img src="assets/benchmark.png" alt="Benchmark: Ohmatic bf16 93.3% verified-clean and Ohmatic Q4_K_M quant 72.0% verified-clean, both with zero broken deliveries (killswitch refusals instead), vs Claude Fable 5 76.0% with 24% broken circuits delivered, and the untrained Qwen3-8B base at just 4.0% verified-clean with 96% broken circuits delivered" width="100%" />
 </p>
 
 > Across a 75-prompt benchmark run end-to-end through the full pipeline, the 8B fine-tune delivered
 > **0 broken circuits** (93.3% verified-clean; the rest withheld as clarification requests). Claude
 > Fable 5, evaluated on the identical prompts zero-context and single-shot, delivered **18 broken
-> circuits (24%)**. Methodology, the full table, and reproduce steps are in
+> circuits (24%)**. Methodology and reproduce steps are in
 > [Benchmark](#benchmark) below.
 
 ## How it works
@@ -50,32 +50,12 @@ product refuses and asks for clarification; the unverified candidate is withheld
 **not** in the evaluation, overlap-checked against all training data), run end-to-end through the
 full product pipeline. Verified by the same ERC engine that gates production.
 
-<table>
-  <tr>
-    <th>model</th><th>N</th><th>delivered clean</th><th>95% CI</th>
-    <th>blocked by killswitch</th><th><b>broken circuits delivered</b></th>
-  </tr>
-  <tr>
-    <td><b>Ohmatic bf16</b> (full pipeline, 8B)</td><td>75</td>
-    <td><b>93.3%</b></td><td>85.3 - 97.1%</td><td>6.7%</td>
-    <td><b>0 (none)</b></td>
-  </tr>
-  <tr>
-    <td>Claude Fable 5 (frontier, single-shot)</td><td>75</td>
-    <td>76.0%</td><td>65.2 - 84.2%</td><td>n/a (no killswitch)</td>
-    <td><b>18 (24%)</b></td>
-  </tr>
-  <tr>
-    <td><b>Ohmatic Q4_K_M</b> (GGUF quant)</td><td>75</td>
-    <td>72.0%</td><td>61.0 - 80.9%</td><td>28.0%</td>
-    <td><b>0 (none)</b></td>
-  </tr>
-</table>
-
-<sub>Wilson 95% intervals; identical prompts, identical verifier for every row. <b>The 8B
+<sub>Wilson 95% intervals; identical prompts, identical verifier for every model. <b>The 8B
 fine-tune beats the frontier model it was benchmarked against</b>, paired McNemar on the same 75
 prompts: Ohmatic-only-clean 17 vs Fable-only-clean 4, exact p = 0.007, <b>while delivering zero
-broken circuits</b>; the frontier model, with no verification loop, handed the user 18.
+broken circuits</b>; the frontier model, with no verification loop, handed the user 18. The same Qwen3-8B base,
+untrained and single-shot, delivers just 4.0% verified-clean and 96% broken on these prompts, so the
+lift is the training, not the base model.
 Quantization degrades the generator (killswitch fires ~4× more); in this run the quality loss
 surfaced as more refusals, not broken deliveries. Fable 5 was evaluated
 zero-context (fresh instance per prompt, no repo or conversation access, default decoding,
