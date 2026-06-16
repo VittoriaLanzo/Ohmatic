@@ -28,6 +28,9 @@ frontend/vite.config.js
 frontend/vite.config.d.ts
 frontend/.env.local
 
+# Internal-only dev tools (not part of the shipped build; kept out of the launch repo)
+frontend/internal-tools/
+
 # Rust
 target/
 
