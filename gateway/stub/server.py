@@ -173,8 +173,12 @@ def _demo_examples() -> dict:
     return _DEMO_CACHE
 
 
-def _demo_circuit(prompt: str) -> dict | None:
-    """The canned circuit for an example prompt or an 'example N' alias, else None."""
+def _demo_circuit(prompt: str) -> tuple[str, dict] | None:
+    """For an example prompt or an 'example N' alias: (job id, circuit), else None.
+
+    The id is a stable 'pre-generated-N' rather than a random hex, so the UI shows
+    these as the pre-verified reference circuits they are -- not a fresh run (a real
+    CPU generation takes over an hour)."""
     text = prompt.strip()
     title = _DEMO_PROMPTS.get(text)
     if title is None:
@@ -184,9 +188,12 @@ def _demo_circuit(prompt: str) -> dict | None:
     if title is None:
         return None
     try:
-        return _demo_examples().get(title)
+        circuit = _demo_examples().get(title)
     except Exception:
         return None
+    if circuit is None:
+        return None
+    return f"pre-generated-{_DEMO_TITLES.index(title) + 1}", circuit
 
 
 def _parts_list_for(circuit_flat: dict) -> tuple[list, int]:
@@ -403,12 +410,12 @@ class Handler(BaseHTTPRequestHandler):
             # required (works even with no weights installed).
             demo = _demo_circuit(prompt)
             if demo is not None:
-                job_id = uuid.uuid4().hex[:12]
-                parts_list, parts_ms = _parts_list_for(demo)
+                job_id, circuit = demo
+                parts_list, parts_ms = _parts_list_for(circuit)
                 JOBS[job_id] = {
                     "status": "done", "stage": None, "t0": time.time(),
                     "progress": 1.0, "loops": 0, "error": None,
-                    "result": {"circuit": demo, "drc_warnings": [], "bom": [],
+                    "result": {"circuit": circuit, "drc_warnings": [], "bom": [],
                                "parts_list": parts_list,
                                "latency_ms": {"inference": 0, "drc": 0, "bom": 0, "parts_list": parts_ms}},
                 }
