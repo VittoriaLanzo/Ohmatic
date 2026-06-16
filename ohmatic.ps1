@@ -52,8 +52,7 @@ $runDir = Join-Path $root ".ohmatic-run"
 $Services = @(
   @{ Name = "gateway";   Dir = (Join-Path $root "gateway/stub");   Port = 8080 },
   @{ Name = "inference"; Dir = (Join-Path $root "inference/stub"); Port = 8001 },
-  @{ Name = "verifier";  Dir = (Join-Path $root "verifier/stub");  Port = 8002 },
-  @{ Name = "enricher";  Dir = (Join-Path $root "enricher/stub");  Port = 8003 }
+  @{ Name = "verifier";  Dir = (Join-Path $root "verifier/stub");  Port = 8002 }
 )
 
 # ---------------------------------------------------------------------------
@@ -444,7 +443,7 @@ function Invoke-Doctor {
   }
 
   # --- Ports ---
-  $ports = @(8080, 8001, 8002, 8003, $Port)
+  $ports = @(8080, 8001, 8002, $Port)
   $busy = @()
   foreach ($p in $ports) { if (-not (Test-PortFree $HostName $p)) { $busy += $p } }
   if ($busy.Count -eq 0) { Write-Ok "ports     $($ports -join ', ') all free" }

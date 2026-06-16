@@ -17,8 +17,6 @@ services:
         condition: service_started
       verifier:
         condition: service_started
-      enricher:
-        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 5s
@@ -53,22 +51,6 @@ services:
       - ohmatic
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-
-  enricher:
-    image: python:3.11.9-slim
-    command: python3 /app/server.py
-    working_dir: /app
-    volumes:
-      - ./enricher/stub:/app
-    restart: on-failure
-    networks:
-      - ohmatic
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
       interval: 5s
       timeout: 3s
       retries: 5

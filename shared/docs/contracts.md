@@ -159,7 +159,7 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 
 ## 3. GET /health
 
-**Service:** all four services (gateway :8080, inference :8001, verifier :8002, enricher :8003)
+**Service:** all three services (gateway :8080, inference :8001, verifier :8002)
 
 Liveness probe for Docker health checks and load balancer readiness.
 
@@ -287,26 +287,19 @@ Two sub-cases, distinguished by rule ID prefix:
 
 ---
 
-## 6. POST /enrich
+## 6. Parts List (gateway-internal)
 
-**Service:** enricher (internal, port 8003)
+**Service:** gateway (built in-process; no separate service or port)
 
-Builds a deterministic local parts list for a verified circuit: one row per component,
-derived entirely from `verifier/config/component_registry.toml`. No network calls, no
-supplier lookups, no pricing. The output is byte-stable for a given circuit, so it can be
-cached and diffed.
+For every successful job the gateway builds a deterministic local parts list: one row per
+component, derived entirely from `verifier/config/component_registry.toml`. No network
+calls, no supplier lookups, no pricing. The output is byte-stable for a given circuit, so
+it can be cached and diffed, and it appears as `result.parts_list` in the job status
+response (§2).
 
-### Request
+### Example
 
-```json
-{
-  "circuit": { "...": "OhmaticCircuitV01 object" }
-}
-```
-
-### Response 200: OK
-
-Returns one `PartsListRow` per component in the same order as `circuit.components`.
+One `PartsListRow` per component, in the same order as `circuit.components`.
 
 ```json
 [
@@ -347,22 +340,18 @@ Returns one `PartsListRow` per component in the same order as `circuit.component
 | `description` | string | Human-readable summary: `parts_list_part value package`, space-joined, blanks dropped. |
 | `is_physical` | boolean | `true` for orderable parts; `false` for schematic-only symbols (power, ground). |
 | `buyable` | boolean | Whether the row can be ordered. Equal to `is_physical` in Stage 0. |
-| `match_status` | string | Resolution state. Always `"local_only"` from the registry-only enricher. |
+| `match_status` | string | Resolution state. Always `"local_only"` from the registry-only builder. |
 
-### Response 422: Unknown component type
-
-Returned when a component `type` has no entry in the component registry.
-
-```json
-{ "error": "unknown component type for parts_list: 'frobnicator'" }
-```
+If a component `type` is missing from the component registry, the gateway logs the gap and
+returns an empty `parts_list`; the job still succeeds and the UI falls back to
+circuit-derived rows.
 
 ### 6.1 Supplier resolution (separate step)
 
 Supplier matching, referral links, and any pricing are handled by the procurement layer
 (`POST /v1/procurement/matches`), which consumes a parts list and returns disclosed
-link-outs. By design the enricher never writes `supplier`, `mpn`, `price`, `url`, or any
-affiliate field onto parts-list rows or circuit JSON.
+link-outs. By design the parts-list builder never writes `supplier`, `mpn`, `price`,
+`url`, or any affiliate field onto parts-list rows or circuit JSON.
 
 ---
 
@@ -407,7 +396,7 @@ running instance.
 POST /v1/generate → inference returns circuit with metadata.version = "0.1"
 → gateway dispatches to verifier with circuit_v01 rule set
 → verifier returns { warnings: [], errors: [] }
-→ gateway proceeds to enricher
+→ gateway builds the local parts list (§6) and returns the job result
 ```
 
 **Unknown version rejection example:**
@@ -437,6 +426,6 @@ Forward-compatible: adding `circuit_v02.json` with a new rule set requires no ga
 5. Update the Tier 3 DRC rules in `shared/docs/contracts.md` if new electrical rules apply.
 6. Bump `metadata.version` only when introducing breaking schema changes (adding a field to components, changing a required field type). Adding a new type to the enum is additive and non-breaking; no version bump required.
 
-> **`/health` versioning note:** The `/health` endpoint on all four services is intentionally unversioned (no `/v1/` prefix). It is a liveness probe, not an API resource. All other endpoints are versioned under `/v1/`.
+> **`/health` versioning note:** The `/health` endpoint on all three services is intentionally unversioned (no `/v1/` prefix). It is a liveness probe, not an API resource. All other endpoints are versioned under `/v1/`.
 
 > **`additionalProperties` policy:** The JSON schema allows extra fields at the circuit root (`additionalProperties: true`) to support dataset annotation fields (e.g. `tier3_reviewed`). The `metadata` object is also open to allow tooling extensions. Only `Component` and `Net` objects are strict (`additionalProperties: false`). Do not rely on schema validation alone to reject unknown fields at the root or metadata level.
