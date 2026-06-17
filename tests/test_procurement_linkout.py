@@ -6,9 +6,9 @@ from unittest.mock import patch
 from shared.procurement import build_procurement_response
 
 ROWS = [
-    {"id": "C1", "buyable": True, "parts_list_part": "capacitor ceramic",
+    {"id": "C1", "is_part": True, "parts_list_part": "capacitor ceramic",
      "value": "100nF", "package": "0603"},
-    {"id": "GND1", "buyable": False, "parts_list_part": "power symbol"},
+    {"id": "GND1", "is_part": False, "parts_list_part": "power symbol"},
 ]
 
 

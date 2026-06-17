@@ -42,8 +42,7 @@ const resultWithPartsList = {
       value: "5V",
       package: "VCC",
       description: "power_vcc 5V VCC",
-      is_physical: false,
-      buyable: false,
+      is_part: false,
       match_status: "local_only"
     },
     {
@@ -53,8 +52,7 @@ const resultWithPartsList = {
       value: "10k",
       package: "0603",
       description: "resistor 10k 0603",
-      is_physical: true,
-      buyable: true,
+      is_part: true,
       match_status: "local_only"
     }
   ],
@@ -69,8 +67,8 @@ describe("ResultPanels parts list", () => {
 
     expect(screen.getByText("VCC1")).toBeInTheDocument();
     expect(screen.getByText("R1")).toBeInTheDocument();
-    expect(screen.getByText("not buyable")).toBeInTheDocument();
-    expect(screen.getByText("buyable")).toBeInTheDocument();
+    expect(screen.getByText("power rail")).toBeInTheDocument();
+    expect(screen.getByText("part")).toBeInTheDocument();
     expect(screen.queryByText("MPN")).not.toBeInTheDocument();
     expect(screen.queryByText("Price")).not.toBeInTheDocument();
     expect(screen.queryByText("matched")).not.toBeInTheDocument();

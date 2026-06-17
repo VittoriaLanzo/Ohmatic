@@ -12,8 +12,7 @@ const PARTS: PartsListRow[] = [
     value: "100nF",
     package: "0603",
     description: "capacitor 100nF 0603",
-    is_physical: true,
-    buyable: true,
+    is_part: true,
     match_status: "local_only"
   }
 ];

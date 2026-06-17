@@ -69,16 +69,13 @@ def test_parts_list_is_deterministic_and_preserves_component_order():
     assert [row["id"] for row in first] == ["VCC1", "R1", "U1", "GND1"]
 
 
-def test_parts_list_marks_non_physical_symbols_not_buyable():
+def test_parts_list_marks_power_rail_symbols_as_non_parts():
     rows = build_parts_list(_sample_circuit(), registry_path=REGISTRY)
 
     by_id = {row["id"]: row for row in rows}
-    assert by_id["VCC1"]["is_physical"] is False
-    assert by_id["VCC1"]["buyable"] is False
-    assert by_id["GND1"]["is_physical"] is False
-    assert by_id["GND1"]["buyable"] is False
-    assert by_id["R1"]["is_physical"] is True
-    assert by_id["R1"]["buyable"] is True
+    assert by_id["VCC1"]["is_part"] is False
+    assert by_id["GND1"]["is_part"] is False
+    assert by_id["R1"]["is_part"] is True
 
 
 def test_parts_list_uses_registry_parts_metadata_without_supplier_fields():
@@ -92,8 +89,7 @@ def test_parts_list_uses_registry_parts_metadata_without_supplier_fields():
         "value": "10k",
         "package": "0603",
         "description": "resistor 10k 0603",
-        "is_physical": True,
-        "buyable": True,
+        "is_part": True,
         "match_status": "local_only",
     }
     forbidden = {"supplier", "price_usd", "stock", "url", "affiliate_url", "api_key", "mpn"}

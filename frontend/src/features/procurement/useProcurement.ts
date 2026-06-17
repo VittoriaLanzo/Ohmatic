@@ -11,8 +11,8 @@ export type ProcurementState =
   | { status: "ready"; data: ProcurementResponse }
   | { status: "error"; message: string };
 
-/** Drives the online procurement lever. While the lever is off (or there is nothing buyable)
- *  it stays idle and makes no network call; when on it fetches disclosed supplier link-outs. */
+/** Drives the online procurement lever. While the lever is off (or there are no real parts to
+ *  source) it stays idle and makes no network call; when on it fetches disclosed supplier link-outs. */
 export function useProcurement(
   partsList: PartsListRow[] | undefined,
   online: boolean,
@@ -21,8 +21,8 @@ export function useProcurement(
   const [state, setState] = useState<ProcurementState>({ status: "idle" });
 
   useEffect(() => {
-    const buyable = (partsList ?? []).filter((row) => row.buyable);
-    if (!online || buyable.length === 0) {
+    const sourceable = (partsList ?? []).filter((row) => row.is_part);
+    if (!online || sourceable.length === 0) {
       setState({ status: "idle" });
       return;
     }

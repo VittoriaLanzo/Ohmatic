@@ -42,8 +42,8 @@ def _sample_circuit():
 def test_parts_list_for_returns_rows_in_component_order():
     rows, ms = GATEWAY._parts_list_for(_sample_circuit())
     assert [row["id"] for row in rows] == ["R1", "VCC1", "GND1"]
-    assert rows[0]["buyable"] is True   # resistor is physical
-    assert rows[1]["buyable"] is False  # power symbol is not buyable
+    assert rows[0]["is_part"] is True   # resistor is a real part
+    assert rows[1]["is_part"] is False  # power symbol is not a part
     assert ms >= 0
 
 
@@ -105,7 +105,7 @@ def test_procurement_matches_route_rejects_missing_parts_list():
 
 def test_procurement_matches_route_returns_disclosed_linkouts():
     parts = [
-        {"id": "C1", "buyable": True, "parts_list_part": "capacitor",
+        {"id": "C1", "is_part": True, "parts_list_part": "capacitor",
          "value": "100nF", "package": "0603"},
     ]
     with _Server() as server:

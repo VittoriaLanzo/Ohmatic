@@ -176,7 +176,7 @@ def build_linkout_response(
 ) -> dict[str, Any]:
     """Search-link procurement for LINKOUT_SUPPLIERS - no API, no credentials.
 
-    Each buyable parts_list row becomes one search deep-link. When the
+    Each real-part row (is_part true) becomes one search deep-link. When the
     supplier's affiliate wrap template is configured (program approved), the
     link is wrapped and carries the disclosure; otherwise it is a plain link.
     """
@@ -184,7 +184,7 @@ def build_linkout_response(
     wrap = _linkout_wrap_template(supplier)
     link_actions: list[dict[str, Any]] = []
     for row in parts_list:
-        if not row.get("buyable"):
+        if not row.get("is_part"):
             continue
         part_id = _string(row.get("id"))
         query = _query_for_parts_row(row)
@@ -255,7 +255,7 @@ def build_procurement_response(
     link_actions: list[dict[str, Any]] = []
 
     for row in parts_list:
-        if not row.get("buyable"):
+        if not row.get("is_part"):
             continue
         part_id = _string(row.get("id"))
         query = _query_for_parts_row(row)

@@ -41,8 +41,7 @@ def build_parts_list(
             "value": value,
             "package": package,
             "description": _description(metadata["parts_list_part"], value, package),
-            "is_physical": is_physical,
-            "buyable": is_physical,
+            "is_part": is_physical,
             "match_status": "local_only",
         }
         rows.append(row)

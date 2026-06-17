@@ -1,4 +1,4 @@
-import { AlertTriangle, Copy, FileJson, PackageSearch } from "lucide-react";
+import { AlertTriangle, Copy, FileJson, Info, PackageSearch } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { formatCurrency, formatMs } from "../lib/format";
@@ -150,9 +150,21 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
                     <th scope="row">{row.id}</th>
                     <td>{row.description}</td>
                     <td>
-                      <span className={`source-chip is-${row.buyable ? "buyable" : "symbol"}`}>
-                        {row.buyable ? "buyable" : "not buyable"}
-                      </span>
+                      {row.is_part ? (
+                        <span className="source-chip is-part">part</span>
+                      ) : (
+                        <span className="rail-status">
+                          <span className="source-chip is-rail">power rail</span>
+                          <button
+                            type="button"
+                            className="info-dot"
+                            aria-label="Schematic rail label, not a purchasable part"
+                            title="Schematic rail label, not a purchasable part"
+                          >
+                            <Info size={13} aria-hidden="true" />
+                          </button>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -211,7 +223,7 @@ export function ResultPanels({ result, phase }: ResultPanelsProps) {
                     ))}
                   </>
                 ) : (
-                  <p className="muted">No buyable parts to look up.</p>
+                  <p className="muted">No parts to look up.</p>
                 ))}
             </div>
           )}

@@ -43,8 +43,9 @@ export type PartsListRow = {
   value: string;
   package: string;
   description: string;
-  is_physical: boolean;
-  buyable: boolean;
+  /** True for a real component (a BOM line you source); false for a schematic
+   *  power/ground rail symbol, which is notation, not a purchasable part. */
+  is_part: boolean;
   match_status: string;
 };
 

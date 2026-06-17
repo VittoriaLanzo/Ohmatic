@@ -1161,6 +1161,44 @@ th {
   color: var(--steel);
 }
 
+.source-chip.is-part {
+  border-color: rgba(22, 163, 74, 0.34);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.source-chip.is-rail {
+  border-color: rgba(64, 94, 100, 0.3);
+  background: rgba(64, 94, 100, 0.1);
+  color: var(--steel);
+}
+
+.rail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: help;
+}
+
+.info-dot:hover,
+.info-dot:focus-visible {
+  color: var(--steel);
+  border-color: var(--steel);
+}
+
 /* ---- procurement opt-in lever (Parts tab) ---- */
 .proc-lever {
   margin: 0 0 16px;

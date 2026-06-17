@@ -15,8 +15,7 @@ def _parts_list():
             "value": "10k",
             "package": "0603",
             "description": "resistor 10k 0603",
-            "is_physical": True,
-            "buyable": True,
+            "is_part": True,
             "match_status": "local_only",
         },
         {
@@ -26,8 +25,7 @@ def _parts_list():
             "value": "5V",
             "package": "VCC",
             "description": "power_vcc 5V VCC",
-            "is_physical": False,
-            "buyable": False,
+            "is_part": False,
             "match_status": "local_only",
         },
     ]
