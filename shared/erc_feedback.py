@@ -1,14 +1,14 @@
 """
 shared/erc_feedback.py — single source of truth for the ERC correction-feedback message.
 
-GROUND TRUTH = the loopback TRAINING data. The loopback rows (built by
-dataset/scripts/build_erc_loopback_jsonl.py) presented ERC errors to the model in exactly
-this format, so prod serving (inference/pipeline.py) and eval (eval/benchmark/prod_eval.py)
-MUST format errors identically — otherwise the model is fed out-of-distribution feedback at
-correction time and the 2nd-shot capability underperforms what it actually learned.
+GROUND TRUTH = the correction-feedback format the model was trained on: the model saw ERC
+errors in exactly this format at training time, so prod serving (inference/pipeline.py) and
+eval (eval/benchmark/prod_eval.py) MUST format errors identically — otherwise the model is
+fed out-of-distribution feedback at correction time and the 2nd-shot capability underperforms
+what it actually learned.
 
-All three (data builder, serving pipeline, eval) import this one function so they can never
-drift — same discipline as shared/prompt_builder.build_system_prompt().
+Serving pipeline and eval both import this one function so they can never drift — same
+discipline as shared/prompt_builder.build_system_prompt().
 """
 from __future__ import annotations
 
