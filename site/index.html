@@ -6,17 +6,17 @@
     <title>Ohmatic: a compiler for circuits</title>
     <meta
       name="description"
-      content="Ohmatic compiles a plain-language circuit request into a schematic that passed a deterministic electrical rule checker, or it refuses and asks you to clarify. Local-first, source-available."
+      content="Ohmatic compiles a plain-language circuit request into a schematic that passed a deterministic electrical rule checker, or it returns a clarifying question. Local-first, source-available."
     />
     <link rel="canonical" href="https://vittorialanzo.github.io/Ohmatic/" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Ohmatic: a compiler for circuits" />
     <meta
       property="og:description"
-      content="LLMs generate text. Ohmatic compiles circuits. Local-first generation gated by a deterministic electrical rule checker: an unverified circuit is never delivered."
+      content="LLMs generate text. Ohmatic compiles circuits. Local-first generation gated by a deterministic electrical rule checker: an unverified circuit doesn't ship."
     />
     <meta property="og:image" content="https://vittorialanzo.github.io/Ohmatic/assets/benchmark.png" />
-    <meta name="theme-color" content="#0d1117" />
+    <meta name="theme-color" content="#0e231d" />
     <link rel="stylesheet" href="fonts.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -25,14 +25,12 @@
 
     <header class="nav">
       <div class="shell nav__inner">
-        <a class="wordmark" href="/" aria-label="Ohmatic home">
-          <span class="dot" aria-hidden="true"></span>OHMATIC
-        </a>
+        <a class="wordmark" href="/" aria-label="Ohmatic home"><span class="dot" aria-hidden="true"></span>OHMATIC</a>
         <nav class="nav__links" aria-label="Primary">
           <a href="#how">How it works</a>
+          <a href="#architecture">Architecture</a>
           <a href="#benchmark">Benchmark</a>
           <a href="#parts">Parts</a>
-          <a href="privacy.html">Privacy</a>
           <a class="ext" href="https://github.com/VittoriaLanzo/Ohmatic">GitHub</a>
         </nav>
       </div>
@@ -42,28 +40,70 @@
       <!-- HERO -->
       <section class="hero">
         <div class="shell">
-          <span class="badge"><span class="live" aria-hidden="true"></span> Local-first · source-available</span>
-          <h1>LLMs generate text. Ohmatic compiles circuits.</h1>
-          <p class="tagline">
-            A local model drafts the design. A deterministic electrical rule checker decides whether
-            you ever see it. Three retries, then it refuses and asks a question. A circuit that fails
-            ERC isn't a circuit, it's a bug report.
+          <span class="version-badge">Local-first &middot; source-available</span>
+
+          <div class="hero-logo">
+            <svg class="ohmatic-logo is-idle is-active" viewBox="0 0 380 100" role="img" aria-labelledby="logo-title">
+              <title id="logo-title">Ohmatic</title>
+              <defs>
+                <filter id="logo-glow" x="-20%" y="-80%" width="140%" height="260%">
+                  <feGaussianBlur stdDeviation="2.2" result="blur" />
+                  <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.290 0 0 0 0 0.870 0 0 0 0 0.500 0 0 0 0.86 0" />
+                  <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
+                <linearGradient id="logo-surge-gradient" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stop-color="#4ade80" stop-opacity="0" />
+                  <stop offset="42%" stop-color="#4ade80" stop-opacity="0.92" />
+                  <stop offset="56%" stop-color="#e8ede0" stop-opacity="1" />
+                  <stop offset="100%" stop-color="#4ade80" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <rect width="100%" height="100%" rx="8" fill="#0d1117" />
+              <rect class="logo-board-glow" x="1" y="1" width="378" height="98" rx="8" fill="none" />
+              <g class="logo-base">
+                <line x1="14" y1="80" x2="366" y2="80" stroke="#4ade80" stroke-width="0.5" opacity="0.3" />
+                <path d="M14 80 L22 80 L22 74 A32 32 0 1 1 62 74 L62 80 L70 80" stroke="#e8ede0" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                <line x1="80" y1="16" x2="80" y2="80" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <path d="M80 44 C80 28,118 28,118 80" stroke="#e8ede0" stroke-width="3" fill="none" stroke-linecap="round" />
+                <path d="M128 80 L146 20 L164 80 L182 20 L200 80" stroke="#e8ede0" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                <line x1="210" y1="80" x2="231" y2="16" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <line x1="252" y1="80" x2="231" y2="16" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <line x1="218" y1="56" x2="244" y2="56" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <line x1="277" y1="28" x2="277" y2="80" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <line x1="263" y1="44" x2="291" y2="44" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <circle cx="309" cy="14" r="3.5" fill="#e8ede0" class="logo-node" />
+                <line x1="309" y1="20" x2="309" y2="80" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <line x1="303" y1="80" x2="315" y2="80" stroke="#e8ede0" stroke-width="3" stroke-linecap="round" />
+                <path d="M325 40 L337 40 A30 30 0 0 1 337 76 L325 76" stroke="#e8ede0" stroke-width="3" fill="none" stroke-linecap="round" />
+                <circle cx="99" cy="34" r="4.5" fill="#4ade80" class="logo-node" />
+                <circle cx="146" cy="20" r="4" fill="#4ade80" class="logo-node" />
+                <circle cx="182" cy="20" r="4" fill="#4ade80" class="logo-node" />
+                <circle cx="231" cy="16" r="4.5" fill="#4ade80" class="logo-node" />
+                <circle cx="277" cy="44" r="4" fill="#4ade80" class="logo-node" />
+              </g>
+              <g class="logo-current" aria-hidden="true">
+                <path class="spark spark-baseline" pathLength="1" d="M14 80 L366 80" />
+                <path class="spark spark-omega" pathLength="1" d="M14 80 L22 80 L22 74 A32 32 0 1 1 62 74 L62 80 L70 80" />
+                <path class="spark spark-h" pathLength="1" d="M80 16 L80 80 M80 44 C80 28,118 28,118 80" />
+                <path class="spark spark-m" pathLength="1" d="M128 80 L146 20 L164 80 L182 20 L200 80" />
+                <path class="spark spark-a" pathLength="1" d="M210 80 L231 16 L252 80 M218 56 L244 56" />
+                <path class="spark spark-t" pathLength="1" d="M277 28 L277 80 M263 44 L291 44" />
+                <path class="spark spark-i" pathLength="1" d="M309 20 L309 80 M303 80 L315 80" />
+                <path class="spark spark-c" pathLength="1" d="M325 40 L337 40 A30 30 0 0 1 337 76 L325 76" />
+              </g>
+            </svg>
+          </div>
+
+          <p class="tagline">LLMs generate text. Ohmatic compiles circuits.</p>
+          <p class="tagline" style="font-size: 1rem; color: var(--silk-dim); max-width: 52ch">
+            A local model drafts the design; a deterministic rule checker decides whether you ever see it.
           </p>
           <p class="kicker">Compiles clean, or it doesn't ship.</p>
+
           <div class="cta-row">
-            <a class="btn btn--primary" href="https://github.com/VittoriaLanzo/Ohmatic">
-              View on GitHub
-            </a>
+            <a class="btn btn--primary" href="https://github.com/VittoriaLanzo/Ohmatic">View on GitHub</a>
             <a class="btn btn--ghost" href="#how">See how it works</a>
           </div>
-          <figure class="screen">
-            <img
-              src="assets/ohmaticanim.gif"
-              alt="Ohmatic generating a schematic from a typed prompt and validating it through the rule checker"
-              loading="lazy"
-              decoding="async"
-            />
-          </figure>
         </div>
       </section>
 
@@ -71,19 +111,57 @@
       <section id="how">
         <div class="shell">
           <span class="eyebrow">How it works</span>
-          <h2>A verifier sits between the model and you</h2>
+          <h2>A verifier between the model and your board</h2>
           <p>
-            Every candidate design is validated by a deterministic electrical rule checker before it
-            can reach you. If the model can't produce a passing design within its correction budget,
-            Ohmatic refuses and asks for clarification. The broken candidate stays internal.
+            Every candidate design is checked by a deterministic electrical rule checker before it can
+            reach you. If the model cannot reach a passing design within its retry budget, Ohmatic
+            returns a clarifying question instead, and the broken draft stays in the box.
           </p>
-          <ol class="stages" aria-label="Pipeline stages">
-            <li class="stage"><b>Normalize</b><span>A fine-tuned T5 maps any phrasing onto the model's trained input; a faithfulness gate re-attaches dropped specifics.</span></li>
-            <li class="stage"><b>Generate</b><span>A fine-tuned Qwen3-8B emits a two-stage circuit: topology, then spatial layout.</span></li>
+
+          <div class="stage-trace" aria-hidden="true">
+            <svg viewBox="0 0 1000 72" preserveAspectRatio="none">
+              <path class="stage-trace-base" d="M60 26 H180 L210 12 H300 L330 26 H540 L570 40 H650 L680 26 H850 L880 12 H922 L952 26" pathLength="1" />
+              <path class="stage-loop-base" d="M700 34 V58 H380 V34" pathLength="1" />
+              <path class="stage-loop-lit" d="M700 34 V58 H380 V34" pathLength="1" />
+              <path class="stage-trace-lit" d="M60 26 H180 L210 12 H300 L330 26 H540 L570 40 H650 L680 26 H850 L880 12 H922 L952 26" pathLength="1" />
+              <path class="stage-trace-glowhead" d="M60 26 H180 L210 12 H300 L330 26 H540 L570 40 H650 L680 26 H850 L880 12 H922 L952 26" pathLength="1" />
+              <g><circle cx="60" cy="26" r="7" class="stage-pad-ring" /><circle cx="60" cy="26" r="3" class="stage-pad-core" /></g>
+              <g><circle cx="380" cy="26" r="7" class="stage-pad-ring" /><circle cx="380" cy="26" r="3" class="stage-pad-core" /></g>
+              <g><circle cx="700" cy="26" r="7" class="stage-pad-ring" /><circle cx="700" cy="26" r="3" class="stage-pad-core is-pulse" /></g>
+              <g><circle cx="952" cy="26" r="7" class="stage-pad-ring" /><circle cx="952" cy="26" r="3" class="stage-pad-core" /></g>
+            </svg>
+            <div class="stage-trace-labels">
+              <span style="left: 6%">Normalize</span>
+              <span style="left: 38%">Generate</span>
+              <span style="left: 70%">Verify</span>
+              <span style="left: 95.2%">Deliver</span>
+            </div>
+            <span class="loop-tag">&#x27F2; correction loop &middot; Verify back to Generate</span>
+          </div>
+
+          <ol class="stages">
+            <li class="stage"><b>Normalize</b><span>A fine-tuned T5 rewrites any phrasing onto the model's trained input, then re-attaches the specifics it dropped.</span></li>
+            <li class="stage"><b>Generate</b><span>A fine-tuned Qwen3-8B emits a two-stage circuit: topology first, then spatial layout.</span></li>
             <li class="stage"><b>Verify</b><span>The ERC engine checks connectivity, power integrity, pin legality, and structure.</span></li>
-            <li class="stage"><b>Correct</b><span>On failure the model receives the findings and repairs its own design, up to 3 rounds.</span></li>
-            <li class="stage"><b>Refuse</b><span>Retries exhausted → a clarification request, never an unverified schematic.</span></li>
+            <li class="stage"><b>Correct</b><span>On a failure the model receives the findings and repairs its own design, up to three rounds.</span></li>
+            <li class="stage is-refuse"><b>Refuse</b><span>Out of retries, it returns a clarifying question. The broken candidate stays internal.</span></li>
           </ol>
+        </div>
+      </section>
+
+      <!-- ARCHITECTURE -->
+      <section id="architecture">
+        <div class="shell">
+          <span class="eyebrow">Architecture</span>
+          <h2>Five stages, wrapped in a local service layer</h2>
+          <p>
+            Normalize, Generate, Verify, Correct, Refuse. An amber self-correction loop feeds the
+            rule-checker findings back to the model; a red killswitch returns a clarifying question
+            when the retries run out.
+          </p>
+          <figure class="diagram">
+            <img src="assets/architecture.png" alt="Ohmatic pipeline drawn as a PCB board: Normalize via T5, Generate via Qwen3-8B, Verify via the ERC engine, then Deliver, with an amber self-correction loop from Verify back to Generate and a red killswitch branch that asks the user to clarify when retries are exhausted" loading="lazy" decoding="async" />
+          </figure>
         </div>
       </section>
 
@@ -94,110 +172,99 @@
             <span class="eyebrow">Benchmark</span>
             <h2>An 8B fine-tune. Zero broken across 75 prompts.</h2>
             <p>
-              75 messy, underspecified, real-user prompts, authored by a model that is not in the
-              evaluation, run end-to-end through the full pipeline and verified by the same engine
-              that gates production.
+              75 messy, underspecified, real-user prompts, authored by a model outside the evaluation,
+              run end to end through the full pipeline and verified by the same engine that gates
+              production.
             </p>
             <div class="stat-row">
               <div class="stat"><div class="n good">93.3%</div><div class="l">delivered clean (Ohmatic bf16)</div></div>
               <div class="stat"><div class="n good">0</div><div class="l">broken circuits delivered</div></div>
-              <div class="stat"><div class="n bad">24%</div><div class="l">broken circuits the frontier model delivered</div></div>
+              <div class="stat"><div class="n bad">24%</div><div class="l">broken circuits delivered by Claude Fable 5</div></div>
             </div>
-            <p class="muted" style="color: var(--muted); font-size: 0.86rem">
-              Wilson 95% intervals; identical prompts and identical verifier per row. Quality loss
-              converts to reduced availability (more clarification requests), never to bad output.
+            <p style="font-size: 0.82rem">
+              Wilson 95% intervals; identical prompts and the same verifier for every row. Claude Fable 5
+              was evaluated zero-context and single-shot, without Ohmatic's correction loop. Quality loss
+              shows up as fewer deliveries, not as bad output.
+              <a href="https://github.com/VittoriaLanzo/Ohmatic#benchmark">Full methodology &rarr;</a>
             </p>
           </div>
           <figure>
-            <img
-              class="bench-img"
-              src="assets/benchmark.png"
-              alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries, versus Claude Fable 5 at 76.0% with 24% broken circuits delivered"
-              loading="lazy"
-              decoding="async"
-            />
+            <img class="bench-img" src="assets/benchmark.png" alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries, versus Claude Fable 5 at 76.0% with 24% broken circuits delivered" loading="lazy" decoding="async" />
             <figcaption>Verified-clean rate vs. broken deliveries, same 75-prompt suite.</figcaption>
           </figure>
         </div>
       </section>
 
-      <!-- PARTS / disclosed links (affiliate-property legitimizer) -->
+      <!-- PARTS -->
       <section id="parts">
         <div class="shell grid-2">
           <div>
             <span class="eyebrow">Parts</span>
             <h2>A bill of materials, with disclosed links</h2>
             <p>
-              Once a design is verified, Ohmatic can build a parts list inside the desktop app and
-              offer optional buy-links to component distributors. The schematic itself is never
-              changed by this step. Procurement is a separate, post-design layer.
+              Once a design is verified, Ohmatic can build a parts list and offer optional buy-links to
+              component distributors. DigiKey is live today; the rest are coming soon. The schematic
+              itself stays exactly as it was verified.
             </p>
             <ul class="checks">
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Buy-links are search/deep-links you open in your own browser.
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Where a link is an affiliate link, a commission disclosure is shown beside it.
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                No storefront scraping. No carts filled on your behalf. No undisclosed links.
-              </li>
+              <li>Buy-links are search or deep-links you open in your own browser.</li>
+              <li>Where a link is an affiliate link, a commission disclosure is shown beside it.</li>
+              <li>No storefront scraping, no carts filled on your behalf, no undisclosed links.</li>
             </ul>
             <div class="tags" aria-label="Supported distributors">
               <span class="tag">DigiKey</span>
-              <span class="tag">Newark</span>
-              <span class="tag">Jameco</span>
-              <span class="tag">LCSC</span>
+              <span class="tag tag--soon">Newark &middot; soon</span>
+              <span class="tag tag--soon">Jameco &middot; soon</span>
+              <span class="tag tag--soon">LCSC &middot; soon</span>
             </div>
           </div>
-          <div class="panel">
+          <div class="module">
             <h3>Affiliate disclosure</h3>
             <p>
               Ohmatic participates in affiliate programs and may earn a commission from qualifying
-              purchases made through distributor links it surfaces. This never changes the price you
-              pay or which parts are recommended. The parts list comes from your verified design.
+              purchases made through distributor links it surfaces, at no extra cost to you. The parts
+              list comes from your verified design, not from any commission.
             </p>
-            <p style="margin-bottom: 0">
-              <a href="affiliate-disclosure.html">Read the full affiliate disclosure →</a>
-            </p>
+            <p style="margin-bottom: 0"><a href="affiliate-disclosure.html">Read the full affiliate disclosure &rarr;</a></p>
           </div>
         </div>
       </section>
 
-      <!-- LOCAL-FIRST / PRIVACY -->
+      <!-- LOCAL-FIRST -->
       <section id="local">
         <div class="shell">
           <span class="eyebrow">Local-first</span>
           <h2>Runs on your machine</h2>
-          <div class="callout" style="margin-bottom: 22px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <div class="callout">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             <p>
-              No account. No telemetry or analytics. Inference happens locally, so your prompts and
-              designs stay on your device. Nothing leaves your machine unless you open a parts
-              buy-link, which your browser handles like any other link.
+              No account, no telemetry. The whole pipeline runs on your machine, with no cloud calls in
+              the core loop, so your prompts and designs stay on your device. The only thing that leaves
+              is an optional parts lookup you choose to open, handled by your browser like any other link.
             </p>
           </div>
           <pre class="code"><span class="c"># clone and boot the local stack</span>
-git clone https://github.com/VittoriaLanzo/Ohmatic.git <span class="p">&&</span> cd Ohmatic
-ohmatic start   <span class="c"># prints a local URL, no GPU needed to explore</span></pre>
-          <p style="margin-top: 14px">
-            <a href="privacy.html">Read the privacy policy →</a>
-          </p>
+git clone https://github.com/VittoriaLanzo/Ohmatic.git <span class="p">&amp;&amp;</span> cd Ohmatic
+ohmatic start   <span class="c"># first run scans your hardware and offers the matching model</span></pre>
+          <p style="margin-top: 14px"><a href="privacy.html">Read the privacy policy &rarr;</a></p>
         </div>
       </section>
     </main>
 
+    <section class="cta-band">
+      <div class="shell board-footer">
+        <a class="star-button" href="https://github.com/VittoriaLanzo/Ohmatic" target="_blank" rel="noreferrer"><span aria-hidden="true">&#9733;</span> Star Ohmatic on GitHub</a>
+        <span class="board-footer-note">Source-available &middot; Ohmatic-SAL-1.0</span>
+      </div>
+    </section>
+
     <footer class="footer">
       <div class="shell">
         <div class="footer__top">
-          <a class="wordmark" href="/" aria-label="Ohmatic home">
-            <span class="dot" aria-hidden="true"></span>OHMATIC
-          </a>
+          <a class="wordmark" href="/" aria-label="Ohmatic home"><span class="dot" aria-hidden="true"></span>OHMATIC</a>
           <nav class="footer__links" aria-label="Footer">
             <a href="https://github.com/VittoriaLanzo/Ohmatic">GitHub</a>
+            <a href="https://huggingface.co/VittoriaLanzo">Weights</a>
             <a href="privacy.html">Privacy</a>
             <a href="affiliate-disclosure.html">Affiliate disclosure</a>
             <a href="mailto:lanzo.vittoria@gmail.com">Contact</a>
@@ -211,5 +278,8 @@ ohmatic start   <span class="c"># prints a local URL, no GPU needed to explore</
         </p>
       </div>
     </footer>
+
+    <div class="bolt-bl" aria-hidden="true"></div>
+    <div class="bolt-br" aria-hidden="true"></div>
   </body>
 </html>

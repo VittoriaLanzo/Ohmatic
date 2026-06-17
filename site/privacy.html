@@ -9,7 +9,7 @@
       content="How Ohmatic handles information. Ohmatic is a local-first application: your prompts and circuits stay on your device, with no account, analytics, or telemetry."
     />
     <link rel="canonical" href="https://vittorialanzo.github.io/Ohmatic/privacy.html" />
-    <meta name="theme-color" content="#0d1117" />
+    <meta name="theme-color" content="#0e231d" />
     <link rel="stylesheet" href="fonts.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -23,6 +23,7 @@
         </a>
         <nav class="nav__links" aria-label="Primary">
           <a href="index.html#how">How it works</a>
+          <a href="index.html#architecture">Architecture</a>
           <a href="index.html#benchmark">Benchmark</a>
           <a href="index.html#parts">Parts</a>
           <a href="privacy.html" aria-current="page">Privacy</a>
@@ -35,7 +36,7 @@
       <article class="shell legal">
         <span class="eyebrow">Legal</span>
         <h1>Privacy Policy</h1>
-        <p class="updated">Last updated: 14 June 2026</p>
+        <p class="updated">Last updated: 17 June 2026</p>
 
         <h2>1. Overview</h2>
         <p>
@@ -49,8 +50,8 @@
         <h2>2. What stays on your device</h2>
         <p>
           Everything you type and everything Ohmatic generates stays on your machine. Prompts,
-          circuits, parts lists, and settings are processed locally and are not transmitted to us or
-          to anyone else.
+          circuits, parts lists, and settings are processed locally on your device and are not sent to
+          us, with the single exception of the optional parts feature in section 3.
         </p>
 
         <h2>3. The only third-party connection: parts and procurement</h2>
@@ -70,8 +71,8 @@
             <strong>Optional product lookup.</strong> If you turn on the optional Jameco
             product-lookup connector, Ohmatic sends the search terms for a part (such as its
             description and value) to the affiliate network's product-search service to fetch matching
-            products. This connector is off unless you configure it, and it never sends your full
-            circuit or any personal information.
+            products. This connector is off unless you configure it, and it sends only those part
+            search terms, not your full circuit or any personal information.
           </li>
         </ul>
         <p>
@@ -109,7 +110,14 @@
           date above.
         </p>
 
-        <h2>8. Contact</h2>
+        <h2>8. Trademarks and comparisons</h2>
+        <p>
+          Claude and Claude Fable 5 are trademarks of Anthropic. Any comparison Ohmatic publishes is
+          nominative, reflects one specific test, and implies no affiliation with or endorsement by
+          Anthropic.
+        </p>
+
+        <h2>9. Contact</h2>
         <p>
           Questions about this policy can be sent to
           <a href="mailto:lanzo.vittoria@gmail.com">lanzo.vittoria@gmail.com</a>.
@@ -132,5 +140,8 @@
         </div>
       </div>
     </footer>
+
+    <div class="bolt-bl" aria-hidden="true"></div>
+    <div class="bolt-br" aria-hidden="true"></div>
   </body>
 </html>
