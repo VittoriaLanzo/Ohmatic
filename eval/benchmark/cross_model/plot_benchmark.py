@@ -5,7 +5,7 @@ Horizontal stacked bars: green = delivered & passes ERC, gold = killswitch refus
 
     python -m eval.benchmark.cross_model.plot_benchmark
 
-Numbers are the ERC-clean counts per leg (full 75-prompt realuser suite):
+Numbers are the verified-clean counts per leg (full 75-prompt realuser suite):
   bf16  70/75   Fable5 57/75   Q4_K_M 54/75   base 3/75   (Q4 from the T4/llama.cpp leg).
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return (c - h) * 100, (c + h) * 100
 
 
-fig, ax = plt.subplots(figsize=(14.2, 7.0), dpi=200)
+fig, ax = plt.subplots(figsize=(14.2, 7.0), dpi=150)
 fig.patch.set_facecolor(BG); ax.set_facecolor(BG)
 ys = list(range(len(MODELS)))[::-1]   # first model on top
 
@@ -49,19 +49,17 @@ for y, (label, clean, total, kind) in zip(ys, MODELS):
     ax.barh(y, rest, left=pct, color=rest_color, height=0.62, zorder=2)
     lo, hi = wilson(clean, total)
     if pct >= 25:
-        ax.text(pct / 2, y, f"{pct:.1f}% ERC-clean", ha="center", va="center",
+        ax.text(pct / 2, y, f"{pct:.1f}% verified-clean", ha="center", va="center",
                 color="#0d1117" if pct > 40 else FG, fontsize=15, fontweight="bold", zorder=6)
     else:                                  # green sliver too small for the label - place it past the CI whisker
-        ax.text(hi + 2.5, y, f"{pct:.1f}% ERC-clean", ha="left", va="center",
+        ax.text(hi + 2.5, y, f"{pct:.1f}% verified-clean", ha="left", va="center",
                 color="#ffffff", fontsize=13.5, fontweight="bold", zorder=6)
-    rest_label_color = "#ffffff" if kind == "broken" else "#0d1117"
-    if rest >= 14:                         # wide enough for the descriptive two-line label
-        msg = f"{rest:.0f}% BROKEN\ndelivered to user" if kind == "broken" else f"{rest:.0f}%\nblocked"
-        ax.text(pct + rest / 2, y, msg, ha="center", va="center",
-                color=rest_label_color, fontsize=11.5, fontweight="bold", zorder=4)
-    else:                                  # narrow sliver - keep it to the percent only
-        ax.text(pct + rest / 2, y, f"{rest:.0f}%", ha="center", va="center",
-                color=rest_label_color, fontsize=11, fontweight="bold", zorder=4)
+    if kind == "broken":
+        ax.text(pct + rest / 2, y, f"{rest:.0f}% BROKEN\ndelivered to user", ha="center",
+                va="center", color="#ffffff", fontsize=11.5, fontweight="bold", zorder=4)
+    else:
+        ax.text(pct + rest / 2, y, f"{rest:.0f}%\nblocked", ha="center", va="center",
+                color="#0d1117", fontsize=11.5, fontweight="bold", zorder=4)
     ax.text(101.5, y, f"n={total}", ha="left", va="center", color=MUTED, fontsize=12)
     ax.errorbar(pct, y, xerr=[[pct - lo], [hi - pct]], fmt="none", ecolor="#ffffff",
                 elinewidth=2, capsize=6, capthick=2, zorder=5)
@@ -79,7 +77,7 @@ ax.set_title("If it can't verify it, it won't deliver it.", color=FG, fontsize=2
 ax.text(0, 1.045, "75 novel real-user prompts · identical prompts and ERC verifier for "
         "every model · paired McNemar Ohmatic-vs-Fable p = 0.007",
         transform=ax.transAxes, color=MUTED, fontsize=12.5)
-legend = [Patch(facecolor=GREEN, label="delivered · passes ERC"),
+legend = [Patch(facecolor=GREEN, label="delivered, passes verification"),
           Patch(facecolor=GOLD, label="killswitch refusal (asks to clarify)"),
           Patch(facecolor=RED, label="broken circuit delivered")]
 ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=3,
@@ -87,5 +85,5 @@ ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=
 
 out = Path(__file__).resolve().parents[3] / "assets" / "benchmark.png"
 fig.subplots_adjust(left=0.16, right=0.93, top=0.80, bottom=0.16)
-fig.savefig(out, facecolor=BG, dpi=200)
+fig.savefig(out, facecolor=BG, dpi=150)
 print("wrote", out)
