@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use Ohmatic in your work, please cite it as below."
+title: "Ohmatic: a compiler for circuits"
+abstract: >-
+  A local language model drafts a circuit; a deterministic electrical rule check
+  gates delivery and withholds any design that fails it.
+authors:
+  - family-names: Lanzo
+    given-names: Vittoria
+type: software
+date-released: 2026-06-17
+url: "https://github.com/VittoriaLanzo/Ohmatic"
+repository-code: "https://github.com/VittoriaLanzo/Ohmatic"
+keywords:
+  - circuit-design
+  - electronic-design-automation
+  - local-llm
+  - erc
