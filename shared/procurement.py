@@ -364,13 +364,26 @@ def _avantlink_product_search_url(config: AvantLinkConfig, query: str, part_id: 
     return f"{config.base_url}?{urlencode(params)}"
 
 
+# Supplier keyword search (DigiKey et al.) does not match the Ω glyph - it must
+# be spelled "ohm". Cover both the Greek capital omega (U+03A9) that shows up in
+# resistor values and the dedicated ohm sign (U+2126), so "330Ω" searches as
+# "330ohm" and actually returns parts instead of an empty result page.
+_OHM_SYMBOLS = ("Ω", "Ω")
+
+
+def _spell_out_units(text: str) -> str:
+    for symbol in _OHM_SYMBOLS:
+        text = text.replace(symbol, "ohm")
+    return text
+
+
 def _query_for_parts_row(row: dict[str, Any]) -> str:
     parts = [
         _string(row.get("parts_list_part")),
         _string(row.get("value")),
         _string(row.get("package")),
     ]
-    return " ".join(part for part in parts if part)
+    return _spell_out_units(" ".join(part for part in parts if part))
 
 
 def _records_from_response(response: Any) -> list[dict[str, Any]]:

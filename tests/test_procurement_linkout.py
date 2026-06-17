@@ -11,6 +11,11 @@ ROWS = [
     {"id": "GND1", "is_part": False, "parts_list_part": "power symbol"},
 ]
 
+RESISTOR_ROWS = [
+    {"id": "R1", "is_part": True, "parts_list_part": "resistor",
+     "value": "330Ω", "package": "1/4W"},
+]
+
 
 def test_digikey_plain_linkout_needs_no_credentials():
     r = build_procurement_response(ROWS, supplier="digikey")
@@ -32,6 +37,14 @@ def test_affiliate_wrap_adds_tracking_and_disclosure():
     assert a["url"].startswith("https://track.example/c/123?u=")
     assert "disclosure" in a and "commission" in a["disclosure"]
     assert r["eligibility_disclosures"]
+
+
+def test_ohm_symbol_is_spelled_out_so_digikey_returns_results():
+    # The Ω glyph URL-encodes to %CE%A9, which DigiKey keyword search can't match
+    # (empty results). The query must spell it "ohm" -> "330ohm".
+    [a] = build_procurement_response(RESISTOR_ROWS, supplier="digikey")["link_actions"]
+    assert "330ohm" in a["url"]
+    assert "%CE%A9" not in a["url"] and "Ω" not in a["url"]
 
 
 def test_newark_and_lcsc_patterns():
