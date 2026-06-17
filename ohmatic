@@ -83,6 +83,15 @@ find_port() { # $1 host $2 start -> echoes a free port
 
 http_ok() { curl -fsS -m 2 "$1" >/dev/null 2>&1; }
 
+# Open a URL in the default browser, cross-platform. Best-effort; never fails the run.
+open_url() {
+  local url="$1"
+  if   command -v cmd.exe   >/dev/null 2>&1; then cmd.exe /c start "" "$url" >/dev/null 2>&1 || true   # Git Bash / WSL
+  elif command -v xdg-open  >/dev/null 2>&1; then xdg-open "$url" >/dev/null 2>&1 || true               # Linux
+  elif command -v open      >/dev/null 2>&1; then open "$url"     >/dev/null 2>&1 || true               # macOS
+  else dim "open $url in your browser"; fi
+}
+
 save_pid() { mkdir -p "$RUN_DIR"; echo "$2" > "$RUN_DIR/$1.pid"; }
 
 kill_tree() {
@@ -204,9 +213,13 @@ cmd_start() {
   # anaconda MKL and pip torch both ship libiomp; without this the worker dies (OMP #15)
   export KMP_DUPLICATE_LIB_OK=TRUE
   hw_assess
-  ok "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY}) -> $RUN_DIR/doctor.json"
+  dim "doctor: model tier '${OHMATIC_TIER}' (${OHMATIC_TIER_WHY})"
   offer_deps_install
-  offer_model_pull
+  # First run: onboard (scan + offer the matching model) and auto-open the app at
+  # the end. Marker lives in the ephemeral run dir so a fresh clone re-onboards.
+  local _marker="$RUN_DIR/.onboarded" _first=0
+  [ -f "$_marker" ] || _first=1
+  if [ "$_first" = 1 ]; then cmd_onboarding; mkdir -p "$RUN_DIR"; date -u +%Y-%m-%dT%H:%M:%SZ > "$_marker"; fi
   if [ "$backend" = "docker" ]; then start_backend_docker; else step "Starting Python backend stubs"; start_backend_stubs; fi
   wait_for_gateway
   start_frontend
@@ -217,6 +230,8 @@ cmd_start() {
   echo "  Stop     : ./ohmatic stop"
   echo "  Logs     : .ohmatic-run/*.log"
   printf "\n  %sCompiles clean, or it doesn't ship.%s\n" "$C_DIM" "$C_OFF"
+  # First run opens the app for you; later starts just print the URL.
+  if [ "$_first" = 1 ] && [ -t 1 ]; then step "Opening Ohmatic in your browser"; open_url "$FRONTEND_URL"; fi
 }
 
 cmd_stop() {
@@ -321,34 +336,32 @@ offer_deps_install() {
   esac
 }
 
-# First-run model onboarding: no weights installed -> offer the doctor-matched
-# pull right in the terminal. One keypress, zero extra steps. Non-interactive
-# shells (CI, scripts) skip silently.
-offer_model_pull() {
-  [ -f "$ROOT/models/active.json" ] && return 0
-  [ -t 0 ] || return 0
-  [ "$OHMATIC_TIER" = "stub" ] && return 0
-  printf "
-  %sNo local model installed. Recommended for this machine:%s
-" "$C_DIM" "$C_OFF"
-  printf "    %s[1] %s%s  <- recommended (%s)
-" "$C_GREEN" "$OHMATIC_TIER" "$C_OFF" "$OHMATIC_TIER_WHY"
-  printf "    [2] q4_k_m   4-bit GGUF, ~5 GB
-"
-  printf "    [3] q8_0     8-bit GGUF, ~9 GB
-"
-  printf "    [4] bf16     full weights, ~17 GB (GPU)
-"
-  printf "    [s] skip     explore with the stub for now
-"
-  printf "  Pull now? [1/2/3/4/s] (default 1): "
-  local choice; read -r choice || choice="s"
-  case "$choice" in
-    ""|1) cmd_fetch --tier "$OHMATIC_TIER" ;;
-    2) cmd_fetch --tier q4_k_m ;;
-    3) cmd_fetch --tier q8_0 ;;
-    4) cmd_fetch --tier bf16 ;;
-    *) dim "skipped - run './ohmatic fetch' anytime" ;;
+# First-run consumer onboarding: scan the machine, state the verdict in plain words,
+# then offer the matching model with one Y/N. The recommended pull installs BOTH the
+# generator tier and the T5 normalizer (fetch_model --with-t5). Skips if a model is
+# already present; the prompt skips itself in non-interactive shells (CI). Standalone:
+# ./ohmatic onboarding   (other tiers: ./ohmatic fetch bf16|q8_0|q4_k_m)
+cmd_onboarding() {
+  hw_assess
+  if [ -f "$ROOT/models/active.json" ]; then
+    local t; t="$(sed -n 's/.*"tier"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/models/active.json" 2>/dev/null | head -1)"
+    ok "A local model is already installed${t:+ (tier '$t')}. Skipping download."
+    return 0
+  fi
+  local vram_part=""
+  [ "${OHMATIC_VRAM_MB:-0}" -gt 0 ] 2>/dev/null && vram_part=" and ${OHMATIC_VRAM_MB} MB VRAM (${OHMATIC_GPU:-GPU})"
+  printf "\n  Ohmatic doctor scanned your device and found %s GB RAM%s.\n" "${OHMATIC_RAM_GB}" "$vram_part"
+  if [ "$OHMATIC_TIER" = "stub" ]; then
+    warn "Not enough memory for a local model - Ohmatic runs in stub mode. You can still explore the full loop."
+    return 0
+  fi
+  printf "  I suggest you install the '%s' model (generator + T5 normalizer) - %s.\n" "$OHMATIC_TIER" "$OHMATIC_TIER_WHY"
+  if [ ! -t 0 ]; then dim "non-interactive shell - run './ohmatic onboarding' to install when ready"; return 0; fi
+  printf "  Want to go ahead? [Y/N]: "
+  local a; read -r a || a="n"
+  case "$a" in
+    n|N|no|No) dim "skipped - run './ohmatic onboarding' (or './ohmatic fetch') anytime" ;;
+    *) cmd_fetch --tier "$OHMATIC_TIER" ;;
   esac
 }
 
@@ -396,7 +409,7 @@ hw_assess() {
   fi
   printf '{"ram_gb": %s, "vram_mb": %s, "gpu": "%s", "recommended_model": "%s", "reason": "%s", "checked_at": "%s"}
 '     "$ram_gb" "$vram_mb" "$gpu" "$tier" "$why" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RUN_DIR/doctor.json"
-  OHMATIC_TIER="$tier"; OHMATIC_TIER_WHY="$why"; OHMATIC_RAM_GB="$ram_gb"; OHMATIC_VRAM_MB="$vram_mb"
+  OHMATIC_TIER="$tier"; OHMATIC_TIER_WHY="$why"; OHMATIC_RAM_GB="$ram_gb"; OHMATIC_VRAM_MB="$vram_mb"; OHMATIC_GPU="$gpu"
 }
 
 cmd_doctor() {
@@ -439,6 +452,7 @@ usage() {
   ./ohmatic status         Show what is running
   ./ohmatic doctor         Diagnose the system (Node, Python, ports, RAM/GPU -> model tier)
   ./ohmatic stats          Adoption stats (HF model downloads, GitHub stars)
+  ./ohmatic onboarding     Scan hardware + install the matching model (auto on first start)
   ./ohmatic fetch          Download the doctor-recommended model weights (resumable)
   ./ohmatic update         Reset this clone to the latest GitHub main (discards local edits)
 
@@ -452,6 +466,7 @@ case "${1:-help}" in
   status) cmd_status ;;
   doctor) cmd_doctor ;;
   stats) cmd_stats ;;
+  onboarding) cmd_onboarding ;;
   fetch) shift; cmd_fetch "$@" ;;
   update) cmd_update ;;
   help|--help|-h) usage ;;

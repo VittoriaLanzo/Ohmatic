@@ -91,7 +91,9 @@ function Show-Usage {
   Write-Host "  ohmatic start -Docker  Backend via docker compose instead of Python stubs"
   Write-Host "  ohmatic stop           Stop everything ohmatic started"
   Write-Host "  ohmatic status         Show what is running"
-  Write-Host "  ohmatic doctor         Diagnose the system (Node, Python, Docker, ports)"
+  Write-Host "  ohmatic doctor         Diagnose the system (Node, Python, Docker, ports, RAM/GPU -> tier)"
+  Write-Host "  ohmatic onboarding     Scan hardware + install the matching model (auto on first start)"
+  Write-Host "  ohmatic fetch [tier]   Download weights (recommended tier, or bf16 / q8_0 / q4_k_m)"
   Write-Host "  ohmatic update         Reset this clone to the latest GitHub main (discards local edits)"
   Write-Host "  ohmatic help           Show this help"
   Write-Host ""
@@ -349,12 +351,126 @@ function Start-Frontend([bool]$UseMock) {
 }
 
 # ---------------------------------------------------------------------------
+# hardware assessment + first-run model onboarding
+# ---------------------------------------------------------------------------
+
+# RAM + NVIDIA VRAM -> which Ohmatic model this machine can run. Writes
+# .ohmatic-run\doctor.json (the same schema the gateway and the bash launcher use).
+# Every probe is guarded: a missing nvidia-smi or locked-down WMI just degrades the
+# verdict to a lower tier - it never throws and never blocks the launcher.
+function Get-HwAssess {
+  if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir | Out-Null }
+  $ramGb = 0; $vramMb = 0; $gpu = ""
+  try { $ramGb = [int][math]::Floor([double]((Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory) / 1GB) } catch { $ramGb = 0 }
+  if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
+    try {
+      $vramMb = [int]((& nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>$null | Select-Object -First 1).ToString().Trim())
+      $gpu    = ((& nvidia-smi --query-gpu=name --format=csv,noheader 2>$null | Select-Object -First 1).ToString().Trim())
+    } catch { $vramMb = 0; $gpu = "" }
+  }
+  $tier = "stub"; $why = "not enough RAM/VRAM for local inference - stub/cloud mode"
+  if     ($vramMb -ge 20000) { $tier = "bf16";       $why = "$gpu ($vramMb MB VRAM) fits the full bf16 model" }
+  elseif ($vramMb -ge 10000) { $tier = "q8_0";       $why = "$gpu ($vramMb MB VRAM) fits the Q8_0 GGUF" }
+  elseif ($vramMb -ge 6000)  { $tier = "q4_k_m";     $why = "$gpu ($vramMb MB VRAM) fits the Q4_K_M GGUF" }
+  elseif ($ramGb  -ge 12)    { $tier = "q4_k_m_cpu"; $why = "$ramGb GB RAM runs the Q4_K_M GGUF on CPU (slower)" }
+  $checkedAt = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+  $payload = [ordered]@{ ram_gb = $ramGb; vram_mb = $vramMb; gpu = $gpu; recommended_model = $tier; reason = $why; checked_at = $checkedAt }
+  ($payload | ConvertTo-Json -Compress) | Set-Content -LiteralPath (Join-Path $runDir "doctor.json") -Encoding utf8
+  return [pscustomobject]@{ Tier = $tier; Why = $why; RamGb = $ramGb; VramMb = $vramMb; Gpu = $gpu }
+}
+
+# Approx on-disk size per tier (model + the ~1 GB T5 normalizer pulled alongside).
+# Drives the progress bar and the size hint only.
+$script:TierGb = @{ bf16 = 17.5; q8_0 = 10.0; q4_k_m = 6.0; q4_k_m_cpu = 6.0 }
+
+# Download the weights for $Tier anonymously (the repos are public - no token, no
+# login) and render one determinate progress bar from the models\ directory growth.
+# The HF downloader is authoritative; the bar is best-effort so a polling hiccup
+# never fails the install. Returns $true on success.
+function Install-Model([string]$Tier) {
+  $python = Get-PythonCmd
+  if (-not $python) { Write-Fail "Python 3 not found - cannot download weights. Install Python 3, then 'ohmatic onboarding'."; return $false }
+  $modelsDir = Join-Path $root "models"
+  if (-not (Test-Path -LiteralPath $modelsDir)) { New-Item -ItemType Directory -Path $modelsDir | Out-Null }
+  $baseBytes = [double]((Get-ChildItem -LiteralPath $modelsDir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum)
+  $expectGb = $script:TierGb[$Tier]; if (-not $expectGb) { $expectGb = 6.0 }
+  $total = [double]$expectGb * 1GB
+  Write-Step "Installing the '$Tier' model (~$([int]$expectGb) GB, one time)..."
+  $log = Join-Path $runDir "fetch.log"
+  $argList = @($python.PreArgs + @("tools/fetch_model.py", "--tier", $Tier))
+  $proc = Start-Process -FilePath $python.File -ArgumentList $argList -WorkingDirectory $root -PassThru -NoNewWindow `
+            -RedirectStandardOutput $log -RedirectStandardError ([System.IO.Path]::ChangeExtension($log, ".err.log"))
+  while (-not $proc.HasExited) {
+    Start-Sleep -Milliseconds 700
+    $cur = [double]((Get-ChildItem -LiteralPath $modelsDir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum)
+    $dl  = [math]::Max(0, $cur - $baseBytes)
+    $pct = [math]::Min(99, [int](($dl / $total) * 100))
+    Write-Progress -Activity "Installing '$Tier' model" -Status ("{0:N1} of ~{1:N0} GB" -f ($dl / 1GB), $expectGb) -PercentComplete $pct
+  }
+  Write-Progress -Activity "Installing '$Tier' model" -Completed
+  if ($proc.ExitCode -ne 0) {
+    Write-Fail "download failed (exit $($proc.ExitCode)). See $log"
+    return $false
+  }
+  Write-Ok "model installed -> models\active.json"
+  return $true
+}
+
+# First-run consumer onboarding: scan the machine, suggest the matching model, one
+# keypress to install. Skips if a model is already present; skips the prompt in
+# non-interactive shells (CI). Safe to run standalone: 'ohmatic onboarding'.
+function Invoke-Onboarding {
+  $hw = Get-HwAssess
+  $active = Join-Path $root "models\active.json"
+  if (Test-Path -LiteralPath $active) {
+    $tierInstalled = $null
+    try { $tierInstalled = (Get-Content -Raw -LiteralPath $active | ConvertFrom-Json).tier } catch { }
+    $suffix = if ($tierInstalled) { " (tier '$tierInstalled')" } else { "" }
+    Write-Ok "A local model is already installed$suffix. Skipping download."
+    return
+  }
+  $vramPart = if ($hw.VramMb -gt 0) { " and $($hw.VramMb) MB VRAM ($($hw.Gpu))" } else { "" }
+  Write-Host ""
+  Write-Host "  Ohmatic doctor scanned your device and found $($hw.RamGb) GB RAM$vramPart." -ForegroundColor White
+  if ($hw.Tier -eq "stub") {
+    Write-Warn2 "Not enough memory for a local model - Ohmatic runs in stub mode. You can still explore the full loop."
+    return
+  }
+  $sizeGb = [int]$script:TierGb[$hw.Tier]
+  Write-Host "  I suggest you install the '$($hw.Tier)' model (~$sizeGb GB, generator + T5 normalizer) - $($hw.Why)." -ForegroundColor White
+  if ([Console]::IsInputRedirected) { Write-Dim "non-interactive shell - run 'ohmatic onboarding' to install when ready"; return }
+  $ans = Read-Host "  Want to go ahead? [Y/N]"
+  if ($ans -match '^\s*(y|yes|)\s*$') {
+    [void](Install-Model $hw.Tier)
+  } else {
+    Write-Dim "skipped - run 'ohmatic onboarding' (or 'ohmatic fetch') whenever you want the model"
+  }
+}
+
+# ---------------------------------------------------------------------------
 # commands
 # ---------------------------------------------------------------------------
+
+function Invoke-Fetch {
+  $hw = Get-HwAssess
+  $tier = if ($Subcommand -and $Subcommand -ne "all") { $Subcommand } else { $hw.Tier }
+  Write-Step "Ohmatic fetch"
+  Write-Dim "tier $tier ($($hw.Why))"
+  [void](Install-Model $tier)
+}
 
 function Invoke-Start {
   Show-Banner
   Write-Step "Ohmatic starting"
+  # First run: scan hardware, offer the matching model, then auto-open the app at
+  # the end. The marker lives in the ephemeral run dir so a fresh clone re-onboards.
+  $onboardMarker = Join-Path $runDir ".onboarded"
+  $firstRun = -not (Test-Path -LiteralPath $onboardMarker)
+  if ($firstRun -and -not $Mock) {
+    Invoke-Onboarding
+    if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir | Out-Null }
+    Set-Content -LiteralPath $onboardMarker -Value ([DateTime]::UtcNow.ToString("o")) -Encoding ascii
+  }
   $gatewayPort = 8080
   if (-not $Mock) {
     if ($Docker) {
@@ -376,6 +492,11 @@ function Invoke-Start {
   if (-not $Mock) { Write-Host "  Gateway  : http://$HostName`:$gatewayPort" -ForegroundColor Green }
   Write-Host "  Stop     : ohmatic stop" -ForegroundColor DarkGray
   Write-Host "  Logs     : .ohmatic-run\*.log" -ForegroundColor DarkGray
+  # First run opens the app for you; later starts just print the URL.
+  if ($firstRun -and -not [Console]::IsInputRedirected) {
+    Write-Step "Opening Ohmatic in your browser"
+    try { Start-Process $url } catch { Write-Dim "open $url manually" }
+  }
   Write-Host ""
   Write-Host "  Compiles clean, or it doesn't ship." -ForegroundColor DarkGray
 }
@@ -448,6 +569,12 @@ function Invoke-Doctor {
   foreach ($p in $ports) { if (-not (Test-PortFree $HostName $p)) { $busy += $p } }
   if ($busy.Count -eq 0) { Write-Ok "ports     $($ports -join ', ') all free" }
   else { Write-Warn2 "ports     in use: $($busy -join ', ') (ohmatic will auto-pick the next free frontend port)" }
+
+  # --- Hardware -> model tier (read-only here; install lives in 'ohmatic onboarding') ---
+  $hw = Get-HwAssess
+  if ($hw.VramMb -gt 0) { Write-Ok "gpu       $($hw.Gpu) ($($hw.VramMb) MB VRAM)" } else { Write-Dim "gpu       no NVIDIA GPU detected" }
+  Write-Ok "ram       $($hw.RamGb) GB"
+  Write-Ok "model     recommended: $($hw.Tier) - $($hw.Why)"
 
   # --- Verdict ---
   Write-Host ""
@@ -553,6 +680,8 @@ switch ($Command.ToLowerInvariant()) {
   "stop"   { Invoke-Stop }
   "status" { Invoke-Status }
   "doctor" { Invoke-Doctor }
+  "onboarding" { Show-Banner; Invoke-Onboarding }
+  "fetch"  { Invoke-Fetch }
   "update" { Invoke-Update }
   "help"   { Show-Usage }
   default  { Show-Usage; exit 2 }

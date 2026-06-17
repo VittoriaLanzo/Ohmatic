@@ -6,8 +6,8 @@
 
 Weights land in ./models/ (gitignored); ./models/active.json records what's
 installed so the inference pipeline can pick it up. Downloads resume on
-interruption (huggingface_hub). While the repos are private, HF_TOKEN must be
-set; after the public launch, anonymous downloads work.
+interruption (huggingface_hub). The model repos are public: no token or login is
+needed. HF_TOKEN is still honored if set (e.g. pre-launch testing).
 """
 
 import argparse
@@ -80,7 +80,7 @@ def main() -> int:
         print("ERROR: not enough disk space.", file=sys.stderr)
         return 1
     token = os.environ.get("HF_TOKEN") or None
-    print(f"auth      {'HF_TOKEN set' if token else 'anonymous (fails while the repo is private)'}")
+    print(f"auth      {'HF_TOKEN set' if token else 'public download (no token needed)'}")
     if args.dry_run:
         print("dry-run: nothing downloaded.")
         return 0
