@@ -42,3 +42,7 @@ target/
 
 # Local model weights (fetched by ./ohmatic fetch)
 models/
+
+# Local agent / editor state - never ship
+.claude/
+.vscode/

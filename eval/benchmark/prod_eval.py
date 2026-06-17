@@ -43,7 +43,7 @@ def _init_wandb(args):
     caller treats None as 'telemetry disabled'."""
     try:
         import wandb
-        wandb.init(project="ohmatic-qwen3", entity="vittoria3103-123-no-company",
+        wandb.init(project="ohmatic-qwen3", entity=os.environ.get("WANDB_ENTITY"),
                    name=f"prodeval-{(args.revision or 'main')}-n{args.n}-s{args.max_shots}",
                    config={"adapter": args.adapter, "revision": args.revision or "main",
                            "base": args.base, "n": args.n, "max_shots": args.max_shots,
