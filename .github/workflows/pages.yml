@@ -1,0 +1,66 @@
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Post-deploy gate: is the published site actually reachable?
+  # Fails the run (red check) if the live page does not return HTTP 200.
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe live site
+        id: probe
+        run: |
+          url="${{ needs.deploy.outputs.page_url }}"
+          url="${url:-https://vittorialanzo.github.io/Ohmatic/}"
+          echo "Probing $url"
+          site_up=false
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 20 "$url" || echo 000)
+            echo "attempt $attempt: HTTP $code"
+            if [ "$code" = "200" ]; then
+              site_up=true
+              break
+            fi
+            sleep 15
+          done
+          echo "site_up=$site_up" >> "$GITHUB_OUTPUT"
+          echo "### Site up: \`$site_up\` ($url)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$site_up" != "true" ]; then
+            echo "::error::Site did not return HTTP 200"
+            exit 1
+          fi
