@@ -88,7 +88,9 @@ class ClaudeCliAdapter:
         # Fresh, SEALED temp cwd per ask (so no ask can leave memory for the next): the
         # base Claude product prompt stays, the Ohmatic spec rides on top via
         # --append-system-prompt-file (it is far larger than a command line allows).
-        with tempfile.TemporaryDirectory() as cwd:
+        # ignore_cleanup_errors: on Windows the sealed dir's .git can still be locked by
+        # AV / a lingering child at exit; a failed *cleanup* must not discard a paid call.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as cwd:
             self._seal_cwd(cwd)
             specf = Path(cwd) / "ohmatic_spec.txt"
             specf.write_text(system_prompt, encoding="utf-8")
