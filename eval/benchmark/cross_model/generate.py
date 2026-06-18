@@ -1,10 +1,14 @@
-"""Stage 1 - GENERATE (the only stage that costs money).
+"""Stage 1 - GENERATE (the only stage that spends anything - model usage / pod-hours).
 
     python -m eval.benchmark.cross_model.generate --model M --suite S [--n N]
 
 Append-only results/{model}.jsonl keyed (model, suite, prompt_id); reruns SKIP
-completed keys, so a crash or rate-limit resumes without double-paying. Raw outputs
+completed keys, so a crash or rate-limit resumes without redoing work. Raw outputs
 are stored verbatim; verification happens free in stage 2 (verify.py).
+
+Claude legs (claude_cli adapter) need the `claude` CLI on PATH and a logged-in
+session - no api key. The cost column for those rows is the CLI's own reported
+total_cost_usd; every other leg reports 0 here (its cost is pod-hours).
 """
 
 from __future__ import annotations
@@ -33,11 +37,6 @@ def _done_keys(path: Path) -> set[tuple[str, str]]:
                 r = json.loads(line)
                 done.add((r["suite"], r["prompt_id"]))
     return done
-
-
-def _cost(model: str, tin: int, tout: int) -> float:
-    pin, pout = C.PRICES.get(model, (0.0, 0.0))
-    return round((tin * pin + tout * pout) / 1e6, 6)
 
 
 def main() -> None:
@@ -103,8 +102,7 @@ def main() -> None:
                 "suite": it["suite"],
                 "prompt_id": it["prompt_id"],
                 "category": it["category"],
-                "cost_usd": _cost(args.model, frag.get("tokens_in", 0),
-                                  frag.get("tokens_out", 0)),
+                "cost_usd": round(frag.get("cli_cost_usd", 0.0) or 0.0, 6),
                 **frag,
             }
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")

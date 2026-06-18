@@ -1,11 +1,17 @@
 """Cross-model benchmark config and reproducibility pins.
 
 Everything defining a run lives here: model matrix, suites, decoding params,
-artifact revisions. Reproduce = same commit + the three env keys + one
+artifact revisions. Reproduce = same commit + HF_TOKEN + one
 `python -m eval.benchmark.cross_model.generate --model X --suite Y` per leg.
 
-Secrets live ONLY in env, never here: ANTHROPIC_API_KEY (Fable), OPENAI_API_KEY
-(Codex, + optional OPENAI_BASE_URL / OPENAI_MODEL), HF_TOKEN (private HF repos).
+The Claude legs (fable-5, opus) are PRODUCT-vs-PRODUCT, not model-vs-model: each
+ask spins up a fresh, zero-context Claude Code instance via the `claude -p` CLI
+(the shipped product, on its own system prompt) with the Ohmatic format spec
+appended on top. That spec is what lets a chat model emit the circuit schema at
+all, so it levels the field while still measuring product vs product - not a bare
+model behind an api key. The CLI uses the local Claude Code subscription auth, so
+NO api key is needed (the earlier hosted-API framing was a fallacy). The only
+secret is HF_TOKEN, read from env, for the private holdout suites - never here.
 """
 
 from __future__ import annotations
@@ -29,37 +35,44 @@ T5_NORMALIZER      = "VittoriaLanzo/ohmatic-t5-normalizer"
 QWEN_BASE          = "Qwen/Qwen3-8B"
 
 # Decoding - identical budget for every model. Local legs are GREEDY
-# (deterministic); hosted legs are temperature-pinned where the API allows
-# (adaptive models that reject sampling params run at their default - disclosed).
+# (deterministic); the Claude CLI legs run the shipped product's own default
+# decoding (the CLI exposes no sampling knob) - that IS the product, disclosed.
 MAX_TOKENS    = 4096
 TEMPERATURE   = 0.0
 PIPELINE_MAX_RETRIES = 3          # Ohmatic product setting: 1 generate + 3 corrections
 
-# Hosted-API price table, USD per MTok (input, output) - for the cost column.
-PRICES = {
-    "fable-5":   (10.0, 50.0),
-    "codex-5.5": (1.25, 10.0),    # adjust to the configured OpenAI model's sheet
-}
+# Claude-CLI ("subagent") leg settings. No api key: the CLI uses the local Claude
+# Code subscription auth. Cost is whatever the CLI reports per call (total_cost_usd),
+# recorded verbatim in stage 1 - there is no static price table to drift.
+CLI_TIMEOUT_S = 600               # per-ask hard cap; a stuck call is skipped + resumed
 
 # ── Model matrix ──────────────────────────────────────────────────────────────
 # adapter: which client implementation runs the leg
-#   "anthropic" - Anthropic SDK (hosted)
-#   "openai"    - OpenAI-compatible client (hosted Codex OR any base_url)
+#   "claude_cli"- a fresh zero-context Claude Code instance per ask via `claude -p`
+#                 (subscription auth, NO api key); the Ohmatic format spec is appended
+#                 on top of Claude's own product prompt. Single-shot, no tools - the
+#                 shipped product, so this is product-vs-product not model-vs-model.
 #   "ohmatic"   - the FULL product pipeline (T5 -> Qwen -> ERC -> retries ->
 #                 killswitch), via inference.pipeline.OhmaticPipeline. Needs GPU.
 #   "local1shot"- a local HF model run SINGLE-SHOT via vLLM (pass@1, no pipeline):
-#                 the untrained-base control, same harness as the hosted legs.
+#                 the untrained-base control, same harness as the Claude legs.
 # t5: realuser suite only - forward/correction holdout prompts are already
 #     normalized, so the pipeline runs with a pass-through normalizer there
 #     (same convention as eval/benchmark/prod_eval.py).
 MODELS: dict[str, dict] = {
-    # Hosted frontier (forward + realuser only; correction suite is local-only IP)
+    # Claude products, subagent-driven (forward + realuser; correction is local-only IP).
+    # adapter="claude_cli": a fresh zero-context `claude -p` instance per ask with the
+    # Ohmatic spec appended on top of Claude's product prompt. `model` is the CLI's
+    # pinned id (full id, not an alias, so the leg is reproducible).
     "fable-5": dict(
-        adapter="anthropic", model="claude-fable-5",
+        adapter="claude_cli", model="claude-fable-5",
         suites=["forward", "realuser"],
     ),
-    "codex-5.5": dict(
-        adapter="openai", model="env:OPENAI_MODEL",   # resolved at runtime
+    # NOTE: the `realuser` suite was AUTHORED by Claude Opus (see fairness contract).
+    # Opus therefore evaluates realuser on home turf - a conservative bias FAVORING the
+    # Claude leg; `forward` (held-out, not Opus-authored) is the contamination-free read.
+    "opus": dict(
+        adapter="claude_cli", model="claude-opus-4-8",
         suites=["forward", "realuser"],
     ),
 
@@ -93,7 +106,7 @@ MODELS: dict[str, dict] = {
 
 SUITES = ("forward", "realuser", "correction")
 
-# Hosted APIs never see the correction suite (proprietary ERC feedback corpus).
+# Off-box models never see the correction suite (proprietary ERC feedback corpus).
 LOCAL_ONLY_SUITES = ("correction",)
 
 
@@ -108,6 +121,6 @@ def check_suite_allowed(model: str, suite: str) -> None:
     if suite not in cfg["suites"]:
         raise SystemExit(f"Suite '{suite}' not enabled for '{model}' "
                          f"(enabled: {cfg['suites']})")
-    if suite in LOCAL_ONLY_SUITES and cfg["adapter"] in ("anthropic", "openai"):
+    if suite in LOCAL_ONLY_SUITES and cfg["adapter"] not in ("ohmatic", "local1shot"):
         raise SystemExit(f"Suite '{suite}' is LOCAL-ONLY (proprietary) - "
-                         f"refusing to send it to a hosted API.")
+                         f"refusing to send it to an off-box model.")

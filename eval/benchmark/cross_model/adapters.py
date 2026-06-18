@@ -4,9 +4,10 @@ Every adapter exposes run(system_prompt, user_prompt) -> dict returning a unifor
 row fragment (raw_output, latency_s, tokens_in/out; Ohmatic legs also ok, blocked,
 attempts, delivered_circuit_json, user_message, normalized_prompt).
 
-IP boundary: hosted legs are SINGLE-SHOT (pass@1) on the byte-identical system
-prompt + user turn; the ERC feedback loop is proprietary, never offered to hosted
-competitors (disclosed in the report). Ohmatic legs run the full product pipeline:
+IP boundary: the Claude legs are SINGLE-SHOT (pass@1) on the byte-identical system
+prompt + user turn, driven through the `claude -p` CLI (product vs product, NO api
+key); the ERC feedback loop is proprietary, never offered to an off-box model
+(disclosed in the report). Ohmatic legs run the full product pipeline:
 T5 (realuser only) -> Qwen -> ERC -> up to 3 corrections -> killswitch.
 """
 
@@ -24,71 +25,114 @@ if str(_ROOT) not in sys.path:
 from eval.benchmark.cross_model import config as C
 
 
-# ── Hosted: Anthropic ─────────────────────────────────────────────────────────
+# ── Claude products: subagent-driven via the `claude -p` CLI ──────────────────
 
-class AnthropicAdapter:
+class ClaudeCliAdapter:
+    """Product-vs-product leg. Each ask spins up a FRESH, zero-context Claude Code
+    instance through the `claude -p` CLI - the shipped product, on its own system
+    prompt - with the Ohmatic format spec appended on top. The spec is what lets a
+    chat model emit the circuit schema at all, so it levels the field while still
+    measuring product vs product, not a bare model behind an api key.
+
+    What keeps the leg honest and reproducible:
+      * no api key  - the CLI uses the local Claude Code subscription auth;
+      * zero context- a fresh temp cwd SEALED as its own git repo (see _seal_cwd) so no
+                      real project's CLAUDE.md / memory / git status above it is loaded,
+                      plus --setting-sources "" to drop operator hooks/skills/plugins;
+      * single-shot - --allowed-tools none, so it answers in one turn, no tool use and
+                      no ERC feedback loop (that loop is the proprietary Ohmatic edge);
+      * verbatim    - the assistant text is stored raw and verified in stage 2 through
+                      the SAME extractor + ERC path as every other leg.
+
+    The spec is passed via --append-system-prompt-FILE (it is far larger than a
+    command line allows), and the CLI's own reported total_cost_usd rides back as
+    cli_cost_usd, recorded as-is (no static price table to drift)."""
+
     def __init__(self, model: str):
-        import anthropic
-        self.client = anthropic.Anthropic()          # ANTHROPIC_API_KEY from env
+        import shutil
         self.model = model
+        self.exe = shutil.which("claude")
+        if not self.exe:
+            raise SystemExit(
+                "`claude` CLI not on PATH - the Claude legs need it "
+                "(npm i -g @anthropic-ai/claude-code) plus a logged-in session.")
 
-    def run(self, system_prompt: str, user_prompt: str) -> dict:
-        t0 = time.time()
-        # cache_control on the constant system prompt: identical bytes across the
-        # suite, so input cost mostly evaporates after request 1. Adaptive models
-        # reject sampling params, so none sent.
-        resp = self.client.messages.create(
-            model=self.model,
-            max_tokens=C.MAX_TOKENS,
-            system=[{"type": "text", "text": system_prompt,
-                     "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-        u = resp.usage
-        return {
-            "raw_output": text,
-            "latency_s": round(time.time() - t0, 3),
-            "tokens_in": (u.input_tokens or 0)
-                         + getattr(u, "cache_creation_input_tokens", 0)
-                         + getattr(u, "cache_read_input_tokens", 0),
-            "tokens_out": u.output_tokens or 0,
-        }
+    @staticmethod
+    def _seal_cwd(cwd: str) -> None:
+        """Make `cwd` its OWN git repo so Claude Code stops walking UP at this folder
+        and never reaches a real project's .git / CLAUDE.md / auto-memory above it.
 
-
-# ── Hosted/local: OpenAI-compatible ──────────────────────────────────────────
-
-class OpenAICompatAdapter:
-    """Covers Codex (api.openai.com) AND any OpenAI-compatible endpoint via
-    OPENAI_BASE_URL - that's the plug-and-play reproducibility hook."""
-
-    def __init__(self, model: str):
-        from openai import OpenAI
-        kw = {}
-        if os.environ.get("OPENAI_BASE_URL"):
-            kw["base_url"] = os.environ["OPENAI_BASE_URL"]
-        self.client = OpenAI(**kw)                   # OPENAI_API_KEY from env
-        self.model = (os.environ.get("OPENAI_MODEL", "")
-                      if model == "env:OPENAI_MODEL" else model)
-        if not self.model:
-            raise SystemExit("Set OPENAI_MODEL (e.g. the Codex model id).")
-
-    def run(self, system_prompt: str, user_prompt: str) -> dict:
-        t0 = time.time()
-        kw = dict(model=self.model,
-                  messages=[{"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}],
-                  max_completion_tokens=C.MAX_TOKENS)
-        try:                                          # temp-pinned where allowed
-            resp = self.client.chat.completions.create(temperature=C.TEMPERATURE, **kw)
+        This is the cross-machine guarantee: a plain temp dir is enough on a normal box
+        (the system temp is outside any repo), but on a box whose temp lives *inside* a
+        git repo - e.g. a home dir that is itself a repo - the subagent would otherwise
+        inherit that repo's memory + CLAUDE.md + git status. Sealing the temp dir makes
+        the context identically empty everywhere. Identity + default branch are pinned to
+        fixed neutral values so the leg sees the SAME empty repo on every machine, never
+        the operator's global git name. Best-effort: if `git` is missing the temp dir is
+        already a safe boundary on a normal box, so we proceed regardless."""
+        import subprocess
+        run = lambda *a: subprocess.run(a, cwd=cwd, stdin=subprocess.DEVNULL,
+                                        capture_output=True, timeout=30)
+        try:
+            run("git", "-c", "init.defaultBranch=main", "init", "-q")
+            run("git", "config", "user.name", "ohmatic-bench")
+            run("git", "config", "user.email", "bench@ohmatic.local")
         except Exception:
-            resp = self.client.chat.completions.create(**kw)
-        u = resp.usage
+            pass
+
+    def run(self, system_prompt: str, user_prompt: str) -> dict:
+        import json
+        import subprocess
+        import tempfile
+        t0 = time.time()
+        # Fresh, SEALED temp cwd per ask (so no ask can leave memory for the next): the
+        # base Claude product prompt stays, the Ohmatic spec rides on top via
+        # --append-system-prompt-file (it is far larger than a command line allows).
+        with tempfile.TemporaryDirectory() as cwd:
+            self._seal_cwd(cwd)
+            specf = Path(cwd) / "ohmatic_spec.txt"
+            specf.write_text(system_prompt, encoding="utf-8")
+            argv = [self.exe, "-p", user_prompt,
+                    "--model", self.model,
+                    "--append-system-prompt-file", str(specf),
+                    "--allowed-tools", "none",       # single-shot: no tools, one turn
+                    "--setting-sources", "",         # drop operator hooks/skills/plugins
+                    "--output-format", "json"]
+            # The Windows `claude.CMD` shim launch is occasionally flaky ("The batch file
+            # cannot be found" - an AV/cmd race that aborts BEFORE any model call, so a
+            # failed launch is never billed). Retry the launch; returncode 0 means the
+            # model ran, so a success is never re-billed.
+            for attempt in range(3):
+                proc = subprocess.run(argv, cwd=cwd, stdin=subprocess.DEVNULL,
+                                      capture_output=True, text=True, encoding="utf-8",
+                                      timeout=C.CLI_TIMEOUT_S)
+                if proc.returncode == 0:
+                    break
+                time.sleep(2 * (attempt + 1))
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"claude CLI exit {proc.returncode} after retries: "
+                f"{(proc.stderr or '')[-400:]}")
+        d = json.loads(proc.stdout)
+        if d.get("is_error"):
+            raise RuntimeError(f"claude CLI error: {str(d.get('result', ''))[:300]}")
+        u = d.get("usage", {}) or {}
+        # Claude Code may bill a tiny auxiliary model (e.g. haiku, ~20 tok) for internal
+        # orchestration; the circuit generator is the model with the real output volume.
+        mu = d.get("modelUsage", {}) or {}
+        gen_model = (max(mu, key=lambda m: (mu[m].get("outputTokens")
+                                            or mu[m].get("output_tokens") or 0))
+                     if mu else self.model)
         return {
-            "raw_output": resp.choices[0].message.content or "",
+            "raw_output": d.get("result", "") or "",
             "latency_s": round(time.time() - t0, 3),
-            "tokens_in": getattr(u, "prompt_tokens", 0) or 0,
-            "tokens_out": getattr(u, "completion_tokens", 0) or 0,
+            "tokens_in": (u.get("input_tokens", 0)
+                          + u.get("cache_creation_input_tokens", 0)
+                          + u.get("cache_read_input_tokens", 0)),
+            "tokens_out": u.get("output_tokens", 0),
+            "cli_cost_usd": d.get("total_cost_usd", 0.0),
+            "cli_model": gen_model,
+            "cli_num_turns": d.get("num_turns"),
         }
 
 
@@ -202,10 +246,8 @@ class LocalSingleShotAdapter:
 def build_adapter(model_name: str, suite: str):
     cfg = C.model_cfg(model_name)
     kind = cfg["adapter"]
-    if kind == "anthropic":
-        return AnthropicAdapter(cfg["model"])
-    if kind == "openai":
-        return OpenAICompatAdapter(cfg["model"])
+    if kind == "claude_cli":
+        return ClaudeCliAdapter(cfg["model"])
     if kind == "ohmatic":
         # T5 only for realuser (raw messy input). Holdout prompts are already
         # normalized - pass-through there, same as prod_eval.

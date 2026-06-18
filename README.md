@@ -85,9 +85,10 @@ python -m eval.benchmark.cross_model.verify
 python -m eval.benchmark.cross_model.report --by-category
 ```
 
-Hosted legs need `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; local legs need a GPU and `HF_TOKEN`.
-The `realuser` suite is the 75-prompt set the numbers above cite. All pins, the model matrix, and
-the fairness contract live in
+The Claude legs need no api key - they drive the local `claude` CLI (a fresh, zero-context
+instance per prompt with the Ohmatic format spec on top of Claude's own product prompt); the
+local Ohmatic legs need a GPU and `HF_TOKEN`. The `realuser` suite is the 75-prompt set the
+numbers above cite. All pins, the model matrix, and the fairness contract live in
 [`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md).
 </details>
 

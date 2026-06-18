@@ -7,30 +7,39 @@ generation, verified by the same ERC engine the product ships.
 ## The three stages
 
 ```
-stage 1: GENERATE (costs money, resumable)   stage 2: VERIFY (free, forever)   stage 3: REPORT
+stage 1: GENERATE (spends usage, resumable)   stage 2: VERIFY (free, forever)   stage 3: REPORT
 python -m eval.benchmark.cross_model.generate  python -m ....verify              python -m ....report
    --model <leg> --suite <suite>                                                   [--by-category]
 → results/{model}.jsonl  (append-only,        → verified/{model}.jsonl          → pass-rate table,
   keyed (suite, prompt_id); reruns skip         same extraction→ERC path          Wilson 95% CI,
   done rows; crashes/rate limits resume         for EVERY model                   precision vs availability,
-  without double-paying)                                                          latency, cost
+  without redoing work)                                                           latency, cost
 ```
 
 ## Reproducing every leg
 
-Secrets via env only: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (+`OPENAI_MODEL`,
-optional `OPENAI_BASE_URL`), `HF_TOKEN`. Everything else (model IDs, artifact
+One secret, env only: `HF_TOKEN` (the private holdout suites). The Claude legs
+(`fable-5`, `opus`) need NO api key - they drive the local `claude` CLI on the
+machine's own Claude Code subscription. Everything else (model IDs, artifact
 revisions, decoding, prompt sets) is pinned in `config.py`.
 
 | Leg | Where it runs | Command |
 |---|---|---|
-| `fable-5` | any machine w/ Anthropic key | `... generate --model fable-5 --suite forward` |
-| `codex-5.5` | any machine w/ OpenAI key | `... generate --model codex-5.5 --suite forward` |
+| `fable-5` | any machine w/ the `claude` CLI logged in | `... generate --model fable-5 --suite realuser` |
+| `opus` | any machine w/ the `claude` CLI logged in | `... generate --model opus --suite realuser` |
 | `star-r2-bf16` | GPU box | `... generate --model star-r2-bf16 --suite forward` |
 | `star-r2-q4` | GPU box (llama-cpp-python) | `... generate --model star-r2-q4 --suite forward` |
 | `star-r2-noT5` | GPU box (ablation) | `... generate --model star-r2-noT5 --suite realuser` |
 | `qwen3-base` | GPU box (A40+) | `... generate --model qwen3-base --suite forward` |
 | `qwen3-base-1shot` | A40+ or 2x T4 | `... generate --model qwen3-base-1shot --suite realuser` |
+
+Claude legs (`claude_cli` adapter): every ask spins up a fresh `claude -p` instance
+(`npm i -g @anthropic-ai/claude-code`, logged in - no api key). The Ohmatic format
+spec rides on top of Claude's own product prompt via `--append-system-prompt-file`;
+the run cwd is a throwaway temp dir SEALED as its own git repo so no project
+CLAUDE.md / memory / git context is inherited (verified zero-context, identical on
+every machine). `--allowed-tools none` keeps it single-shot. This is product vs
+product: the shipped Claude product, not a bare model behind an api key.
 
 GPU legs: `pip install transformers peft accelerate safetensors sentencepiece
 llama-cpp-python`. The Ohmatic legs import `inference.pipeline` (the literal
@@ -57,18 +66,23 @@ control that isolates the lift as training, not the 8B base.
    (`shared.prompt_builder.build_system_prompt()`, the spec the fine-tunes
    trained on, which doubles as a complete format spec for frontier models)
    and the same user turns.
-2. **Single-shot hosted vs full-pipeline local**: Ohmatic legs keep their
-   retry loop and killswitch because that IS the product; hosted legs are
-   pass@1 because the ERC feedback format is proprietary. The report separates
-   *precision* (of delivered circuits, % ERC-clean) from *availability*
-   (% of requests answered) so the killswitch trade-off is visible, not hidden.
+2. **Single-shot Claude product vs full-pipeline Ohmatic**: Ohmatic legs keep
+   their retry loop and killswitch because that IS the product; the Claude legs
+   are pass@1 because the ERC feedback format is proprietary. It stays product
+   vs product - the Claude legs run the shipped Claude product (its own system
+   prompt) with only the Ohmatic format spec added, never a bare model behind an
+   api key. The report separates *precision* (of delivered circuits, % ERC-clean)
+   from *availability* (% answered) so the killswitch trade-off is visible.
 3. **One shared lenient extractor** (fences/prose stripped, first balanced
    JSON object) applied to every model equally, then one shared verifier
    (`eval.diagnostics.analyze_schematic`, the single source of truth).
-4. **Neutral prompt authorship**: the `realuser` suite was authored by a model
-   that is not in the matrix (Claude Opus), blinded from the training data,
-   and overlap-checked against the holdout + training corpus (max Jaccard
-   0.30, flag line 0.60).
+4. **Prompt authorship (with disclosure)**: the `realuser` suite was authored by
+   Claude Opus, blinded from the training data and overlap-checked against the
+   holdout + training corpus (max Jaccard 0.30, flag line 0.60). Opus is now also
+   an evaluated leg, so on `realuser` it answers prompts it wrote - a home-field
+   advantage that biases IN FAVOUR of the Claude side, making any Ohmatic win
+   there conservative. The held-out `forward` suite (not Opus-authored) is the
+   contamination-free cross-check.
 5. **Outcome taxonomy**: `delivered_clean` / `delivered_broken` /
    `blocked_killswitch` (Ohmatic refusal, no unverified circuit reaches the
    user) / `invalid_output`. Hosted legs have no killswitch: every ERC failure
