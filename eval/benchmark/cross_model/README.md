@@ -1,8 +1,9 @@
 # Cross-model benchmark: full reproducibility
 
-Compares hosted frontier models against the end-to-end Ohmatic product
-(T5 normalizer → Qwen → ERC → self-correction → **killswitch**) on circuit
-generation, verified by the same ERC engine the product ships.
+Compares frontier chat models - run product-vs-product through their own CLIs, no
+api key - against the end-to-end Ohmatic product (T5 normalizer → Qwen → ERC →
+self-correction → **killswitch**) on circuit generation, verified by the same ERC
+engine the product ships.
 
 ## The three stages
 
@@ -85,5 +86,5 @@ control that isolates the lift as training, not the 8B base.
    contamination-free cross-check.
 5. **Outcome taxonomy**: `delivered_clean` / `delivered_broken` /
    `blocked_killswitch` (Ohmatic refusal, no unverified circuit reaches the
-   user) / `invalid_output`. Hosted legs have no killswitch: every ERC failure
+   user) / `invalid_output`. The off-box legs have no killswitch: every ERC failure
    is a broken circuit delivered to the user.

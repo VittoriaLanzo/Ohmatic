@@ -179,18 +179,19 @@
             <div class="stat-row">
               <div class="stat"><div class="n good">93.3%</div><div class="l">delivered clean (Ohmatic bf16)</div></div>
               <div class="stat"><div class="n good">0</div><div class="l">broken circuits delivered</div></div>
-              <div class="stat"><div class="n bad">24%</div><div class="l">broken circuits delivered by Claude Fable 5</div></div>
+              <div class="stat"><div class="n bad">35%</div><div class="l">broken circuits delivered by Claude Opus 4.8</div></div>
             </div>
             <p style="font-size: 0.82rem">
               Wilson 95% intervals; identical prompts and the same verifier for every row. Claude Fable 5
-              received the complete Ohmatic system prompt, every ERC rule included, and was run
-              single-shot; only the correction loopback was withheld. Quality loss
-              shows up as fewer deliveries, not as bad output.
+              and Claude Opus 4.8 each received the complete Ohmatic system prompt, every ERC rule
+              included, and were run single-shot; only the correction loopback was withheld. Fable
+              delivered 24% broken, Opus 35% &mdash; and Opus authored these prompts, so that is its
+              home-field advantage. Quality loss shows up as fewer deliveries, not as bad output.
               <a href="https://github.com/VittoriaLanzo/Ohmatic#benchmark">Full methodology &rarr;</a>
             </p>
           </div>
           <figure>
-            <img class="bench-img" src="assets/benchmark.png" alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries, versus Claude Fable 5 at 76.0% with 24% broken circuits delivered" loading="lazy" decoding="async" />
+            <img class="bench-img" src="assets/benchmark.png" alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries, versus Claude Fable 5 at 76.0% (24% broken) and Claude Opus 4.8 at 65.3% (35% broken), with the untrained Qwen3-8B base at 4.0%" loading="lazy" decoding="async" />
             <figcaption>Verified-clean rate vs. broken deliveries, same 75-prompt suite.</figcaption>
           </figure>
         </div>

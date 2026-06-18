@@ -6,7 +6,8 @@ Horizontal stacked bars: green = delivered & passes ERC, gold = killswitch refus
     python -m eval.benchmark.cross_model.plot_benchmark
 
 Numbers are the ERC-clean counts per leg (full 75-prompt realuser suite):
-  bf16  70/75   Fable5 57/75   Q4_K_M 54/75   base 3/75   (Q4 from the T4/llama.cpp leg).
+  bf16 70/75   Fable5 57/75   Q4_K_M 54/75   Opus 49/75   base 3/75   (Q4 from the T4/llama.cpp leg).
+Opus authored the realuser prompts, so its row carries a home-field-advantage footnote.
 """
 from __future__ import annotations
 import math
@@ -22,10 +23,11 @@ FG = "#e6edf3"; MUTED = "#8b949e"; GRID = "#30363d"
 
 # label, clean, total, rest_kind
 MODELS = [
-    ("Ohmatic bf16\nfull pipeline · 8B",      70, 75, "blocked"),
-    ("Claude Fable 5\nfrontier · single-shot", 57, 75, "broken"),
-    ("Ohmatic Q4_K_M\nGGUF quant",                 54, 75, "blocked"),
-    ("Qwen3-8B base\nuntrained · single-shot",  3, 75, "broken"),
+    ("Ohmatic bf16\nfull pipeline · 8B",          70, 75, "blocked"),
+    ("Claude Fable 5\nfrontier · single-shot",    57, 75, "broken"),
+    ("Ohmatic Q4_K_M\nGGUF quant",                54, 75, "blocked"),
+    ("Claude Opus 4.8\nfrontier · single-shot *",  49, 75, "broken"),
+    ("Qwen3-8B base\nuntrained · single-shot",     3, 75, "broken"),
 ]
 
 
@@ -37,7 +39,7 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return (c - h) * 100, (c + h) * 100
 
 
-fig, ax = plt.subplots(figsize=(14.2, 7.0), dpi=200)
+fig, ax = plt.subplots(figsize=(14.2, 8.2), dpi=200)
 fig.patch.set_facecolor(BG); ax.set_facecolor(BG)
 ys = list(range(len(MODELS)))[::-1]   # first model on top
 
@@ -85,7 +87,12 @@ legend = [Patch(facecolor=GREEN, label="delivered · passes ERC"),
 ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=3,
           frameon=False, labelcolor=FG, fontsize=12, handlelength=1.3)
 
+fig.text(0.16, 0.045,
+         "*  Claude Opus authored the 75 prompts (blinded from training data). Evaluating it here is a "
+         "home-field advantage,\n   so its ERC-clean rate is if anything optimistic - the Ohmatic margin over it is conservative.",
+         color=MUTED, fontsize=11, ha="left", va="bottom")
+
 out = Path(__file__).resolve().parents[3] / "assets" / "benchmark.png"
-fig.subplots_adjust(left=0.16, right=0.93, top=0.80, bottom=0.16)
+fig.subplots_adjust(left=0.16, right=0.93, top=0.82, bottom=0.205)
 fig.savefig(out, facecolor=BG, dpi=200)
 print("wrote", out)

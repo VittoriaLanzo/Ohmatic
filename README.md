@@ -45,12 +45,12 @@ model can't get there, it returns a clarifying question and keeps the broken dra
 evaluation and overlap-checked against all training data, run end to end through the full pipeline.
 
 <p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark across 75 identical prompts judged by the same ERC engine: Ohmatic bf16 93.3% ERC-clean with zero ERC-failing deliveries (the rest withheld by the killswitch); Ohmatic Q4_K_M quant 72.0% ERC-clean, zero ERC-failing; Claude Fable 5 (full system prompt, single-shot) 76.0% ERC-clean with 18 of 75 outputs failing the same checks; the untrained Qwen3-8B base 4.0% ERC-clean" width="100%" />
+  <img src="assets/benchmark.png" alt="Benchmark across 75 identical prompts judged by the same ERC engine: Ohmatic bf16 93.3% ERC-clean with zero ERC-failing deliveries (the rest withheld by the killswitch); Ohmatic Q4_K_M quant 72.0% ERC-clean, zero ERC-failing; Claude Fable 5 (full system prompt, single-shot) 76.0% ERC-clean with 18 of 75 outputs failing the same checks; Claude Opus 4.8 (full system prompt, single-shot) 65.3% ERC-clean with 26 of 75 failing, despite Opus having authored the prompts; the untrained Qwen3-8B base 4.0% ERC-clean" width="100%" />
 </p>
 
 Every model is judged by the same ERC engine. "ERC-clean" means a delivered circuit passed that
 engine: structurally and electrically consistent against a fixed rule set. Ohmatic delivered 70 of
-the 75 and withheld the other 5; every delivery passed. On the same prompts, single-shot, 18 of 75 Claude Fable 5 outputs failed the same checks.
+the 75 and withheld the other 5; every delivery passed. On the same prompts, single-shot, 18 of 75 Claude Fable 5 outputs failed the same checks, and 26 of 75 Claude Opus 4.8 outputs failed it — even though Opus authored the prompts.
 
 <details>
 <summary><b>Methodology and reproduce</b></summary>
@@ -60,8 +60,8 @@ intervals (bf16 ERC-clean 93.3%, 95% CI 85.3-97.1%; the full set is in the repor
 "Failed ERC" means an output did not pass that engine. Because that engine also trains and gates
 Ohmatic, the ERC-clean rate measures conformance to a shared rule set; independent correctness is a
 separate question, addressed in [A note on verification](#a-note-on-verification). The comparison is
-fair because the rule set is held identical for every model, and Claude Fable 5 received the same
-complete system prompt, with the schema, component registry, and every ERC rule included.
+fair because the rule set is held identical for every model, and the Claude legs (Fable 5, Opus 4.8)
+received the same complete system prompt, with the schema, component registry, and every ERC rule included.
 
 On clean-rate, paired McNemar on the same 75 prompts: Ohmatic-only-clean 17 vs Claude
 Fable 5-only-clean 4, exact p = 0.007. Of the 75, Ohmatic delivered 70 (93.3% of all prompts; 100%
@@ -75,6 +75,13 @@ prompt (no repo or conversation access, default decoding). The only thing withhe
 correction loopback: the iterative repair loop is the product, and a chat user does not have it. Quantization degrades the generator: the Q4_K_M build still delivers 0
 ERC-failing circuits, but its killswitch fires about four times as often (28.0% withheld vs 6.7%),
 so the quality loss showed up as extra refusals while every delivery stayed ERC-clean.
+
+Claude Opus 4.8, run the identical way (full system prompt, single-shot, fresh instance per prompt),
+reaches 65.3% ERC-clean (49/75, 95% CI 54.1-75.1%) and delivers 26 broken circuits with no
+killswitch to catch them. Opus authored the realuser suite, so here it answers prompts it wrote — a
+home-field advantage that biases in its favour, which makes the Ohmatic margin over it conservative,
+not inflated. (`MISSING_POWER_VCC` was its most common failure: a circuit that reads fine but never
+ties the part to power.)
 
 ```bash
 # stage 1: generate (per model leg; append-only, crash-resumable)
