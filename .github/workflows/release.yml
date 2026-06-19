@@ -1,0 +1,76 @@
+name: Release
+
+# Distribution is release-driven: pushing a vX.Y.Z tag is what cuts a release.
+# The tag must agree with the in-tree version, the tests must pass, and only
+# then does the GitHub Release get published.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, e.g. v0.0.1'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          ref="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "name=$ref" >> "$GITHUB_OUTPUT"
+          echo "version=${ref#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version agreement
+        env:
+          TAG_VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          file="$(tr -d ' \t\r\n' < VERSION)"
+          py="$(grep -E '^version' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+          fe="$(grep -E '"version"' frontend/package.json | head -1 | sed -E 's/.*: *"([^"]+)".*/\1/')"
+          echo "tag=$TAG_VERSION  VERSION=$file  pyproject=$py  package.json=$fe"
+          for v in "$file" "$py" "$fe"; do
+            if [ "$v" != "$TAG_VERSION" ]; then
+              echo "::error::version mismatch: tag is '$TAG_VERSION' but found '$v'"
+              exit 1
+            fi
+          done
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pytest
+      - run: pytest tests/ -q
+
+      - name: Build release notes
+        env:
+          TAG_VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          awk -v hdr="## [$TAG_VERSION]" '
+            index($0, hdr) == 1 {flag=1; next}
+            flag && /^## \[/ {exit}
+            flag {print}
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "Release ${{ steps.tag.outputs.name }}." > notes.md
+          fi
+          cat notes.md
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+        run: |
+          gh release create "$TAG_NAME" \
+            --title "Ohmatic $TAG_NAME" \
+            --notes-file notes.md \
+            --verify-tag

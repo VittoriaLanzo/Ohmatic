@@ -85,6 +85,27 @@ function Show-Banner {
   Write-Host ""
 }
 
+function Invoke-Version {
+  # Canonical version from VERSION plus the short commit it was built from, so a
+  # bug report can name exactly what is running.
+  $ver = "unknown"
+  $verFile = Join-Path $root "VERSION"
+  if (Test-Path $verFile) { $ver = (Get-Content $verFile -Raw).Trim() }
+  $sha = ""
+  try {
+    & git -C $root rev-parse --git-dir *> $null
+    if ($LASTEXITCODE -eq 0) { $sha = (& git -C $root rev-parse --short HEAD 2>$null) }
+  } catch { }
+  Write-Host "  $($Glyph.Omega) " -ForegroundColor Green -NoNewline
+  Write-Host "ohmatic " -NoNewline
+  if ($sha) {
+    Write-Host "v$ver" -ForegroundColor Cyan -NoNewline
+    Write-Host " ($sha)" -ForegroundColor DarkGray
+  } else {
+    Write-Host "v$ver" -ForegroundColor Cyan
+  }
+}
+
 function Show-Usage {
   Show-Banner
   Write-Host "  ohmatic start          Full stack: Python backend stubs + frontend (server mode)"
@@ -96,6 +117,7 @@ function Show-Usage {
   Write-Host "  ohmatic onboarding     Scan hardware + install the matching model (auto on first start)"
   Write-Host "  ohmatic fetch [tier]   Download weights (recommended tier, or bf16 / q8_0 / q4_k_m)"
   Write-Host "  ohmatic update         Reset this clone to the latest GitHub main (discards local edits)"
+  Write-Host "  ohmatic version        Print the installed Ohmatic version"
   Write-Host "  ohmatic help           Show this help"
   Write-Host ""
   Write-Host "  Fresh clone -> 'ohmatic start' -> open the printed URL." -ForegroundColor DarkGray
@@ -732,6 +754,8 @@ switch ($Command.ToLowerInvariant()) {
     $fits = if ($total -ge ($script:Q4CommittedMb + $reserve)) { "yes" } else { "no" }
     Write-Output "reserve=$reserve q4_cpu=$fits"
   }
+  "version" { Invoke-Version }
+  "--version" { Invoke-Version }
   "help"   { Show-Usage }
   default  { Show-Usage; exit 2 }
 }

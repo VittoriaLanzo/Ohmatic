@@ -511,6 +511,22 @@ cmd_doctor() {
   else printf "%sVerdict: install Node.js first, then re-run './ohmatic doctor'.%s\n" "$C_RED" "$C_OFF"; fi
 }
 
+# Print the installed version: the canonical string from VERSION plus the short
+# commit it was built from, so a bug report can name exactly what is running.
+cmd_version() {
+  local ver="unknown"
+  [ -f "$ROOT/VERSION" ] && ver="$(tr -d ' \t\r\n' < "$ROOT/VERSION")"
+  local sha=""
+  if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    sha="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)"
+  fi
+  if [ -n "$sha" ]; then
+    printf "  %sΩ%s ohmatic %sv%s%s %s(%s)%s\n" "$C_GREEN" "$C_OFF" "$C_CYAN" "$ver" "$C_OFF" "$C_DIM" "$sha" "$C_OFF"
+  else
+    printf "  %sΩ%s ohmatic %sv%s%s\n" "$C_GREEN" "$C_OFF" "$C_CYAN" "$ver" "$C_OFF"
+  fi
+}
+
 usage() {
   banner
   cat <<'EOF'
@@ -523,6 +539,7 @@ usage() {
   ./ohmatic onboarding     Scan hardware + install the matching model (auto on first start)
   ./ohmatic fetch          Download the doctor-recommended model weights (resumable)
   ./ohmatic update         Reset this clone to the latest GitHub main (discards local edits)
+  ./ohmatic version        Print the installed Ohmatic version
 
   Fresh clone -> './ohmatic start' -> open the printed URL.
 EOF
@@ -538,6 +555,7 @@ case "${1:-help}" in
   fetch) shift; cmd_fetch "$@" ;;
   update) cmd_update ;;
   __hwprobe) shift; _hwprobe "${1:-}" ;;  # hidden: reserve/tier math probe for tests
+  version|--version|-v) cmd_version ;;
   help|--help|-h) usage ;;
   *) usage; exit 2 ;;
 esac
