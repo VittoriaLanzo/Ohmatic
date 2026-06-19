@@ -136,6 +136,9 @@ class PipelineResult:
 # was TRAINED on. Inline copies drift out-of-distribution and must not be reintroduced.
 from shared.prompt_builder import build_system_prompt as _shared_system_prompt
 from shared.erc_feedback import format_erc_errors as _format_erc_errors
+# Pure-Python Qwen3 ChatML renderer - replaces transformers.apply_chat_template on
+# the GGUF edge path (no torch/transformers import; proven byte-identical).
+from inference.qwen_chat import render_chat
 from shared.t5_normalizer import (
     T5_TASK_PREFIX as _T5_PREFIX,
     add_prefix as _t5_add_prefix,
@@ -328,8 +331,10 @@ class HFChatModel:
 class LlamaCppChatModel:
     """GGUF inference via llama-cpp-python (CPU/CUDA/Metal). Greedy (temperature=0)
     with thinking suppressed (enable_thinking=False) - matches training and the bf16
-    benchmark leg (93.3%/0% broken). The model's own tokenizer builds the prompt, so
-    it is byte-faithful to that leg; the prefix KV cache is the one perf add kept.
+    benchmark leg (93.3%/0% broken). A pure-Python Qwen3 ChatML renderer
+    (inference.qwen_chat) builds the prompt - byte-identical to the model tokenizer's
+    apply_chat_template that the benchmark legs used (proven in tests/test_qwen_chat.py),
+    but with NO transformers/torch import. The prefix KV cache is the one perf add kept.
 
     No speculative decoding / forced flash_attn: both perturbed the greedy output
     (not byte-identical to the benchmark) and were the source of the crash."""
@@ -364,37 +369,22 @@ class LlamaCppChatModel:
             self.llm.set_cache(LlamaRAMCache(capacity_bytes=2 << 30))
         except Exception:
             pass  # speedup, not a requirement
-        # The model tokenizer formats the prompt with enable_thinking=False, exactly
-        # as training/the bf16 leg did. Without it the GGUF template defaults to
-        # thinking ON, which wastes the budget and underperforms - so warn loudly.
-        self._tok = None
-        if tokenizer_dir:
-            try:
-                from transformers import AutoTokenizer
-                self._tok = AutoTokenizer.from_pretrained(tokenizer_dir)
-            except Exception as exc:
-                print(f"[LlamaCppChatModel] tokenizer load failed ({exc}); using the GGUF "
-                      f"chat template (thinking NOT suppressed).", file=sys.stderr, flush=True)
-        else:
-            print("[LlamaCppChatModel] no tokenizer_dir; using GGUF chat template "
-                  "(thinking NOT suppressed - re-run ./ohmatic fetch).", file=sys.stderr, flush=True)
+        # The prompt is built by inference.qwen_chat.render_chat with
+        # enable_thinking=False - byte-identical to the model tokenizer's
+        # apply_chat_template that training/the benchmark legs used (proven in
+        # tests/test_qwen_chat.py), but pure-Python: no transformers/torch (~366 MB)
+        # and no network-capable dep in the loop. tokenizer_dir is accepted for
+        # call-site compatibility but no longer used.
         self.max_new_tokens = max_new_tokens
         self.progress_cb = None  # optional fn(frac 0..1), set per job by the caller
         print(f"[LlamaCppChatModel] loaded {gguf_path} (n_ctx={n_ctx}, "
-              f"n_gpu_layers={n_gpu_layers}, thinking={'off' if self._tok else 'template'})",
+              f"n_gpu_layers={n_gpu_layers}, thinking=off, prompt=pure-python)",
               file=sys.stderr, flush=True)
 
-    def _prompt(self, messages: list[dict[str, str]]) -> str | None:
-        """Format with enable_thinking=False via the model tokenizer. None -> caller
-        falls back to the GGUF chat template (tokenizer missing)."""
-        if self._tok is None:
-            return None
-        try:
-            return self._tok.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
-        except TypeError:
-            return self._tok.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True)
+    def _prompt(self, messages: list[dict[str, str]]) -> str:
+        """Qwen3 ChatML with enable_thinking=False via the pure-Python renderer -
+        byte-identical to the tokenizer's apply_chat_template (tests/test_qwen_chat.py)."""
+        return render_chat(messages, add_generation_prompt=True, enable_thinking=False)
 
     def _consume(self, chunks, extract) -> str:
         parts, n = [], 0
@@ -418,14 +408,6 @@ class LlamaCppChatModel:
         # attempt must be resampled (Olausson et al., ICLR 2024 - diversity drives self-repair).
         prompt = self._prompt(messages)
         stream = self.progress_cb is not None
-        if prompt is None:  # tokenizer missing: GGUF chat-template fallback (thinking on)
-            if not stream:
-                out = self.llm.create_chat_completion(
-                    messages=messages, max_tokens=self.max_new_tokens, temperature=temperature)
-                return _strip_think((out["choices"][0]["message"]["content"] or "").strip())
-            chunks = self.llm.create_chat_completion(
-                messages=messages, max_tokens=self.max_new_tokens, temperature=temperature, stream=True)
-            return self._consume(chunks, lambda c: c["choices"][0]["delta"].get("content"))
         if not stream:
             out = self.llm.create_completion(
                 prompt=prompt, max_tokens=self.max_new_tokens, temperature=temperature)

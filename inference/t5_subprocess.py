@@ -58,6 +58,11 @@ def _run_worker(model_id: str, max_new_tokens: int, prompt: str) -> str:
     device_map='auto', num_beams=4, do_sample=False, decode(skip_special_tokens=True).strip().
     """
     # Lazy imports: keep module-level import torch-free.
+    # Force offline: the T5 weights are local, so never let transformers/hub phone
+    # home (would stall a genuinely offline edge box on first run). Set before import.
+    import os as _os
+    _os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    _os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
     import torch
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 

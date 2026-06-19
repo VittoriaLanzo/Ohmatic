@@ -132,12 +132,21 @@ _KV_BYTES_PER_TOKEN = 2 * 36 * 8 * 128 * 2  # = 147456
 # path, so it is always committed alongside the model.
 _RAM_PREFIX_CACHE_MB = 2048
 
-# T5/torch is NOT charged here: on every tier this guard evaluates (.gguf paths,
-# see the model_path check below) OhmaticPipeline.from_config runs T5 in a
-# short-lived subprocess (inference/t5_subprocess.py), so torch+T5 (~3 GiB) live
-# only during the normalize phase and exit before Qwen generates. That phase's
-# total (weights + ~3 GiB) stays below the generation peak (weights + KV + prefix
-# cache), so T5 never sets the committed peak; charging it would only over-refuse.
+# Neither T5 nor any ML framework is charged here, because none is resident during
+# the generation peak this formula sizes:
+#   - T5 runs in a short-lived subprocess (inference/t5_subprocess.py): torch+T5
+#     (~3 GiB) live only during normalize and exit before Qwen generates; that
+#     phase's total (weights + ~3 GiB) stays below the generation peak.
+#   - The Qwen prompt renders in pure Python (inference/qwen_chat.py), so the
+#     generation loop no longer imports transformers/torch. The long-lived process
+#     is now ~43 MB of runtime (llama_cpp + numpy + stdlib), comfortably inside the
+#     OS reserve below.
+# So the committed generation peak is exactly weights + KV(n_ctx) + prefix cache.
+# NOTE: this number did NOT shrink when transformers was removed - the formula never
+# included it. What changed is accuracy: the loop previously also held ~366 MB of
+# transformers/torch outside this estimate, so a loaded box near the limit could run
+# ~366 MB over budget; that overhead is now gone (not re-budgeted), so the estimate
+# matches the real generation peak.
 
 # OS reserve: RAM to leave for the OS + other apps, computed dynamically rather
 # than as a flat 2 GB guess. It tracks what is ACTUALLY in use right now
@@ -147,7 +156,7 @@ _RAM_PREFIX_CACHE_MB = 2048
 # a machine the model would still fit. Falls back to a flat 2 GB when available RAM
 # cannot be read. (Unlike _total_ram_mb, where the weights are evictable so total
 # is the right basis, the reserve covers committed allocations - current
-# availability is the honest input.) The doctor's static ~11 GB floor (ohmatic,
+# availability is the right input.) The doctor's static ~11 GB floor (ohmatic,
 # ohmatic.ps1) is the conservative end of this range.
 _RAM_OS_RESERVE_FLOOR_MB = 768
 _RAM_OS_RESERVE_CAP_MB = 3072

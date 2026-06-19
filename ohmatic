@@ -378,9 +378,12 @@ cmd_fetch() {
 # nvidia driver, locked-down powershell) degrades the verdict, never the launcher.
 # ── Dynamic OS reserve (mirror of gateway/stub/server.py _os_reserve_mb) ───────
 # Q4_K_M CPU committed peak in MB: weights ~4794 + KV(n_ctx=16384) 2304 + prefix
-# cache 2048. The doctor recommends a q4 tier only when total RAM clears this peak
-# PLUS a dynamic OS reserve (what the OS + other apps use now), identical to the
-# gateway guard - so the doctor never recommends a tier the guard then refuses.
+# cache 2048. The generation loop is ML-framework-free (prompts render in pure
+# Python; T5 is a short-lived subprocess), so the ~43 MB process runtime fits in
+# the reserve and the peak is exactly weights+KV+prefix - no transformers/torch term.
+# The doctor recommends a q4 tier only when total RAM clears this peak PLUS a dynamic
+# OS reserve (what the OS + other apps use now), identical to the gateway guard - so
+# the doctor never recommends a tier the guard then refuses.
 Q4_COMMITTED_MB=9146
 OS_RESERVE_FLOOR_MB=768
 OS_RESERVE_CAP_MB=3072

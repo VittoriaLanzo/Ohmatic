@@ -5,9 +5,12 @@ huggingface_hub>=1.17.0      # model fetch (./ohmatic fetch)
 llama-cpp-python>=0.3.28     # GGUF inference; prebuilt wheels:
                              #   pip install llama-cpp-python --prefer-binary \
                              #     --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
-torch>=2.12.0                # T5 normalizer. CPU-only machines:
+torch>=2.12.0                # T5 normalizer (subprocess) + HF generator path. NOT loaded
+                             #   by the GGUF edge generation loop. CPU-only machines:
                              #   pip install torch --index-url https://download.pytorch.org/whl/cpu
-transformers>=5.10.1
+transformers>=5.10.1         # T5 normalizer + HF generator path ONLY; the GGUF edge
+                             #   generation loop renders prompts in pure Python
+                             #   (inference/qwen_chat.py) and never imports transformers.
 accelerate>=1.14.0           # required by transformers device_map
 sentencepiece>=0.2.1         # T5 tokenizer
 

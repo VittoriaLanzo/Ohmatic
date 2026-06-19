@@ -360,9 +360,12 @@ function Start-Frontend([bool]$UseMock) {
 # verdict to a lower tier - it never throws and never blocks the launcher.
 # ── Dynamic OS reserve (mirror of gateway/stub/server.py _os_reserve_mb) ───────
 # Q4_K_M CPU committed peak in MB: weights ~4794 + KV(n_ctx=16384) 2304 + prefix
-# cache 2048. The doctor recommends q4_k_m_cpu only when total RAM clears this peak
-# plus a dynamic OS reserve (what the OS + other apps use now), identical to the
-# gateway guard - so the doctor never recommends a tier the guard then refuses.
+# cache 2048. The generation loop is ML-framework-free (prompts render in pure
+# Python; T5 is a short-lived subprocess), so the ~43 MB process runtime fits in
+# the reserve and the peak is exactly weights+KV+prefix - no transformers/torch term.
+# The doctor recommends q4_k_m_cpu only when total RAM clears this peak plus a dynamic
+# OS reserve (what the OS + other apps use now), identical to the gateway guard - so
+# the doctor never recommends a tier the guard then refuses.
 $script:Q4CommittedMb       = 9146
 $script:OsReserveFloorMb    = 768
 $script:OsReserveCapMb      = 3072
