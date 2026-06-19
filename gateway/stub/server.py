@@ -78,14 +78,31 @@ def _total_ram_mb() -> int | None:
     return None
 
 
-# Headroom over the weights for the KV cache (n_ctx=16384 ~ 2.3 GB for Qwen3-8B
-# GQA), compute buffers, and the prefix RAM cache. These are the anonymous, truly
-# committed allocations; the weights themselves are file-backed and evictable, so
-# counting the full weights file below already builds in a large hidden cushion.
-_RAM_HEADROOM_MB = 2048
-# Left free for the OS and other apps. Only the headroom above is hard-committed,
-# so a 2 GB reserve keeps the machine responsive without refusing on a machine the
-# doctor already deemed big enough (it only recommends a CPU tier at >=12 GB).
+# KV-cache cost per context token, in BYTES. This is the dominant committed
+# (anonymous, non-evictable) allocation that the old gate ignored. Derivation for
+# the q4_k_m_cpu tier's Qwen3-8B (GQA):
+#   2 (K and V) * 36 layers * 8 KV heads * 128 head_dim * 2 bytes (f16)
+#   = 147,456 bytes/token  (~144 KiB/token)
+# At n_ctx=16384 that is ~2.25 GiB. We carry the per-token figure (not a single
+# model's total) so the estimate tracks PipelineConfig.llamacpp_n_ctx if it moves;
+# this is an admission heuristic, not an exact accountant.
+_KV_BYTES_PER_TOKEN = 2 * 36 * 8 * 128 * 2  # = 147456
+
+# LlamaRAMCache capacity for the shared system-prompt prefix KV, in MB. Set in
+# inference/pipeline.py (~line 364) at 2 GiB and currently always on for the GGUF
+# path, so it is always committed alongside the model.
+_RAM_PREFIX_CACHE_MB = 2048
+
+# T5/torch is NOT charged here: on every tier this guard evaluates (.gguf paths,
+# see the model_path check below) OhmaticPipeline.from_config runs T5 in a
+# short-lived subprocess (inference/t5_subprocess.py), so torch+T5 (~3 GiB) live
+# only during the normalize phase and exit before Qwen generates. That phase's
+# total (weights + ~3 GiB) stays below the generation peak (weights + KV + prefix
+# cache), so T5 never sets the committed peak; charging it would only over-refuse.
+
+# Left free for the OS and other apps, in MB. A 2 GB reserve keeps the machine
+# responsive without refusing on a machine the doctor already deemed big enough
+# (it only recommends a CPU tier at >=12 GB total RAM).
 _RAM_OS_RESERVE_MB = 2048
 
 
@@ -115,12 +132,53 @@ def _ram_guard() -> str | None:
     except OSError:
         return None
     tier = manifest.get("tier", "installed")
-    need_mb = weights_mb + _RAM_HEADROOM_MB
+    # Estimate the TRUE committed peak, not just the weights. The OLD gate charged
+    # the EVICTABLE part (mmap'd, file-backed GGUF weights, which the OS can drop
+    # under pressure) and IGNORED the COMMITTED part (KV cache + prefix cache, the
+    # anonymous allocations that actually cause OOM) - it was backwards. That let a
+    # ~9 GB machine pass and then OOM mid-generation.
+    #   peak ~= weights + KV(n_ctx) + prefix_cache   (T5 is subprocess-isolated; see above)
+    # KV scales with the context window; read n_ctx from PipelineConfig's default
+    # so the two stay in sync instead of hardcoding a token count here.
+    try:
+        from inference.pipeline import PipelineConfig
+        n_ctx = PipelineConfig.llamacpp_n_ctx
+    except Exception:
+        n_ctx = 16384  # PipelineConfig default; conservative fallback if import fails
+    kv_mb = (_KV_BYTES_PER_TOKEN * n_ctx) // (1024 * 1024)
+    need_mb = weights_mb + kv_mb + _RAM_PREFIX_CACHE_MB
     if total - _RAM_OS_RESERVE_MB < need_mb:
         return (f"This machine has ~{total} MB total RAM, but the '{tier}' tier needs "
-                f"~{need_mb} MB plus an OS reserve. Re-run ./ohmatic doctor and fetch "
-                f"the recommended tier, or use stub/cloud mode.")
+                f"~{need_mb} MB committed (weights {weights_mb} + KV {kv_mb} + prefix "
+                f"cache {_RAM_PREFIX_CACHE_MB}) plus a {_RAM_OS_RESERVE_MB} MB OS reserve. "
+                f"Re-run ./ohmatic doctor and fetch the recommended tier, or use stub/cloud mode.")
     return None
+
+
+def _n_gpu_layers_for(tier: str) -> int:
+    """How many of the model's layers to offload to the GPU for this tier.
+
+    PipelineConfig defaults llamacpp_n_gpu_layers to -1 (offload ALL layers), which
+    is right for the GPU GGUF tiers but WRONG for a _cpu tier: on a CUDA-enabled
+    llama.cpp build, -1 tries to push all 36 layers onto a small GPU and OOMs VRAM
+    on the very machine the CPU tier targets. So:
+      *_cpu            -> 0   (keep every layer in system RAM)
+      q4_k_m / q8_0    -> -1  (offload all; the GPU GGUF tiers)
+
+    OHMATIC_N_GPU_LAYERS overrides the tier default with an explicit count N: it
+    moves N of the 36 layers to VRAM (partial offload), which frees that much
+    system RAM - useful on a cheap GPU that cannot hold all layers but can hold
+    some. The value is passed straight to llama.cpp (0 = none, -1 = all)."""
+    import os
+    override = os.environ.get("OHMATIC_N_GPU_LAYERS")
+    if override is not None and override.strip():
+        try:
+            return int(override)
+        except ValueError:
+            pass  # malformed override -> fall back to the tier default
+    if tier.endswith("_cpu"):
+        return 0
+    return -1  # GPU GGUF tiers (q4_k_m, q8_0): offload all layers
 
 
 def _get_pipeline():
@@ -132,6 +190,7 @@ def _get_pipeline():
             cfg = PipelineConfig(t5_model_id=manifest.get("t5_path") or "",
                                  qwen_model_id=manifest["model_path"],
                                  qwen_tokenizer_dir=manifest.get("tokenizer_path") or "")
+            cfg.llamacpp_n_gpu_layers = _n_gpu_layers_for(manifest.get("tier", ""))
             _PIPELINE = OhmaticPipeline.from_config(cfg)
         return _PIPELINE
 
