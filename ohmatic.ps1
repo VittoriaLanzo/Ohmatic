@@ -372,7 +372,10 @@ function Get-HwAssess {
   if     ($vramMb -ge 20000) { $tier = "bf16";       $why = "$gpu ($vramMb MB VRAM) fits the full bf16 model" }
   elseif ($vramMb -ge 10000) { $tier = "q8_0";       $why = "$gpu ($vramMb MB VRAM) fits the Q8_0 GGUF" }
   elseif ($vramMb -ge 6000)  { $tier = "q4_k_m";     $why = "$gpu ($vramMb MB VRAM) fits the Q4_K_M GGUF" }
-  elseif ($ramGb  -ge 12)    { $tier = "q4_k_m_cpu"; $why = "$ramGb GB RAM runs the Q4_K_M GGUF on CPU (slower)" }
+  # Q4_K_M CPU floor = 11 GB: _ram_guard's committed peak (weights + KV + prefix cache)
+  # plus a ~2 GB OS reserve; T5 is subprocess-isolated and no longer counted. Keep in
+  # sync with gateway/stub/server.py so the doctor never recommends a tier the guard refuses.
+  elseif ($ramGb  -ge 11)    { $tier = "q4_k_m_cpu"; $why = "$ramGb GB RAM runs the Q4_K_M GGUF on CPU (slower)" }
   $checkedAt = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
   $payload = [ordered]@{ ram_gb = $ramGb; vram_mb = $vramMb; gpu = $gpu; recommended_model = $tier; reason = $why; checked_at = $checkedAt }
   ($payload | ConvertTo-Json -Compress) | Set-Content -LiteralPath (Join-Path $runDir "doctor.json") -Encoding utf8

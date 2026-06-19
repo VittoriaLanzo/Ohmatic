@@ -102,7 +102,8 @@ _RAM_PREFIX_CACHE_MB = 2048
 
 # Left free for the OS and other apps, in MB. A 2 GB reserve keeps the machine
 # responsive without refusing on a machine the doctor already deemed big enough
-# (it only recommends a CPU tier at >=12 GB total RAM).
+# (it only recommends a CPU tier at >=11 GB total RAM, matching the committed peak
+# below now that T5 is subprocess-isolated).
 _RAM_OS_RESERVE_MB = 2048
 
 

@@ -403,9 +403,13 @@ hw_assess() {
   elif [ "$vram_mb" -ge  6000 ]; then tier="q4_k_m";     why="${gpu} (${vram_mb} MB VRAM) fits the Q4_K_M GGUF"
   elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 24 ]; then
     tier="q8_0";   why="Apple Silicon, ${ram_gb} GB unified memory - Q8_0 GGUF on Metal"
-  elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 12 ]; then
+  # Q4_K_M floor = 11 GB: the gateway _ram_guard's committed peak (weights ~4.8 + KV
+  # ~2.3 + prefix cache 2.0 GiB) plus a ~2 GB OS reserve. T5 no longer counts - it
+  # runs in a short-lived subprocess that exits before generation. Keep this in sync
+  # with gateway/stub/server.py so the doctor never recommends a tier the guard refuses.
+  elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 11 ]; then
     tier="q4_k_m"; why="Apple Silicon, ${ram_gb} GB unified memory - Q4_K_M GGUF on Metal"
-  elif [ "$ram_gb" -ge 12 ];     then tier="q4_k_m_cpu"; why="${ram_gb} GB RAM runs Q4_K_M on CPU (slow)"
+  elif [ "$ram_gb" -ge 11 ];     then tier="q4_k_m_cpu"; why="${ram_gb} GB RAM runs Q4_K_M on CPU (slow)"
   fi
   printf '{"ram_gb": %s, "vram_mb": %s, "gpu": "%s", "recommended_model": "%s", "reason": "%s", "checked_at": "%s"}
 '     "$ram_gb" "$vram_mb" "$gpu" "$tier" "$why" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RUN_DIR/doctor.json"

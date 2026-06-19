@@ -7,6 +7,7 @@ or GPU here.
 """
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -15,9 +16,19 @@ from inference.t5_subprocess import SubprocessT5Normalizer, _OUT_MARKER
 
 
 def test_module_import_is_torch_free():
-    """Importing the parent module must NOT pull torch into the process."""
-    assert "torch" not in sys.modules
-    assert "transformers" not in sys.modules
+    """Importing the parent module must NOT pull torch/transformers in. Checked in a
+    clean subprocess so the result is independent of what earlier tests imported - the
+    real-model parity test (test_t5_parity.py) imports torch in-process."""
+    code = (
+        "import sys, inference.t5_subprocess\n"
+        "assert 'torch' not in sys.modules, 'torch leaked'\n"
+        "assert 'transformers' not in sys.modules, 'transformers leaked'\n"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True,
+        cwd=str(Path(__file__).resolve().parents[1]),
+    )
+    assert proc.returncode == 0, proc.stderr
 
 
 def _fake_run(returncode=0, stdout="", stderr="", raises=None):
@@ -135,3 +146,45 @@ def test_pipeline_falls_back_to_raw_prompt_on_worker_failure(monkeypatch):
     result = pipe.run("a 5v regulator")
     # mock Qwen returns an ERC-passing stub, so the run still completes ok.
     assert result.ok
+
+
+# ── from_config routing: T5 goes to the subprocess ONLY on the edge tier ───────
+# These lock in the blast radius of the subprocess change: the edge (GGUF) path
+# must isolate T5, every other path must keep the in-process normalizer, and a
+# missing t5 must stay the mock. All torch-free - the generators and the
+# would-be in-process T5 are stubbed so nothing loads a model.
+
+def _stub_generators(monkeypatch):
+    from inference import pipeline as P
+    monkeypatch.setattr(P, "LlamaCppChatModel", lambda *a, **k: object())
+    monkeypatch.setattr(P, "HFChatModel", lambda *a, **k: object())
+
+
+def test_from_config_routes_t5_to_subprocess_on_gguf_path(monkeypatch):
+    from inference import pipeline as P
+    _stub_generators(monkeypatch)
+    # qwen path ends in .gguf -> edge tier -> subprocess T5
+    cfg = P.PipelineConfig(t5_model_id="some/t5", qwen_model_id="x/model.gguf")
+    pipe = P.OhmaticPipeline.from_config(cfg)
+    assert isinstance(pipe.normalizer, SubprocessT5Normalizer)
+    # backend='llamacpp' is the same edge tier even without a .gguf suffix
+    cfg2 = P.PipelineConfig(t5_model_id="some/t5", qwen_model_id="x", backend="llamacpp")
+    assert isinstance(P.OhmaticPipeline.from_config(cfg2).normalizer, SubprocessT5Normalizer)
+
+
+def test_from_config_keeps_in_process_t5_off_edge(monkeypatch):
+    from inference import pipeline as P
+    _stub_generators(monkeypatch)
+    sentinel = object()
+    monkeypatch.setattr(P, "HFT5Normalizer", lambda *a, **k: sentinel)
+    # default 'hf' backend, non-gguf qwen -> not edge -> in-process HFT5Normalizer
+    cfg = P.PipelineConfig(t5_model_id="some/t5", qwen_model_id="Qwen/Qwen3-8B")
+    assert P.OhmaticPipeline.from_config(cfg).normalizer is sentinel
+
+
+def test_from_config_uses_mock_normalizer_without_t5(monkeypatch):
+    from inference import pipeline as P
+    _stub_generators(monkeypatch)
+    # no t5 (the prod_eval / pass-through case) stays the mock even on the gguf path
+    cfg = P.PipelineConfig(t5_model_id="", qwen_model_id="x/model.gguf")
+    assert isinstance(P.OhmaticPipeline.from_config(cfg).normalizer, P._MockNormalizer)
