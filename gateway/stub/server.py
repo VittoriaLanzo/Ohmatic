@@ -63,16 +63,55 @@ def _total_ram_mb() -> int | None:
                                  capture_output=True, text=True, timeout=2)
             return int(out.stdout.strip()) // (1024 * 1024)
         if sys.platform == "win32":
-            import ctypes
-            class MEMORYSTATUSEX(ctypes.Structure):
-                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
-                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
-                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
-                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
-                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
-            st = MEMORYSTATUSEX(); st.dwLength = ctypes.sizeof(st)
-            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
-            return int(st.ullTotalPhys) // (1024 * 1024)
+            return _win_mem()[0]
+    except Exception:
+        pass
+    return None
+
+
+def _win_mem() -> tuple[int | None, int | None]:
+    """(total_mb, available_mb) from GlobalMemoryStatusEx on Windows; (None, None)
+    off Windows or on failure. Shared by _total_ram_mb and _available_ram_mb so the
+    struct is defined once."""
+    if sys.platform != "win32":
+        return None, None
+    import ctypes
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+    st = MEMORYSTATUSEX(); st.dwLength = ctypes.sizeof(st)
+    ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
+    return int(st.ullTotalPhys) // (1024 * 1024), int(st.ullAvailPhys) // (1024 * 1024)
+
+
+def _available_ram_mb() -> int | None:
+    """RAM currently available for a new allocation, in MB; None = unknown.
+
+    Sizes the OS reserve only (how much to leave for the OS + other apps); it does
+    NOT gate the mmap'd weights, which stay sized against total RAM (_total_ram_mb).
+    MemAvailable on Linux, ullAvailPhys on Windows, free+inactive+speculative pages
+    on macOS - the kernel's estimate of what is allocatable without swapping."""
+    try:
+        if sys.platform.startswith("linux"):
+            for line in open("/proc/meminfo", encoding="utf-8"):
+                if line.startswith("MemAvailable"):
+                    return int(line.split()[1]) // 1024
+            return None  # pre-3.14 kernels lack MemAvailable
+        if sys.platform == "darwin":
+            import subprocess
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=2)
+            page, pages = 4096, 0
+            for line in out.stdout.splitlines():
+                if "page size of" in line:
+                    page = int(line.split("page size of")[1].split("bytes")[0].strip())
+                elif line.startswith(("Pages free:", "Pages inactive:", "Pages speculative:")):
+                    pages += int(line.rsplit(":", 1)[1].strip().rstrip("."))
+            return pages * page // (1024 * 1024)
+        if sys.platform == "win32":
+            return _win_mem()[1]
     except Exception:
         pass
     return None
@@ -100,11 +139,30 @@ _RAM_PREFIX_CACHE_MB = 2048
 # total (weights + ~3 GiB) stays below the generation peak (weights + KV + prefix
 # cache), so T5 never sets the committed peak; charging it would only over-refuse.
 
-# Left free for the OS and other apps, in MB. A 2 GB reserve keeps the machine
-# responsive without refusing on a machine the doctor already deemed big enough
-# (it only recommends a CPU tier at >=11 GB total RAM, matching the committed peak
-# below now that T5 is subprocess-isolated).
-_RAM_OS_RESERVE_MB = 2048
+# OS reserve: RAM to leave for the OS + other apps, computed dynamically rather
+# than as a flat 2 GB guess. It tracks what is ACTUALLY in use right now
+# (total - available), so a lean headless box reserves almost nothing and runs the
+# tier, while a busy box reserves what it is really using - clamped to [FLOOR, CAP]
+# so we never under-reserve below the OS baseline, nor let a transient spike refuse
+# a machine the model would still fit. Falls back to a flat 2 GB when available RAM
+# cannot be read. (Unlike _total_ram_mb, where the weights are evictable so total
+# is the right basis, the reserve covers committed allocations - current
+# availability is the honest input.) The doctor's static ~11 GB floor (ohmatic,
+# ohmatic.ps1) is the conservative end of this range.
+_RAM_OS_RESERVE_FLOOR_MB = 768
+_RAM_OS_RESERVE_CAP_MB = 3072
+_RAM_OS_RESERVE_FALLBACK_MB = 2048
+
+
+def _os_reserve_mb(total_mb: int) -> int:
+    """RAM to hold back for the OS + other apps: what is in use now (total minus
+    available), clamped to [FLOOR, CAP]; the flat fallback when availability is
+    unknown."""
+    avail = _available_ram_mb()
+    if avail is None:
+        return _RAM_OS_RESERVE_FALLBACK_MB
+    used_by_others = max(0, total_mb - avail)
+    return max(_RAM_OS_RESERVE_FLOOR_MB, min(used_by_others, _RAM_OS_RESERVE_CAP_MB))
 
 
 def _ram_guard() -> str | None:
@@ -148,11 +206,13 @@ def _ram_guard() -> str | None:
         n_ctx = 16384  # PipelineConfig default; conservative fallback if import fails
     kv_mb = (_KV_BYTES_PER_TOKEN * n_ctx) // (1024 * 1024)
     need_mb = weights_mb + kv_mb + _RAM_PREFIX_CACHE_MB
-    if total - _RAM_OS_RESERVE_MB < need_mb:
+    reserve_mb = _os_reserve_mb(total)
+    if total - reserve_mb < need_mb:
         return (f"This machine has ~{total} MB total RAM, but the '{tier}' tier needs "
                 f"~{need_mb} MB committed (weights {weights_mb} + KV {kv_mb} + prefix "
-                f"cache {_RAM_PREFIX_CACHE_MB}) plus a {_RAM_OS_RESERVE_MB} MB OS reserve. "
-                f"Re-run ./ohmatic doctor and fetch the recommended tier, or use stub/cloud mode.")
+                f"cache {_RAM_PREFIX_CACHE_MB}) plus a ~{reserve_mb} MB OS reserve "
+                f"(in-use headroom). Re-run ./ohmatic doctor and fetch the recommended "
+                f"tier, or use stub/cloud mode.")
     return None
 
 

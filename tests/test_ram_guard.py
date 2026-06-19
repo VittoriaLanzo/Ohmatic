@@ -6,10 +6,11 @@ guard then applies only to GGUF CPU inference; GPU/HF tiers keep weights in VRAM
 and are skipped.
 
 The cost model estimates the TRUE committed peak - weights + KV(n_ctx) + prefix
-cache - against total RAM minus an OS reserve, instead of the old
-weights-plus-fixed-headroom gate that charged the evictable mmap weights and
-ignored the committed allocations that cause OOM. T5 is not charged: it runs in a
-short-lived subprocess that exits before generation, so it never sets the peak.
+cache - against total RAM minus a dynamic OS reserve (what the OS + other apps are
+using now, clamped), instead of the old weights-plus-fixed-headroom gate that
+charged the evictable mmap weights and ignored the committed allocations that cause
+OOM. T5 is not charged: it runs in a short-lived subprocess that exits before
+generation, so it never sets the peak.
 
 The Linux and macOS branches are mocked here so CI covers them on any host; the
 win32 ctypes branch runs for real when the suite runs on Windows.
@@ -107,6 +108,7 @@ def test_guard_refuses_when_total_ram_too_small(monkeypatch, tmp_path):
     # + 2048 headroom = ~2053) would have PASSED this machine and then OOM'd, because
     # it charged the evictable mmap weights and ignored the committed KV/prefix cache.
     monkeypatch.setattr(server, "_total_ram_mb", lambda: 6000)
+    monkeypatch.setattr(server, "_os_reserve_mb", lambda total: 2048)  # pin; dynamic reserve has its own tests
     msg = server._ram_guard()
     assert msg and "total RAM" in msg and "q4_k_m_cpu" in msg
     assert "KV" in msg and "prefix cache" in msg  # message names the committed terms
@@ -117,6 +119,7 @@ def test_guard_passes_when_total_ram_ample(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "_MANIFEST",
                         _manifest(tmp_path, "q4_k_m_cpu", _gguf(tmp_path, 5)))
     monkeypatch.setattr(server, "_total_ram_mb", lambda: 16384)  # 16384-2048=14336 >= 4357
+    monkeypatch.setattr(server, "_os_reserve_mb", lambda total: 2048)
     assert server._ram_guard() is None
 
 
@@ -128,6 +131,7 @@ def test_guard_does_not_charge_t5_when_subprocess_isolated(monkeypatch, tmp_path
     # 5952 >= 4357, so both manifests pass; t5_path adds nothing to the committed peak.
     monkeypatch.setattr(server, "_PIPELINE", None)
     monkeypatch.setattr(server, "_total_ram_mb", lambda: 8000)
+    monkeypatch.setattr(server, "_os_reserve_mb", lambda total: 2048)
 
     monkeypatch.setattr(server, "_MANIFEST",
                         _manifest(tmp_path, "q4_k_m_cpu", _gguf(tmp_path, 5)))
@@ -173,3 +177,91 @@ def test_guard_skips_when_ram_unknown(monkeypatch):
     monkeypatch.setattr(server, "_PIPELINE", None)
     monkeypatch.setattr(server, "_total_ram_mb", lambda: None)
     assert server._ram_guard() is None  # unknown RAM -> fail open, never block
+
+
+# ── _available_ram_mb: one branch per OS ──────────────────────────────────────
+
+def test_available_ram_mb_linux(monkeypatch):
+    monkeypatch.setattr(server.sys, "platform", "linux")
+    meminfo = "MemTotal:        8017136 kB\nMemAvailable:     4000000 kB\n"
+    real_open = open
+
+    def fake_open(path, *args, **kwargs):
+        if str(path) == "/proc/meminfo":
+            return io.StringIO(meminfo)
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", fake_open)
+    assert server._available_ram_mb() == 4000000 // 1024  # 3906
+
+
+def test_available_ram_mb_darwin(monkeypatch):
+    monkeypatch.setattr(server.sys, "platform", "darwin")
+    vm = ("Mach Virtual Memory Statistics: (page size of 4096 bytes)\n"
+          "Pages free:                          100000.\n"
+          "Pages active:                        500000.\n"
+          "Pages inactive:                       50000.\n"
+          "Pages speculative:                    10000.\n")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: SimpleNamespace(stdout=vm))
+    # available = (free + inactive + speculative) pages * page size; 'active' excluded
+    assert server._available_ram_mb() == (160000 * 4096) // (1024 * 1024)  # 625
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="win32 ctypes branch")
+def test_available_ram_mb_win32_real():
+    avail = server._available_ram_mb()
+    assert isinstance(avail, int) and avail > 100  # a running machine has some free RAM
+
+
+def test_available_ram_mb_unknown_platform_returns_none(monkeypatch):
+    monkeypatch.setattr(server.sys, "platform", "sunos5")
+    assert server._available_ram_mb() is None
+
+
+# ── _os_reserve_mb: measured headroom, clamped to [768, 3072], 2048 fallback ───
+
+def test_os_reserve_tracks_in_use_within_band(monkeypatch):
+    monkeypatch.setattr(server, "_available_ram_mb", lambda: 13000)
+    assert server._os_reserve_mb(16000) == 3000  # used 3000, inside [768, 3072]
+
+
+def test_os_reserve_caps_a_busy_machine(monkeypatch):
+    monkeypatch.setattr(server, "_available_ram_mb", lambda: 9000)
+    assert server._os_reserve_mb(16000) == 3072  # used 7000 -> capped
+
+
+def test_os_reserve_floors_a_lean_machine(monkeypatch):
+    monkeypatch.setattr(server, "_available_ram_mb", lambda: 15800)
+    assert server._os_reserve_mb(16000) == 768  # used 200 -> floored
+
+
+def test_os_reserve_falls_back_when_availability_unknown(monkeypatch):
+    monkeypatch.setattr(server, "_available_ram_mb", lambda: None)
+    assert server._os_reserve_mb(16000) == 2048  # flat fallback
+
+
+# ── _ram_guard with the dynamic reserve: lean admits, busy refuses ────────────
+
+def test_guard_dynamic_reserve_admits_lean_machine_flat_2gb_would_refuse(monkeypatch, tmp_path):
+    """A lean box reserves the 768 MB floor, not a flat 2 GB, so it clears a budget
+    the old fixed reserve refused. need = 5 + 2304 + 2048 = 4357."""
+    monkeypatch.setattr(server, "_PIPELINE", None)
+    monkeypatch.setattr(server, "_MANIFEST",
+                        _manifest(tmp_path, "q4_k_m_cpu", _gguf(tmp_path, 5)))
+    monkeypatch.setattr(server, "_total_ram_mb", lambda: 6000)
+    monkeypatch.setattr(server, "_available_ram_mb", lambda: 5500)  # only 500 MB in use
+    # flat 2048: 6000 - 2048 = 3952 < 4357 -> would refuse.
+    # dynamic:   reserve = max(768, 500) = 768; 6000 - 768 = 5232 >= 4357 -> admit.
+    assert server._ram_guard() is None
+
+
+def test_guard_dynamic_reserve_refuses_busy_machine(monkeypatch, tmp_path):
+    """When other apps are using a lot, the reserve grows (to the cap) and the guard
+    refuses a machine that is momentarily too full for the committed peak."""
+    monkeypatch.setattr(server, "_PIPELINE", None)
+    monkeypatch.setattr(server, "_MANIFEST",
+                        _manifest(tmp_path, "q4_k_m_cpu", _gguf(tmp_path, 5)))
+    monkeypatch.setattr(server, "_total_ram_mb", lambda: 7000)
+    monkeypatch.setattr(server, "_available_ram_mb", lambda: 3500)  # 3500 in use -> cap 3072
+    # reserve = min(3500, 3072) = 3072; 7000 - 3072 = 3928 < 4357 -> refuse.
+    assert server._ram_guard() is not None

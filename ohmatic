@@ -376,15 +376,68 @@ cmd_fetch() {
 # can run. Writes $RUN_DIR/doctor.json (served by the gateway at /v1/doctor).
 # Probes are || true-guarded: under set -euo pipefail a failing probe (broken
 # nvidia driver, locked-down powershell) degrades the verdict, never the launcher.
+# ── Dynamic OS reserve (mirror of gateway/stub/server.py _os_reserve_mb) ───────
+# Q4_K_M CPU committed peak in MB: weights ~4794 + KV(n_ctx=16384) 2304 + prefix
+# cache 2048. The doctor recommends a q4 tier only when total RAM clears this peak
+# PLUS a dynamic OS reserve (what the OS + other apps use now), identical to the
+# gateway guard - so the doctor never recommends a tier the guard then refuses.
+Q4_COMMITTED_MB=9146
+OS_RESERVE_FLOOR_MB=768
+OS_RESERVE_CAP_MB=3072
+OS_RESERVE_FALLBACK_MB=2048
+
+# Available RAM in MB (what a new allocation can use), empty if unknown. Sizes the
+# OS reserve only - never gates the evictable, mmap'd weights (those use total RAM).
+_avail_ram_mb() {
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+    Linux)  awk '/^MemAvailable/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null ;;
+    Darwin) vm_stat 2>/dev/null | awk '
+              /page size of/ { for (i=1;i<=NF;i++) if ($i=="of") ps=$(i+1) }
+              /^Pages free:/        { v=$NF; gsub(/\./,"",v); free=v }
+              /^Pages inactive:/    { v=$NF; gsub(/\./,"",v); inact=v }
+              /^Pages speculative:/ { v=$NF; gsub(/\./,"",v); spec=v }
+              END { if (ps=="") ps=4096; if (free+inact+spec > 0) printf "%d", (free+inact+spec)*ps/1048576 }' ;;
+    MINGW*|MSYS*|CYGWIN*) powershell -NoProfile -Command "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" 2>/dev/null ;;
+  esac
+}
+
+# clamp(total-avail, FLOOR, CAP); FALLBACK when avail is unknown/non-numeric.
+_os_reserve_mb() {  # args: total_mb avail_mb
+  local total="$1" avail="$2" used reserve
+  case "$avail" in (*[!0-9]*|"") echo "$OS_RESERVE_FALLBACK_MB"; return ;; esac
+  used=$(( total - avail ))
+  if [ "$used" -lt 0 ]; then used=0; fi
+  reserve="$used"
+  if [ "$reserve" -lt "$OS_RESERVE_FLOOR_MB" ]; then reserve="$OS_RESERVE_FLOOR_MB"; fi
+  if [ "$reserve" -gt "$OS_RESERVE_CAP_MB" ]; then reserve="$OS_RESERVE_CAP_MB"; fi
+  echo "$reserve"
+}
+
+# Hidden test seam: "__hwprobe <total_mb>:<avail_mb>" -> "reserve=<n> q4_cpu=<yes|no>"
+# so tests can assert the bash reserve math matches the Python guard. avail empty
+# (e.g. "16000:") exercises the fallback.
+_hwprobe() {
+  local arg="${1:-}" total avail reserve fits=no
+  total="${arg%%:*}"; avail="${arg#*:}"
+  case "$total" in (*[!0-9]*|"") total=0 ;; esac
+  reserve="$(_os_reserve_mb "$total" "$avail")"
+  if [ "$total" -ge $(( Q4_COMMITTED_MB + reserve )) ]; then fits=yes; fi
+  echo "reserve=${reserve} q4_cpu=${fits}"
+}
+
 hw_assess() {
   mkdir -p "$RUN_DIR"
-  local ram_gb=0 vram_mb=0 gpu="" os arch
+  local ram_gb=0 ram_mb=0 vram_mb=0 gpu="" os arch avail_mb=""
   os="$(uname -s 2>/dev/null || echo unknown)"; arch="$(uname -m 2>/dev/null || echo unknown)"
   case "$os" in
-    Linux)  ram_gb=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null || true) ;;
-    Darwin) ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 )) ;;
-    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null || true) ;;
+    Linux)  ram_gb=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null || true)
+            ram_mb=$(awk '/MemTotal/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || true) ;;
+    Darwin) ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
+            ram_mb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1048576 )) ;;
+    MINGW*|MSYS*|CYGWIN*) ram_gb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)" 2>/dev/null || true)
+            ram_mb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1MB)" 2>/dev/null || true) ;;
   esac
+  avail_mb="$(_avail_ram_mb || true)"
   if command -v nvidia-smi >/dev/null 2>&1; then
     vram_mb=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 || true)
     gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)
@@ -397,19 +450,26 @@ hw_assess() {
 '/}"
   case "$ram_gb"  in (*[!0-9]*|"") ram_gb=0  ;; esac
   case "$vram_mb" in (*[!0-9]*|"") vram_mb=0 ;; esac
+  ram_mb="${ram_mb//[!0-9]/}"; case "$ram_mb" in ("") ram_mb=0 ;; esac
+  avail_mb="${avail_mb//[!0-9]/}"  # digits, or empty -> OS-reserve fallback
+  # Dynamic OS reserve + the Q4 committed peak = the real RAM the q4 tiers need,
+  # identical to gateway/stub/server.py _ram_guard.
+  local reserve_mb q4_need_mb
+  reserve_mb="$(_os_reserve_mb "$ram_mb" "$avail_mb")"
+  q4_need_mb=$(( Q4_COMMITTED_MB + reserve_mb ))
   local tier="stub" why="not enough RAM/VRAM for local inference - stub/cloud mode"
   if   [ "$vram_mb" -ge 20000 ]; then tier="bf16";       why="${gpu} (${vram_mb} MB VRAM) fits the full bf16 model"
   elif [ "$vram_mb" -ge 10000 ]; then tier="q8_0";       why="${gpu} (${vram_mb} MB VRAM) fits the Q8_0 GGUF"
   elif [ "$vram_mb" -ge  6000 ]; then tier="q4_k_m";     why="${gpu} (${vram_mb} MB VRAM) fits the Q4_K_M GGUF"
   elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 24 ]; then
     tier="q8_0";   why="Apple Silicon, ${ram_gb} GB unified memory - Q8_0 GGUF on Metal"
-  # Q4_K_M floor = 11 GB: the gateway _ram_guard's committed peak (weights ~4.8 + KV
-  # ~2.3 + prefix cache 2.0 GiB) plus a ~2 GB OS reserve. T5 no longer counts - it
-  # runs in a short-lived subprocess that exits before generation. Keep this in sync
-  # with gateway/stub/server.py so the doctor never recommends a tier the guard refuses.
-  elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_gb" -ge 11 ]; then
+  # q4 tiers: total RAM must clear the committed peak (weights+KV+prefix) plus the
+  # DYNAMIC OS reserve - mirrors _ram_guard, so the doctor never recommends a tier
+  # the guard then refuses. A lean box clears it near ~10 GB; a busy box needs more.
+  elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && [ "$ram_mb" -ge "$q4_need_mb" ]; then
     tier="q4_k_m"; why="Apple Silicon, ${ram_gb} GB unified memory - Q4_K_M GGUF on Metal"
-  elif [ "$ram_gb" -ge 11 ];     then tier="q4_k_m_cpu"; why="${ram_gb} GB RAM runs Q4_K_M on CPU (slow)"
+  elif [ "$ram_mb" -ge "$q4_need_mb" ]; then
+    tier="q4_k_m_cpu"; why="${ram_gb} GB RAM (~${reserve_mb} MB held for OS) runs Q4_K_M on CPU (slow)"
   fi
   printf '{"ram_gb": %s, "vram_mb": %s, "gpu": "%s", "recommended_model": "%s", "reason": "%s", "checked_at": "%s"}
 '     "$ram_gb" "$vram_mb" "$gpu" "$tier" "$why" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RUN_DIR/doctor.json"
@@ -473,6 +533,7 @@ case "${1:-help}" in
   onboarding) cmd_onboarding ;;
   fetch) shift; cmd_fetch "$@" ;;
   update) cmd_update ;;
+  __hwprobe) shift; _hwprobe "${1:-}" ;;  # hidden: reserve/tier math probe for tests
   help|--help|-h) usage ;;
   *) usage; exit 2 ;;
 esac

@@ -358,10 +358,43 @@ function Start-Frontend([bool]$UseMock) {
 # .ohmatic-run\doctor.json (the same schema the gateway and the bash launcher use).
 # Every probe is guarded: a missing nvidia-smi or locked-down WMI just degrades the
 # verdict to a lower tier - it never throws and never blocks the launcher.
+# ── Dynamic OS reserve (mirror of gateway/stub/server.py _os_reserve_mb) ───────
+# Q4_K_M CPU committed peak in MB: weights ~4794 + KV(n_ctx=16384) 2304 + prefix
+# cache 2048. The doctor recommends q4_k_m_cpu only when total RAM clears this peak
+# plus a dynamic OS reserve (what the OS + other apps use now), identical to the
+# gateway guard - so the doctor never recommends a tier the guard then refuses.
+$script:Q4CommittedMb       = 9146
+$script:OsReserveFloorMb    = 768
+$script:OsReserveCapMb      = 3072
+$script:OsReserveFallbackMb = 2048
+
+function Get-AvailRamMb {
+  # Available physical RAM in MB (FreePhysicalMemory is KB); $null if unreadable.
+  # Sizes the OS reserve only - never gates the evictable, mmap'd weights.
+  try { return [int]((Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).FreePhysicalMemory / 1024) }
+  catch { return $null }
+}
+
+function Get-OsReserveMb([int]$totalMb, $availMb) {
+  # clamp(total-avail, FLOOR, CAP); FALLBACK when availability is unknown.
+  if ($null -eq $availMb) { return $script:OsReserveFallbackMb }
+  $used = $totalMb - [int]$availMb
+  if ($used -lt 0) { $used = 0 }
+  if ($used -lt $script:OsReserveFloorMb) { return $script:OsReserveFloorMb }
+  if ($used -gt $script:OsReserveCapMb)   { return $script:OsReserveCapMb }
+  return $used
+}
+
 function Get-HwAssess {
   if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir | Out-Null }
-  $ramGb = 0; $vramMb = 0; $gpu = ""
-  try { $ramGb = [int][math]::Floor([double]((Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory) / 1GB) } catch { $ramGb = 0 }
+  $ramGb = 0; $ramMb = 0; $vramMb = 0; $gpu = ""
+  try {
+    $totalBytes = [double]((Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory)
+    $ramGb = [int][math]::Floor($totalBytes / 1GB)
+    $ramMb = [int][math]::Floor($totalBytes / 1MB)
+  } catch { $ramGb = 0; $ramMb = 0 }
+  $reserveMb = Get-OsReserveMb $ramMb (Get-AvailRamMb)
+  $q4NeedMb  = $script:Q4CommittedMb + $reserveMb
   if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
     try {
       $vramMb = [int]((& nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>$null | Select-Object -First 1).ToString().Trim())
@@ -372,10 +405,10 @@ function Get-HwAssess {
   if     ($vramMb -ge 20000) { $tier = "bf16";       $why = "$gpu ($vramMb MB VRAM) fits the full bf16 model" }
   elseif ($vramMb -ge 10000) { $tier = "q8_0";       $why = "$gpu ($vramMb MB VRAM) fits the Q8_0 GGUF" }
   elseif ($vramMb -ge 6000)  { $tier = "q4_k_m";     $why = "$gpu ($vramMb MB VRAM) fits the Q4_K_M GGUF" }
-  # Q4_K_M CPU floor = 11 GB: _ram_guard's committed peak (weights + KV + prefix cache)
-  # plus a ~2 GB OS reserve; T5 is subprocess-isolated and no longer counted. Keep in
-  # sync with gateway/stub/server.py so the doctor never recommends a tier the guard refuses.
-  elseif ($ramGb  -ge 11)    { $tier = "q4_k_m_cpu"; $why = "$ramGb GB RAM runs the Q4_K_M GGUF on CPU (slower)" }
+  # q4 CPU tier: total RAM must clear the committed peak (weights + KV + prefix cache)
+  # plus the DYNAMIC OS reserve - mirrors gateway/stub/server.py _ram_guard, so the
+  # doctor never recommends a tier the guard then refuses.
+  elseif ($ramMb  -ge $q4NeedMb) { $tier = "q4_k_m_cpu"; $why = "$ramGb GB RAM (~$reserveMb MB held for OS) runs the Q4_K_M GGUF on CPU (slower)" }
   $checkedAt = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
   $payload = [ordered]@{ ram_gb = $ramGb; vram_mb = $vramMb; gpu = $gpu; recommended_model = $tier; reason = $why; checked_at = $checkedAt }
   ($payload | ConvertTo-Json -Compress) | Set-Content -LiteralPath (Join-Path $runDir "doctor.json") -Encoding utf8
@@ -686,6 +719,15 @@ switch ($Command.ToLowerInvariant()) {
   "onboarding" { Show-Banner; Invoke-Onboarding }
   "fetch"  { Invoke-Fetch }
   "update" { Invoke-Update }
+  "__hwprobe" {
+    # hidden: reserve/tier math probe for tests. Arg is "<total_mb>:<avail_mb>".
+    $parts = ($Subcommand -split ":", 2)
+    $total = [int]$parts[0]
+    $avail = if ($parts.Count -ge 2 -and $parts[1] -match '^\d+$') { [int]$parts[1] } else { $null }
+    $reserve = Get-OsReserveMb $total $avail
+    $fits = if ($total -ge ($script:Q4CommittedMb + $reserve)) { "yes" } else { "no" }
+    Write-Output "reserve=$reserve q4_cpu=$fits"
+  }
   "help"   { Show-Usage }
   default  { Show-Usage; exit 2 }
 }
