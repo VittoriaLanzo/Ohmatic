@@ -533,8 +533,20 @@ class OhmaticPipeline:
         # System prompt = the shared single source (exactly what the model trained on).
         system_prompt = _build_system_prompt()
 
+        # GGUF/edge tier: the llama.cpp generator is torch-free, so T5 is the ONLY
+        # thing that pulls torch (~3 GiB) into the long-lived process. Run it in a
+        # short-lived subprocess (SubprocessT5Normalizer) so torch/T5 are reclaimed
+        # by the OS before Qwen generates -> the T5 cost and the Qwen KV-cache cost
+        # never stack. On HF/vLLM GPU paths torch is already resident for the
+        # generator, so subprocess isolation gains nothing -> keep HFT5Normalizer.
+        edge_tier = cfg.backend == "llamacpp" or (cfg.qwen_model_id or "").endswith(".gguf")
+
         normalizer: TextNormalizer
-        if cfg.t5_model_id:
+        if cfg.t5_model_id and edge_tier:
+            from inference.t5_subprocess import SubprocessT5Normalizer  # torch-free import
+            normalizer = SubprocessT5Normalizer(
+                cfg.t5_model_id, max_new_tokens=cfg.t5_max_new_tokens)
+        elif cfg.t5_model_id:
             normalizer = HFT5Normalizer(cfg.t5_model_id, max_new_tokens=cfg.t5_max_new_tokens)
         else:
             normalizer = _MockNormalizer()
