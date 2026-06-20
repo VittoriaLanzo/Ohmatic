@@ -20,14 +20,15 @@ python -m eval.benchmark.cross_model.generate  python -m ....verify             
 ## Reproducing every leg
 
 One secret, env only: `HF_TOKEN` (the private holdout suites). The Claude legs
-(`fable-5`, `opus`) need NO api key - they drive the local `claude` CLI on the
-machine's own Claude Code subscription. Everything else (model IDs, artifact
-revisions, decoding, prompt sets) is pinned in `config.py`.
+(`fable-5`, `opus`) and the `codex` leg need NO api key - they drive the local
+`claude` / `codex` CLI on the machine's own subscription. Everything else (model
+IDs, artifact revisions, decoding, prompt sets) is pinned in `config.py`.
 
 | Leg | Where it runs | Command |
 |---|---|---|
 | `fable-5` | any machine w/ the `claude` CLI logged in | `... generate --model fable-5 --suite realuser` |
 | `opus` | any machine w/ the `claude` CLI logged in | `... generate --model opus --suite realuser` |
+| `codex` | any machine w/ a PLAIN `codex` CLI logged in | `... generate --model codex --suite realuser` |
 | `star-r2-bf16` | GPU box | `... generate --model star-r2-bf16 --suite forward` |
 | `star-r2-q4` | GPU box (llama-cpp-python) | `... generate --model star-r2-q4 --suite forward` |
 | `star-r2-noT5` | GPU box (ablation) | `... generate --model star-r2-noT5 --suite realuser` |
@@ -41,6 +42,17 @@ the run cwd is a throwaway temp dir SEALED as its own git repo so no project
 CLAUDE.md / memory / git context is inherited (verified zero-context, identical on
 every machine). `--allowed-tools none` keeps it single-shot. This is product vs
 product: the shipped Claude product, not a bare model behind an api key.
+
+Codex leg (`codex_cli` adapter): the OpenAI mirror - a fresh `codex exec` per ask
+(`npm i -g @openai/codex`, logged in - no api key), the Ohmatic spec written to
+`AGENTS.md` in the same sealed temp cwd, `-s read-only --skip-git-repo-check
+--ephemeral` for a single-shot zero-context run, at MAX reasoning effort
+(`model_reasoning_effort=xhigh`). Codex MUST be PLAIN: a customized install whose
+runtime injects extra startup skills/plugins (e.g. a "superpowers" framework)
+contaminates every session even with a clean `CODEX_HOME`. Point at an isolated
+stock install via env - `OHMATIC_CODEX_BIN` (the binary) + `OHMATIC_CODEX_HOME`
+(a clean `CODEX_HOME` holding only `auth.json`) - and verify zero-context with a
+probe before trusting the leg.
 
 GPU legs: `pip install transformers peft accelerate safetensors sentencepiece
 llama-cpp-python`. The Ohmatic legs import `inference.pipeline` (the literal

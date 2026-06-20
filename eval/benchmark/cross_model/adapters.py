@@ -48,9 +48,10 @@ class ClaudeCliAdapter:
     command line allows), and the CLI's own reported total_cost_usd rides back as
     cli_cost_usd, recorded as-is (no static price table to drift)."""
 
-    def __init__(self, model: str):
+    def __init__(self, model: str, effort: str | None = None):
         import shutil
         self.model = model
+        self.effort = effort          # reasoning effort level, e.g. "max"/"xhigh"
         self.exe = shutil.which("claude")
         if not self.exe:
             raise SystemExit(
@@ -100,6 +101,8 @@ class ClaudeCliAdapter:
                     "--allowed-tools", "none",       # single-shot: no tools, one turn
                     "--setting-sources", "",         # drop operator hooks/skills/plugins
                     "--output-format", "json"]
+            if self.effort:                          # pin reasoning effort (else default,
+                argv += ["--effort", self.effort]    # since --setting-sources "" drops it)
             # The Windows `claude.CMD` shim launch is occasionally flaky ("The batch file
             # cannot be found" - an AV/cmd race that aborts BEFORE any model call, so a
             # failed launch is never billed). Retry the launch; returncode 0 means the
@@ -135,6 +138,77 @@ class ClaudeCliAdapter:
             "cli_cost_usd": d.get("total_cost_usd", 0.0),
             "cli_model": gen_model,
             "cli_num_turns": d.get("num_turns"),
+        }
+
+
+# ── OpenAI Codex product: subagent-driven via the `codex exec` CLI ────────────
+
+class CodexCliAdapter:
+    """The Codex mirror of ClaudeCliAdapter (product vs product, NO api key). Each ask
+    runs a fresh, zero-context `codex exec` - the shipped Codex product on its local
+    ChatGPT-subscription auth - with the Ohmatic format spec written to AGENTS.md in a
+    sealed temp workspace, so the spec rides on top of Codex's own product prompt the
+    same way --append-system-prompt does for the Claude legs.
+
+    Zero-context + single-shot:
+      * `-C <temp>` + `--skip-git-repo-check` - a throwaway workspace, no real repo /
+        AGENTS.md above it inherited;
+      * `--ignore-user-config --ignore-rules` - drop the operator's ~/.codex config + rules;
+      * `--ephemeral` - persist no session files;
+      * `-s read-only` - sandbox: the agent cannot edit/run, so it just answers in JSON;
+      * the final assistant message is captured via `-o <file>` and verified in stage 2
+        through the SAME extractor + ERC path as every other leg.
+    The verified zero-context check lives in the README; run it before trusting a leg."""
+
+    def __init__(self, model: str):
+        import os
+        import shutil
+        self.model = model            # "" -> use the Codex CLI's configured default
+        # The codex leg MUST run against a PLAIN codex (stock skills only). If the default
+        # codex on a machine is customized - extra startup skills/plugins (e.g. a
+        # "superpowers" framework) leak into every session - point at an isolated plain
+        # install via env: OHMATIC_CODEX_BIN (the binary) + OHMATIC_CODEX_HOME (a clean
+        # CODEX_HOME holding only auth.json). Else the `codex` on PATH is used as-is.
+        self.exe = os.environ.get("OHMATIC_CODEX_BIN") or shutil.which("codex")
+        self.codex_home = os.environ.get("OHMATIC_CODEX_HOME") or None
+        if not self.exe:
+            raise SystemExit(
+                "codex CLI not found - set OHMATIC_CODEX_BIN or put `codex` on PATH "
+                "(npm i -g @openai/codex) plus a logged-in session.")
+
+    def run(self, system_prompt: str, user_prompt: str) -> dict:
+        import json
+        import os
+        import subprocess
+        import tempfile
+        t0 = time.time()
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as cwd:
+            ClaudeCliAdapter._seal_cwd(cwd)       # same git boundary as the Claude legs
+            (Path(cwd) / "AGENTS.md").write_text(system_prompt, encoding="utf-8")
+            outf = Path(cwd) / "_last_message.txt"
+            argv = [self.exe, "exec",
+                    "-c", f"model_reasoning_effort={C.CODEX_REASONING_EFFORT}"]
+            if self.model:
+                argv += ["-m", self.model]
+            argv += [user_prompt, "-C", cwd, "-s", "read-only",
+                     "--skip-git-repo-check", "--ignore-user-config",
+                     "--ignore-rules", "--ephemeral", "-o", str(outf)]
+            env = dict(os.environ)
+            if self.codex_home:                   # clean, plain CODEX_HOME (auth only)
+                env["CODEX_HOME"] = self.codex_home
+            proc = subprocess.run(argv, cwd=cwd, stdin=subprocess.DEVNULL,
+                                  capture_output=True, text=True, encoding="utf-8",
+                                  timeout=C.CLI_TIMEOUT_S, env=env)
+            text = outf.read_text(encoding="utf-8") if outf.exists() else ""
+        if not text and proc.returncode != 0:
+            raise RuntimeError(
+                f"codex exec exit {proc.returncode}: {(proc.stderr or '')[-400:]}")
+        return {
+            "raw_output": text,
+            "latency_s": round(time.time() - t0, 3),
+            "tokens_in": 0, "tokens_out": 0,     # codex exec exposes no clean per-call usage
+            "cli_cost_usd": 0.0,                 # ChatGPT subscription: no per-call price
+            "cli_model": self.model or "codex-default",
         }
 
 
@@ -249,7 +323,9 @@ def build_adapter(model_name: str, suite: str):
     cfg = C.model_cfg(model_name)
     kind = cfg["adapter"]
     if kind == "claude_cli":
-        return ClaudeCliAdapter(cfg["model"])
+        return ClaudeCliAdapter(cfg["model"], cfg.get("effort"))
+    if kind == "codex_cli":
+        return CodexCliAdapter(cfg["model"])
     if kind == "ohmatic":
         # T5 only for realuser (raw messy input). Holdout prompts are already
         # normalized - pass-through there, same as prod_eval.

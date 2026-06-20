@@ -44,7 +44,13 @@ PIPELINE_MAX_RETRIES = 3          # Ohmatic product setting: 1 generate + 3 corr
 # Claude-CLI ("subagent") leg settings. No api key: the CLI uses the local Claude
 # Code subscription auth. Cost is whatever the CLI reports per call (total_cost_usd),
 # recorded verbatim in stage 1 - there is no static price table to drift.
-CLI_TIMEOUT_S = 600               # per-ask hard cap; a stuck call is skipped + resumed
+CLI_TIMEOUT_S = 1200              # per-ask hard cap; a stuck call is skipped + resumed
+                                  # (generous: codex at xhigh effort can take many minutes)
+
+# Codex leg runs at MAX reasoning effort (xhigh) - the strongest setting the codex
+# product offers, so the leg is the toughest possible competitor (disclosed: higher
+# than the Claude legs' default effort, which only makes the Ohmatic margin conservative).
+CODEX_REASONING_EFFORT = "xhigh"
 
 # ── Model matrix ──────────────────────────────────────────────────────────────
 # adapter: which client implementation runs the leg
@@ -52,6 +58,8 @@ CLI_TIMEOUT_S = 600               # per-ask hard cap; a stuck call is skipped + 
 #                 (subscription auth, NO api key); the Ohmatic format spec is appended
 #                 on top of Claude's own product prompt. Single-shot, no tools - the
 #                 shipped product, so this is product-vs-product not model-vs-model.
+#   "codex_cli" - the OpenAI mirror of claude_cli: `codex exec` on the ChatGPT
+#                 subscription (no api key), spec in AGENTS.md, sandboxed read-only.
 #   "ohmatic"   - the FULL product pipeline (T5 -> Qwen -> ERC -> retries ->
 #                 killswitch), via inference.pipeline.OhmaticPipeline. Needs GPU.
 #   "local1shot"- a local HF model run SINGLE-SHOT via vLLM (pass@1, no pipeline):
@@ -64,15 +72,26 @@ MODELS: dict[str, dict] = {
     # adapter="claude_cli": a fresh zero-context `claude -p` instance per ask with the
     # Ohmatic spec appended on top of Claude's product prompt. `model` is the CLI's
     # pinned id (full id, not an alias, so the leg is reproducible).
+    # effort: every frontier leg runs at its product's MAX reasoning effort so the
+    # comparison is fair and the competitor is as strong as possible. Claude's ceiling
+    # is "max" (above "xhigh"); fable-5 is pinned to "xhigh" to match the effort its
+    # published run actually used (a subagent run that preserved that setting).
     "fable-5": dict(
-        adapter="claude_cli", model="claude-fable-5",
+        adapter="claude_cli", model="claude-fable-5", effort="xhigh",
         suites=["forward", "realuser"],
     ),
     # NOTE: the `realuser` suite was AUTHORED by Claude Opus (see fairness contract).
     # Opus therefore evaluates realuser on home turf - a conservative bias FAVORING the
     # Claude leg; `forward` (held-out, not Opus-authored) is the contamination-free read.
     "opus": dict(
-        adapter="claude_cli", model="claude-opus-4-8",
+        adapter="claude_cli", model="claude-opus-4-8", effort="max",
+        suites=["forward", "realuser"],
+    ),
+    # OpenAI Codex, the mirror of the Claude legs: `codex exec` on the local ChatGPT
+    # subscription (no api key), Ohmatic spec in AGENTS.md on top of Codex's product
+    # prompt. model="" -> the Codex CLI's configured default (recorded via cli_model).
+    "codex": dict(
+        adapter="codex_cli", model="",
         suites=["forward", "realuser"],
     ),
 
