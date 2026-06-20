@@ -22,6 +22,7 @@ SERVICES=(
   "gateway:$ROOT/gateway/stub:8080"
   "inference:$ROOT/inference/stub:8001"
   "verifier:$ROOT/verifier/stub:8002"
+  "exporter:$ROOT/exporter/stub:8004"
 )
 
 # colours (disabled when not a TTY)
@@ -501,8 +502,8 @@ cmd_doctor() {
   offer_deps_install
 
   local busy="" p
-  for p in 8080 8001 8002 "$FRONTEND_PORT"; do port_free "$HOST" "$p" || busy="$busy $p"; done
-  if [ -z "$busy" ]; then ok "ports     8080 8001 8002 $FRONTEND_PORT all free"; else warn "ports     in use:$busy (frontend port auto-advances)"; fi
+  for p in 8080 8001 8002 8004 "$FRONTEND_PORT"; do port_free "$HOST" "$p" || busy="$busy $p"; done
+  if [ -z "$busy" ]; then ok "ports     8080 8001 8002 8004 $FRONTEND_PORT all free"; else warn "ports     in use:$busy (frontend port auto-advances)"; fi
 
   echo
   if [ "$ok_fe" = 1 ] && [ "$ok_be" = 1 ]; then printf "%sVerdict: ready. Run './ohmatic start'.%s\n" "$C_GREEN" "$C_OFF"

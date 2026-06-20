@@ -159,7 +159,7 @@ Polls the status of an async job. The client should poll at ~500 ms intervals.
 
 ## 3. GET /health
 
-**Service:** all three services (gateway :8080, inference :8001, verifier :8002)
+**Service:** all services (gateway :8080, inference :8001, verifier :8002, exporter :8004)
 
 Liveness probe for Docker health checks and load balancer readiness.
 
@@ -425,7 +425,110 @@ Forward-compatible: adding `circuit_v02.json` with a new rule set requires no ga
 4. Add an example circuit using the new type to `dataset/examples.json`.
 5. Update the Tier 3 DRC rules in `shared/docs/contracts.md` if new electrical rules apply.
 6. Bump `metadata.version` only when introducing breaking schema changes (adding a field to components, changing a required field type). Adding a new type to the enum is additive and non-breaking; no version bump required.
+7. Optionally add a row to `exporter/emit/mapping.py` (`lib_id`, `ref_prefix`, default footprint) so KiCad export renders a proper symbol; unmapped types fall back to a generic box and still export correctly.
 
-> **`/health` versioning note:** The `/health` endpoint on all three services is intentionally unversioned (no `/v1/` prefix). It is a liveness probe, not an API resource. All other endpoints are versioned under `/v1/`.
+> **`/health` versioning note:** The `/health` endpoint on all services is intentionally unversioned (no `/v1/` prefix). It is a liveness probe, not an API resource. All other endpoints are versioned under `/v1/`.
 
 > **`additionalProperties` policy:** The JSON schema allows extra fields at the circuit root (`additionalProperties: true`) to support dataset annotation fields (e.g. `tier3_reviewed`). The `metadata` object is also open to allow tooling extensions. Only `Component` and `Net` objects are strict (`additionalProperties: false`). Do not rely on schema validation alone to reject unknown fields at the root or metadata level.
+
+---
+
+## 10. POST /v1/export
+
+**Service:** exporter (port 8004)
+
+Renders a finished `OhmaticCircuitV01` into a downloadable KiCad file. The emitters
+(`exporter/emit/`) are pure-stdlib serializers over KiCad's open S-expression file
+formats; **no KiCad code is imported, linked, or bundled**, so the exporter carries
+no copyleft (GPL `pcbnew`/`kicad-cli`) obligation and the output is unencumbered
+(see `LICENSE`: outputs are unrestricted).
+
+### Reached directly by the local UI, not proxied
+
+Unlike the other backends, the exporter binds **127.0.0.1 only**. The local frontend
+calls it directly on `:8004`; the gateway does not proxy `/v1/export`. Proxying
+through the gateway (which binds `0.0.0.0`) would re-expose export to the LAN and
+defeat the loopback pin. The export payload is a circuit the client already holds, so
+no proxy is needed.
+
+### Handshake
+
+Local-first, with a TLS seam for the day Ohmatic runs off-machine:
+
+| Layer | Mechanism | Effect |
+|-------|-----------|--------|
+| Transport | loopback bind (`127.0.0.1`) | traffic never leaves the machine |
+| Host pin | `Host` header must be `localhost`/`127.0.0.1` | blocks DNS-rebinding |
+| Origin pin | `Origin`, when present, must be localhost | blocks drive-by CSRF from a web page |
+| Auth | `Authorization: Bearer <token>` when `OHMATIC_EXPORT_TOKEN` is set | per-session token the launcher mints; constant-time compare |
+| TLS / mTLS | `OHMATIC_EXPORT_TLS_CERT`/`_KEY` (+ `_CLIENT_CA` for mutual TLS) | drop-in HTTPS via `_build_httpd()`, no route changes |
+
+Plain HTTP on loopback is the default on purpose: browsers already treat
+`http://127.0.0.1` as a secure context, so TLS there is ceremony. The seam exists so
+mTLS is a deployment switch, not a rewrite.
+
+### Request
+
+```json
+{ "circuit": { "...": "OhmaticCircuitV01 object" }, "format": "netlist" }
+```
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `circuit` | object | required | A circuit that has passed verification. |
+| `format` | string | `"netlist"` | One of the ids from `GET /v1/export/capabilities`. |
+
+### Response 200: OK
+
+```json
+{
+  "filename": "led_blinker.net",
+  "content_type": "application/x-kicad-netlist",
+  "content": "(export (version \"E\") ...)"
+}
+```
+
+`content` is the file body as text; the client saves it as `filename`. The
+`kicad_sch` format returns an editable schematic whose connectivity is carried by
+per-pin net labels (same-named labels are one net in KiCad), so it opens on any
+install with no external symbol libraries.
+
+### Response 400 / 422
+
+```json
+{ "error": "missing 'circuit' field" }
+```
+
+| Status | Cause |
+|--------|-------|
+| 400 | Body absent/not JSON/not an object; `circuit` missing; `format` unknown. |
+| 422 | `circuit` missing `metadata`/`components`/`nets`, or `metadata.version` is not `"0.1"` (`error: "unsupported_schema_version"`). |
+| 401 / 403 / 421 | Handshake failure (bad token / cross-origin / bad Host). |
+
+---
+
+## 11. GET /v1/export/capabilities
+
+**Service:** exporter (port 8004)
+
+Advertises what the exporter can produce so a client never hard-codes a format list.
+Mirrors the `metadata.version` dispatch in §8: adding a format or schema version is a
+server-only change.
+
+### Response 200: OK
+
+```json
+{
+  "schema_versions": ["0.1"],
+  "formats": [
+    { "id": "netlist",   "ext": ".net",        "content_type": "application/x-kicad-netlist",   "label": "KiCad netlist" },
+    { "id": "kicad_sch", "ext": ".kicad_sch",  "content_type": "application/x-kicad-schematic", "label": "KiCad schematic" }
+  ]
+}
+```
+
+> **Pin-name passthrough:** When a circuit names pins (e.g. an LED's `A`/`K`) rather
+> than numbering them, the netlist carries those names verbatim as KiCad pin numbers.
+> For a component the exporter also stamps a stock footprint on, confirm the pad
+> mapping on import. Generic-box schematic symbols are unaffected (they connect by
+> net label, not pad number).

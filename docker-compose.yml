@@ -56,6 +56,27 @@ services:
       retries: 5
       start_period: 10s
 
+  # The exporter imports exporter/emit, so it mounts the repo root (not just the
+  # stub dir) and runs the server by module path. Loopback-pinned in the launcher;
+  # here it is on the compose network for parity with the other services.
+  exporter:
+    image: python:3.11.9-slim
+    command: python3 /app/exporter/stub/server.py
+    working_dir: /app
+    environment:
+      - OHMATIC_PORT=8004
+    volumes:
+      - ./:/app
+    restart: on-failure
+    networks:
+      - ohmatic
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
 networks:
   ohmatic:
     driver: bridge
