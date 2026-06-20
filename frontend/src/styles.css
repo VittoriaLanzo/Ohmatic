@@ -833,6 +833,143 @@ textarea:disabled {
   color: var(--ink);
 }
 
+.schematic-toolbar__cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-control {
+  position: relative;
+  display: inline-flex;
+}
+
+.export-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.68);
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.export-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-trigger .export-caret {
+  opacity: 0.7;
+  transition: transform 140ms ease;
+}
+
+.export-trigger[aria-expanded="true"] .export-caret {
+  transform: rotate(180deg);
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 264px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-strong);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+  animation: export-menu-in 120ms ease;
+}
+
+@keyframes export-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.export-menu__title {
+  margin: 4px 8px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.export-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-menu__item:hover:not(:disabled),
+.export-menu__item:focus-visible {
+  background: var(--green-soft);
+}
+
+.export-menu__item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.export-menu__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-menu__label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.export-menu__ext {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.export-menu__desc {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.export-menu__error {
+  margin: 6px 8px 2px;
+  font-size: 0.78rem;
+  color: var(--red, #ff5c49);
+}
+
+.export-spin {
+  animation: export-spin 800ms linear infinite;
+}
+
+@keyframes export-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .schematic-svg,
 .empty-schematic {
   display: block;
@@ -2238,6 +2375,32 @@ body::after  { top: 14px; right: 14px; }
   border-radius: 6px;
 }
 .secondary-button:hover, .icon-button:hover { border-color: var(--gold); color: var(--gold); }
+
+/* Export: eject the compiled artifact from the cartridge. Pixel label like the
+   primary pad; menu reads as a soldermask panel with copper silk. */
+.export-trigger {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.82rem;
+  border: 1.5px solid var(--copper-dim);
+  background: var(--board-dark);
+  color: var(--silk);
+}
+.export-trigger:hover:not(:disabled),
+.export-trigger[aria-expanded="true"] {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.export-menu {
+  border: 1.5px solid var(--copper-dim);
+  background: linear-gradient(180deg, rgba(20, 48, 42, 0.55), transparent 60%), var(--board-dark);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+.export-menu__title { font-family: var(--font-pixel); color: var(--copper-bright); }
+.export-menu__item:hover:not(:disabled),
+.export-menu__item:focus-visible { background: rgba(196, 122, 61, 0.16); color: var(--gold); }
+.export-menu__ext { color: var(--copper-bright); }
 
 /* Stage rail: HUD LED row */
 .stage-icon { color: var(--silk-dim); }

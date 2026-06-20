@@ -1,6 +1,7 @@
 import { AlertCircle, Maximize2, RotateCcw, Send, Server, SlidersHorizontal, ZoomIn, ZoomOut } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { createGatewayApi } from "./api/gateway";
+import { ExportButton } from "./components/ExportButton";
 import { HardwareBadge } from "./components/HardwareBadge";
 import { OhmaticLogo } from "./components/OhmaticLogo";
 import { ResultPanels } from "./components/ResultPanels";
@@ -220,7 +221,9 @@ export default function App() {
                 IEC
               </button>
             </div>
-            <div className="schematic-zoom-controls" role="group" aria-label="Schematic zoom">
+            <div className="schematic-toolbar__cluster">
+              <ExportButton circuit={job.result?.circuit ?? null} />
+              <div className="schematic-zoom-controls" role="group" aria-label="Schematic zoom">
               <button type="button" aria-label="Fit schematic" title="Fit schematic" onClick={() => setSchematicZoom(1)}>
                 <Maximize2 size={16} aria-hidden="true" />
               </button>
@@ -240,6 +243,7 @@ export default function App() {
               >
                 <ZoomIn size={16} aria-hidden="true" />
               </button>
+            </div>
             </div>
           </div>
 
