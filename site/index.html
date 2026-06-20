@@ -196,17 +196,17 @@
               <div class="stat"><div class="n bad">24%</div><div class="l">broken circuits delivered by Claude Fable 5</div></div>
             </div>
             <p style="font-size: 0.82rem">
-              Wilson 95% intervals; identical prompts and verifier for every row. Claude Fable 5 and
-              OpenAI Codex each received the complete Ohmatic system prompt and ran single-shot at max
-              reasoning effort (xhigh) &mdash; that spec levels the field upward, since a bare model can't
-              emit the schema at all. Claude Opus 4.8 at Claude's max effort is a run in progress, not yet
-              plotted. Quality loss shows up as fewer deliveries, not as bad output.
+              Wilson 95% intervals; identical prompts and verifier for every row. Claude Fable 5, Claude
+              Opus 4.8 and OpenAI Codex each received the complete Ohmatic system prompt and ran
+              single-shot at high reasoning effort (Opus at Claude's max; Fable and Codex at xhigh)
+              &mdash; that spec levels the field upward, since a bare model can't emit the schema at all.
+              Even so, each ships ~24&ndash;25% broken; quality loss shows up as fewer deliveries, not bad output.
               <a href="https://github.com/VittoriaLanzo/Ohmatic#benchmark">Full methodology &rarr;</a>
             </p>
           </div>
           <figure>
-            <img class="bench-img" src="assets/benchmark.png" alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries; Claude Fable 5 (xhigh effort) at 76.0% with 24% broken and OpenAI Codex (xhigh effort) at 74.7% with 25% broken; the untrained Qwen3-8B base at 4.0%. Claude Opus 4.8 at max effort is a run in progress, not shown" loading="lazy" decoding="async" />
-            <figcaption>Verified-clean rate vs. broken deliveries, same 75-prompt suite &mdash; frontier legs at xhigh effort.</figcaption>
+            <img class="bench-img" src="assets/benchmark.png" alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries; Claude Fable 5 (xhigh effort) at 76.0% with 24% broken, Claude Opus 4.8 (max effort) at 76.0% with 24% broken, and OpenAI Codex (xhigh effort) at 74.7% with 25% broken; the untrained Qwen3-8B base at 4.0%" loading="lazy" decoding="async" />
+            <figcaption>Verified-clean rate vs. broken deliveries, same 75-prompt suite &mdash; frontier legs at high effort (Opus max; Fable, Codex xhigh).</figcaption>
           </figure>
         </div>
       </section>

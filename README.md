@@ -46,12 +46,12 @@ overlap-checked against all training data, run end to end through the full pipel
 an evaluated leg, so its own row carries a disclosed home-field advantage — see methodology.)
 
 <p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark across 75 identical prompts judged by the same ERC engine: Ohmatic bf16 93.3% ERC-clean with zero ERC-failing deliveries (the rest withheld by the killswitch); Claude Fable 5 (xhigh effort, single-shot) 76.0% ERC-clean with 18 of 75 outputs failing the same checks; OpenAI Codex (xhigh effort, single-shot) 74.7% ERC-clean with 19 of 75 failing; Ohmatic Q4_K_M quant 72.0% ERC-clean, zero ERC-failing; the untrained Qwen3-8B base 4.0% ERC-clean. Claude Opus 4.8 at Claude's max effort is a run in progress and not yet plotted." width="100%" />
+  <img src="assets/benchmark.png" alt="Benchmark across 75 identical prompts judged by the same ERC engine: Ohmatic bf16 93.3% ERC-clean with zero ERC-failing deliveries (the rest withheld by the killswitch); Claude Fable 5 (xhigh effort, single-shot) 76.0% ERC-clean with 18 of 75 outputs failing the same checks; Claude Opus 4.8 (max effort, single-shot) 76.0% ERC-clean with 18 of 75 failing, despite Opus having authored the prompts; OpenAI Codex (xhigh effort, single-shot) 74.7% ERC-clean with 19 of 75 failing; Ohmatic Q4_K_M quant 72.0% ERC-clean, zero ERC-failing; the untrained Qwen3-8B base 4.0% ERC-clean." width="100%" />
 </p>
 
 Every model is judged by the same ERC engine. "ERC-clean" means a delivered circuit passed that
 engine: structurally and electrically consistent against a fixed rule set. Ohmatic delivered 70 of
-the 75 and withheld the other 5; every delivery passed. On the same prompts, single-shot, 18 of 75 Claude Fable 5 and 19 of 75 OpenAI Codex outputs failed the same checks. (Claude Opus 4.8 at max effort is a run in progress — see below.)
+the 75 and withheld the other 5; every delivery passed. On the same prompts, single-shot, 18 of 75 Claude Fable 5, 18 of 75 Claude Opus 4.8 (at max effort), and 19 of 75 OpenAI Codex outputs failed the same checks.
 
 <details>
 <summary><b>Methodology and reproduce</b></summary>
@@ -61,8 +61,8 @@ intervals (bf16 ERC-clean 93.3%, 95% CI 85.3-97.1%; the full set is in the repor
 "Failed ERC" means an output did not pass that engine. Because that engine also trains and gates
 Ohmatic, the ERC-clean rate measures conformance to a shared rule set; independent correctness is a
 separate question, addressed in [A note on verification](#a-note-on-verification). The comparison is
-fair because the rule set is held identical for every model, and every frontier leg (Fable 5, Codex,
-and the in-progress Opus 4.8) received the same complete system prompt — the schema, component
+fair because the rule set is held identical for every model, and every frontier leg (Fable 5, Opus 4.8,
+Codex) received the same complete system prompt — the schema, component
 registry, and every ERC rule. That spec levels the field upward: without it a chat model cannot emit
 the schema at all, so these competitor rates if anything overstate what a bare model would deliver.
 
@@ -83,11 +83,14 @@ OpenAI Codex, run the identical way (full spec, single-shot via the `codex` CLI)
 effort (xhigh), reaches 74.7% ERC-clean (56/75, 95% CI 63.8-83.1%) and delivers 19 broken circuits
 with no killswitch — schema-validation errors, invalid pin references, missing bypass capacitors.
 
-Claude Opus 4.8 runs at Claude's **max** effort (a level above xhigh); that run is in progress and its
-number lands here when complete. An earlier default-effort pass is being discarded — the other
-frontier legs run at their product's top setting, so Opus must too. Opus also authored the realuser
-suite, so its row will carry a **home-field advantage** that biases in Opus's favour — a real,
-disclosed caveat, opposite in direction to the system-prompt leveling above.
+Claude Opus 4.8, run the identical way at Claude's **max** effort (a level above xhigh), reaches
+76.0% ERC-clean (57/75, 95% CI 65.2-84.2%) and delivers 18 broken circuits with no killswitch —
+landing exactly on Fable. Max effort lifts Opus well above its default-effort pass (65.3%, discarded
+as not comparable), which is why every frontier leg is held at its product's top setting. Opus also
+authored the realuser suite, so its row carries a **home-field advantage** that biases in Opus's
+favour — a real, disclosed caveat, opposite in direction to the system-prompt leveling above.
+(`MISSING_POWER_VCC` ×12 was its most common failure: a circuit that reads fine but never ties the
+part to power.)
 
 **Reasoning effort per leg** (stated explicitly, so nothing is hidden):
 
@@ -95,12 +98,12 @@ disclosed caveat, opposite in direction to the system-prompt leveling above.
 |---|---|
 | Ohmatic bf16 / Q4_K_M | greedy decode (temp 0), full pipeline |
 | Claude Fable 5 | xhigh |
+| Claude Opus 4.8 | max (Claude's ceiling) |
 | OpenAI Codex | xhigh (Codex's ceiling) |
-| Claude Opus 4.8 | max (Claude's ceiling) — run in progress |
 | Qwen3-8B base | greedy, single-shot |
 
-Claude's scale is low < medium < high < xhigh < max; Codex tops out at xhigh. So Codex ran at its
-max, Fable one notch below Claude's max, and Opus (in progress) at Claude's max.
+Claude's scale is low < medium < high < xhigh < max; Codex tops out at xhigh. So Opus ran at Claude's
+max, Codex at its own max (xhigh), and Fable one notch below Claude's max.
 
 ```bash
 # stage 1: generate (per model leg; append-only, crash-resumable)
