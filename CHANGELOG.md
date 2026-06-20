@@ -4,6 +4,13 @@ All notable changes to Ohmatic are recorded here. Ohmatic follows
 [Semantic Versioning](https://semver.org). While the version stays below 1.0,
 behavior and the circuit schema may change between releases.
 
+## [0.0.2] - 2026-06-20
+
+### Changed
+- `ohmatic update` now follows the latest published release tag instead of
+  `main`, so a clone tracks tagged releases rather than every commit. Pass
+  `--edge` (PowerShell: `-Edge`) to track `main` HEAD for development.
+
 ## [0.0.1] - 2026-06-19
 
 The first tagged release. It sets the version baseline and moves distribution

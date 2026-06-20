@@ -1,7 +1,7 @@
 {
   "name": "ohmatic-frontend",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "LicenseRef-Ohmatic-SAL-1.0",
   "type": "module",
   "scripts": {

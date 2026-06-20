@@ -22,6 +22,7 @@ param(
   [switch]$Mock,
   [switch]$Docker,
   [switch]$Foreground,
+  [switch]$Edge,
   [string]$HostName = "127.0.0.1",
   [int]$Port = 5173
 )
@@ -116,7 +117,7 @@ function Show-Usage {
   Write-Host "  ohmatic doctor         Diagnose the system (Node, Python, Docker, ports, RAM/GPU -> tier)"
   Write-Host "  ohmatic onboarding     Scan hardware + install the matching model (auto on first start)"
   Write-Host "  ohmatic fetch [tier]   Download weights (recommended tier, or bf16 / q8_0 / q4_k_m)"
-  Write-Host "  ohmatic update         Reset this clone to the latest GitHub main (discards local edits)"
+  Write-Host "  ohmatic update         Reset this clone to the latest release tag (-Edge for main HEAD)"
   Write-Host "  ohmatic version        Print the installed Ohmatic version"
   Write-Host "  ohmatic help           Show this help"
   Write-Host ""
@@ -672,7 +673,11 @@ function Invoke-Status {
 }
 
 function Invoke-Update {
-  Write-Step "Ohmatic update: syncing this clone to the latest GitHub main"
+  if ($Edge) {
+    Write-Step "Ohmatic update: syncing this clone to the latest main (edge)"
+  } else {
+    Write-Step "Ohmatic update: syncing this clone to the latest release"
+  }
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Fail "git not found on PATH. Install Git, then re-run 'ohmatic update'."
     exit 1
@@ -684,30 +689,42 @@ function Invoke-Update {
     exit 1
   }
 
-  # Hard reset to origin/main: this clone tracks the published main, not your
-  # working copy. Local commits and tracked edits are discarded (untracked
-  # files survive). Built for a consumer clone, not a dev checkout with WIP.
+  # A consumer clone tracks published releases, not the moving main: update
+  # hard-resets to the newest vX.Y.Z tag (local tracked edits are discarded;
+  # untracked files survive). -Edge opts into main HEAD for bleeding-edge dev.
   & git -C $root diff --quiet 2>$null
   $dirtyTree = ($LASTEXITCODE -ne 0)
   & git -C $root diff --cached --quiet 2>$null
   $dirtyIndex = ($LASTEXITCODE -ne 0)
-  if ($dirtyTree -or $dirtyIndex) { Write-Warn2 "local changes will be discarded (hard reset to origin/main)" }
+  if ($dirtyTree -or $dirtyIndex) { Write-Warn2 "local changes will be discarded (hard reset)" }
 
-  & git -C $root fetch origin
+  & git -C $root fetch origin --tags --force
   if ($LASTEXITCODE -ne 0) { Write-Fail "fetch failed: check the network or the remote."; exit 1 }
 
+  if ($Edge) {
+    $target = "origin/main"; $label = "origin/main (edge)"
+  } else {
+    $target = (& git -C $root tag -l "v[0-9]*" --sort=-v:refname | Select-Object -First 1)
+    if (-not $target) {
+      Write-Warn2 "no release tag found: falling back to origin/main"
+      $target = "origin/main"; $label = "origin/main"
+    } else {
+      $label = $target
+    }
+  }
+
   $before = (& git -C $root rev-parse --short HEAD 2>$null)
-  & git -C $root reset --hard origin/main
+  & git -C $root reset --hard $target
   if ($LASTEXITCODE -ne 0) {
-    Write-Fail "reset failed: is 'main' on origin? Check 'git status'."
+    Write-Fail "reset failed: check 'git status'."
     exit 1
   }
   $after = (& git -C $root rev-parse --short HEAD 2>$null)
 
   if ($before -eq $after) {
-    Write-Ok "already current at $after"
+    Write-Ok "already current at $after ($label)"
   } else {
-    Write-Ok "reset $before $($Glyph.Arrow) $after (origin/main)"
+    Write-Ok "reset $before $($Glyph.Arrow) $after ($label)"
     # Reinstall only when the reset actually moved package.json; otherwise a no-op.
     $changed = (& git -C $root diff --name-only $before $after 2>$null)
     if ($changed -match "frontend/package\.json") {
