@@ -6,8 +6,11 @@ Horizontal stacked bars: green = delivered & passes ERC, gold = killswitch refus
     python -m eval.benchmark.cross_model.plot_benchmark
 
 Numbers are the ERC-clean counts per leg (full 75-prompt realuser suite):
-  bf16 70/75   Fable5 57/75   Q4_K_M 54/75   Opus 49/75   base 3/75   (Q4 from the T4/llama.cpp leg).
-Opus authored the realuser prompts, so its row carries a home-field-advantage footnote.
+  bf16 70/75   Fable5 57/75 (xhigh)   Codex 56/75 (xhigh)   Q4_K_M 54/75   base 3/75.
+Claude Opus 4.8 is intentionally NOT plotted yet: it runs at Claude's "max" effort and
+that run is still in progress (WIP). Effort scales differ - Claude is low<medium<high<
+xhigh<max, Codex tops out at xhigh - so Codex's xhigh is its ceiling while Fable's xhigh
+is one below Claude's max. Per-leg effort is tabulated in the README so nothing is hidden.
 """
 from __future__ import annotations
 import math
@@ -24,10 +27,11 @@ FG = "#e6edf3"; MUTED = "#8b949e"; GRID = "#30363d"
 # label, clean, total, rest_kind
 MODELS = [
     ("Ohmatic bf16\nfull pipeline · 8B",          70, 75, "blocked"),
-    ("Claude Fable 5\nfrontier · single-shot",    57, 75, "broken"),
+    ("Claude Fable 5\nfrontier · xhigh effort",   57, 75, "broken"),
+    ("OpenAI Codex\nfrontier · xhigh effort",     56, 75, "broken"),
     ("Ohmatic Q4_K_M\nGGUF quant",                54, 75, "blocked"),
-    ("Claude Opus 4.8\nfrontier · single-shot *",  49, 75, "broken"),
     ("Qwen3-8B base\nuntrained · single-shot",     3, 75, "broken"),
+    # Claude Opus 4.8 (max effort) intentionally omitted - run in progress (WIP).
 ]
 
 
@@ -88,8 +92,8 @@ ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=
           frameon=False, labelcolor=FG, fontsize=12, handlelength=1.3)
 
 fig.text(0.16, 0.045,
-         "*  Claude Opus authored the 75 prompts (blinded from training data). Evaluating it here is a "
-         "home-field advantage,\n   so its ERC-clean rate is if anything optimistic - the Ohmatic margin over it is conservative.",
+         "Effort: Fable & Codex ran at xhigh (Codex's ceiling; one below Claude's max). Claude Opus 4.8 at\n"
+         "   Claude's max effort is omitted here - that run is still in progress (WIP). Per-leg effort table in the README.",
          color=MUTED, fontsize=11, ha="left", va="bottom")
 
 out = Path(__file__).resolve().parents[3] / "assets" / "benchmark.png"
