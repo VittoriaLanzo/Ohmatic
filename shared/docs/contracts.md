@@ -470,7 +470,7 @@ mTLS is a deployment switch, not a rewrite.
 ### Request
 
 ```json
-{ "circuit": { "...": "OhmaticCircuitV01 object" }, "format": "netlist" }
+{ "circuit": { "...": "OhmaticCircuitV01 object" }, "format": "kicad_project" }
 ```
 
 | Field | Type | Default | Notes |
@@ -482,16 +482,24 @@ mTLS is a deployment switch, not a rewrite.
 
 ```json
 {
-  "filename": "led_blinker.net",
-  "content_type": "application/x-kicad-netlist",
-  "content": "(export (version \"E\") ...)"
+  "filename": "led_blinker.zip",
+  "content_type": "application/zip",
+  "content": "UEsDBBQ...",
+  "encoding": "base64"
 }
 ```
 
-`content` is the file body as text; the client saves it as `filename`. The
-`kicad_sch` format returns an editable schematic whose connectivity is carried by
-per-pin net labels (same-named labels are one net in KiCad), so it opens on any
-install with no external symbol libraries.
+`content` is the file body; `encoding` is `"utf-8"` for text formats (`netlist`) or
+`"base64"` for binary ones (the project zip). The client decodes per `encoding` and
+saves as `filename`.
+
+The `kicad_project` format returns a self-contained KiCad project zip: the
+`.kicad_sch` (connectivity carried by per-pin net labels - same-named labels are one
+net in KiCad), a project-local `ohmatic.kicad_sym` holding the generic symbols, the
+`sym-lib-table` that registers them, and a `.kicad_pro`. Because the library is
+registered in the project, KiCad's ERC is clean (no "library not in configuration"
+warnings). Verified with `kicad-cli sch erc` across every dataset example: 0 errors,
+0 warnings.
 
 ### Response 400 / 422
 
@@ -521,8 +529,8 @@ server-only change.
 {
   "schema_versions": ["0.1"],
   "formats": [
-    { "id": "netlist",   "ext": ".net",        "content_type": "application/x-kicad-netlist",   "label": "KiCad netlist" },
-    { "id": "kicad_sch", "ext": ".kicad_sch",  "content_type": "application/x-kicad-schematic", "label": "KiCad schematic" }
+    { "id": "kicad_project", "ext": ".zip", "content_type": "application/zip",                "label": "KiCad project" },
+    { "id": "netlist",       "ext": ".net", "content_type": "application/x-kicad-netlist",     "label": "KiCad netlist" }
   ]
 }
 ```

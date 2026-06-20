@@ -18,6 +18,7 @@ Y-down. A placed symbol mirrors its library (Y-up) coordinates, so a pin defined
 local (lx, ly) lands at world (px + lx, py - ly): that single transform is the only
 assumption here, and the connectivity test pins it down.
 """
+import json
 import uuid as _uuid
 
 _GRID = 50.8          # mm between placed symbols
@@ -58,31 +59,74 @@ def _pin_layout(n: int) -> list[tuple[int, float, float, int]]:
     return out
 
 
-def _lib_symbol(n: int) -> str:
-    """Definition of a generic n-pin box for the `lib_symbols` block."""
-    name = f"ohmatic:GENERIC_{n}"
+def _lib_symbol(n: int, name: str | None = None, base: str = "    ") -> str:
+    """A generic n-pin box symbol definition.
+
+    Shared, character-for-character, by two consumers: the schematic's `lib_symbols`
+    cache (name `ohmatic:GENERIC_n`, default indent) and the standalone
+    `ohmatic.kicad_sym` library (name `GENERIC_n`, library indent). They MUST stay
+    geometrically identical or KiCad reports a symbol mismatch, so both go through
+    here. `base` sets the indent of the outer `(symbol ...)`.
+    """
+    if name is None:
+        name = f"ohmatic:GENERIC_{n}"
+    i1, i2, i3, i4 = base, base + "  ", base + "    ", base + "      "
     rows = max((n + 1) // 2, n // 2, 1)
     half_h = (rows - 1) / 2 * _PIN_SPACING + _PIN_SPACING
     lines = [
-        f'    (symbol {_q(name)}',
-        '      (pin_names (offset 1.016)) (in_bom yes) (on_board yes)',
-        f'      (symbol {_q(f"GENERIC_{n}_0_1")}',
-        f'        (rectangle (start {-_BODY_HALF_W} {half_h}) '
-        f'(end {_BODY_HALF_W} {-half_h})',
-        '          (stroke (width 0.254) (type default)) '
-        '(fill (type background)))',
-        '      )',
-        f'      (symbol {_q(f"GENERIC_{n}_1_1")}',
+        f'{i1}(symbol {_q(name)}',
+        f'{i2}(pin_names (offset 1.016)) (in_bom yes) (on_board yes)',
+        f'{i2}(symbol {_q(f"GENERIC_{n}_0_1")}',
+        f'{i3}(rectangle (start {-_BODY_HALF_W} {half_h}) (end {_BODY_HALF_W} {-half_h})',
+        f'{i4}(stroke (width 0.254) (type default)) (fill (type background)))',
+        f'{i2})',
+        f'{i2}(symbol {_q(f"GENERIC_{n}_1_1")}',
     ]
     for num, lx, ly, rot in _pin_layout(n):
         lines.append(
-            f'        (pin passive line (at {lx} {ly} {rot}) (length {_PIN_LEN})'
+            f'{i3}(pin passive line (at {lx} {ly} {rot}) (length {_PIN_LEN})'
             f' (name "~" (effects (font (size 1.27 1.27))))'
             f' (number {_q(num)} (effects (font (size 1.27 1.27)))))'
         )
-    lines.append("      )")
-    lines.append("    )")
+    lines.append(f'{i2})')
+    lines.append(f'{i1})')
     return "\n".join(lines)
+
+
+def _used_pin_counts(circuit: dict) -> list[int]:
+    return sorted({max(len(c.get("pins") or {}), 1) for c in circuit["components"]})
+
+
+# A schematic that references custom symbols needs the symbols' library registered,
+# or KiCad's ERC warns "library not in configuration" for every symbol. So the export
+# ships a project: the `.kicad_sch` below, plus the three files here register an
+# `ohmatic` symbol library local to the project. KiCad then resolves it and ERC is
+# clean. KIPRJMOD is KiCad's project-directory variable.
+SYM_LIB_TABLE = (
+    '(sym_lib_table\n  (version 7)\n'
+    '  (lib (name "ohmatic")(type "KiCad")(uri "${KIPRJMOD}/ohmatic.kicad_sym")'
+    '(options "")(descr "Ohmatic generated symbols"))\n)\n'
+)
+
+
+def symbol_library(circuit: dict) -> str:
+    """`ohmatic.kicad_sym`: the generic symbols this circuit uses, as a KiCad symbol
+    library. Geometry comes from the same `_lib_symbol` the schematic caches."""
+    body = "\n".join(_lib_symbol(n, name=f"GENERIC_{n}", base="  ")
+                     for n in _used_pin_counts(circuit))
+    return ('(kicad_symbol_lib\n  (version 20231120)\n  (generator "ohmatic")\n'
+            + body + "\n)\n")
+
+
+def project_file(stem: str) -> str:
+    """Minimal `.kicad_pro` so KiCad opens the directory as a project (and thus loads
+    the project `sym-lib-table`)."""
+    return json.dumps({
+        "meta": {"filename": f"{stem}.kicad_pro", "version": 1},
+        "schematic": {},
+        "libraries": {"pinned_symbol_libs": [], "pinned_footprint_libs": []},
+        "sheets": [],
+    }, indent=2) + "\n"
 
 
 def emit_kicad_sch(circuit: dict) -> str:

@@ -3,14 +3,14 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   EXPORT_FORMATS,
   ExportError,
-  downloadTextFile,
+  downloadExport,
   exportCircuit,
   type ExportFormatId
 } from "../features/export/exportClient";
 import type { OhmaticCircuitV01 } from "../types/circuit";
 
 const FORMAT_ICON: Record<ExportFormatId, typeof CircuitBoard> = {
-  kicad_sch: CircuitBoard,
+  kicad_project: CircuitBoard,
   netlist: FileCode2
 };
 
@@ -58,7 +58,7 @@ export function ExportButton({ circuit }: ExportButtonProps) {
     setError(null);
     try {
       const file = await exportCircuit(circuit, format);
-      downloadTextFile(file);
+      downloadExport(file);
       setOpen(false);
     } catch (cause) {
       setError(cause instanceof ExportError ? cause.message : "Export failed");

@@ -6,12 +6,15 @@ correctness of the emitters - the netlist resolves real pin numbers and footprin
 and the schematic places a net label coincident with every connected pin so the
 circuit is electrically connected by name on import.
 """
+import base64
 import importlib.util
+import io
 import json
 import re
 import threading
 import urllib.error
 import urllib.request
+import zipfile
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
@@ -84,10 +87,33 @@ def test_netlist_resolves_pin_numbers_and_footprints():
     assert content.count("(net (code") == len(CIRCUIT["nets"])
 
 
+def _project_files(circuit):
+    """Decode the kicad_project export into {name: text}."""
+    result = build_export(circuit, "kicad_project")
+    assert result["encoding"] == "base64"
+    assert result["filename"].endswith(".zip")
+    zf = zipfile.ZipFile(io.BytesIO(base64.b64decode(result["content"])))
+    return {n: zf.read(n).decode("utf-8") for n in zf.namelist()}
+
+
+def test_kicad_project_registers_its_symbol_library():
+    """The zip is a self-contained project so KiCad ERC stays clean: a schematic, a
+    project-local symbol library, the sym-lib-table that registers it, and a .kicad_pro."""
+    files = _project_files(CIRCUIT)
+    assert any(n.endswith(".kicad_sch") for n in files)
+    assert any(n.endswith(".kicad_pro") for n in files)
+    assert "ohmatic.kicad_sym" in files and "sym-lib-table" in files
+    assert 'name "ohmatic"' in files["sym-lib-table"]
+    # The library must contain the same generic symbols the schematic references.
+    sch = next(files[n] for n in files if n.endswith(".kicad_sch"))
+    for n in re.findall(r'lib_id "ohmatic:(GENERIC_\d+)"', sch):
+        assert f'(symbol "{n}"' in files["ohmatic.kicad_sym"], f"{n} missing from library"
+
+
 def test_schematic_labels_every_connected_pin():
     """Connectivity-by-name invariant: every (component, pin) that belongs to a net
     has a label of that net's name at the pin's computed world coordinate."""
-    content = build_export(CIRCUIT, "kicad_sch")["content"]
+    content = next(v for k, v in _project_files(CIRCUIT).items() if k.endswith(".kicad_sch"))
 
     pin_net = {}
     for net in CIRCUIT["nets"]:
@@ -121,7 +147,7 @@ def test_schematic_labels_every_connected_pin():
 
 def test_capabilities_lists_both_formats():
     fmts = {f["id"] for f in capabilities()["formats"]}
-    assert fmts == {"netlist", "kicad_sch"}
+    assert fmts == {"netlist", "kicad_project"}
     assert capabilities()["schema_versions"] == ["0.1"]
 
 
@@ -161,7 +187,7 @@ def test_missing_circuit_is_400(ex):
 def test_capabilities_endpoint(ex):
     code, body = _request(ex.base, "/v1/export/capabilities")
     assert code == 200
-    assert {f["id"] for f in body["formats"]} == {"netlist", "kicad_sch"}
+    assert {f["id"] for f in body["formats"]} == {"netlist", "kicad_project"}
 
 
 def test_health_is_open_and_unversioned(ex):

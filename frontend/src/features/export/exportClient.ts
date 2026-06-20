@@ -5,7 +5,7 @@ import type { OhmaticCircuitV01 } from "../../types/circuit";
 // the loopback exporter service (:8004), keeping the browser on one base URL exactly
 // like the gateway calls. Contract: shared/docs/contracts.md sections 10-11.
 
-export type ExportFormatId = "kicad_sch" | "netlist";
+export type ExportFormatId = "kicad_project" | "netlist";
 
 export type ExportFormat = {
   id: ExportFormatId;
@@ -18,10 +18,10 @@ export type ExportFormat = {
 // instant menu; the server stays the source of truth for what actually renders.
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
-    id: "kicad_sch",
-    label: "KiCad schematic",
-    ext: ".kicad_sch",
-    description: "Editable schematic. Opens in KiCad."
+    id: "kicad_project",
+    label: "KiCad project",
+    ext: ".zip",
+    description: "Schematic + library. Opens clean in KiCad."
   },
   {
     id: "netlist",
@@ -35,6 +35,8 @@ export type ExportFile = {
   filename: string;
   content_type: string;
   content: string;
+  // "utf-8" for text formats (netlist); "base64" for binary ones (the project zip).
+  encoding?: "utf-8" | "base64";
 };
 
 export class ExportError extends Error {
@@ -67,10 +69,21 @@ export async function exportCircuit(
   return payload as ExportFile;
 }
 
-// Stream the returned text straight to a browser download. Kept separate from the
-// fetch so the network path stays unit-testable without a DOM.
-export function downloadTextFile(file: ExportFile): void {
-  const blob = new Blob([file.content], {
+function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Stream the returned file straight to a browser download. Handles both text
+// formats and base64-encoded binary (the project zip). Kept separate from the fetch
+// so the network path stays unit-testable without a DOM.
+export function downloadExport(file: ExportFile): void {
+  const body: BlobPart = file.encoding === "base64" ? base64ToBytes(file.content) : file.content;
+  const blob = new Blob([body], {
     type: file.content_type || "application/octet-stream"
   });
   const url = URL.createObjectURL(blob);

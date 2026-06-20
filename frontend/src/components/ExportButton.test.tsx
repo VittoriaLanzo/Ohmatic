@@ -19,9 +19,9 @@ describe("ExportButton", () => {
   });
 
   it("opens the format menu and downloads the chosen format on click", async () => {
-    const file = { filename: "led_blinker.kicad_sch", content_type: "application/x-kicad-schematic", content: "(kicad_sch)" };
+    const file = { filename: "led_blinker.zip", content_type: "application/zip", content: "UEsDBA==", encoding: "base64" as const };
     const exportSpy = vi.spyOn(exportClient, "exportCircuit").mockResolvedValue(file);
-    const downloadSpy = vi.spyOn(exportClient, "downloadTextFile").mockImplementation(() => undefined);
+    const downloadSpy = vi.spyOn(exportClient, "downloadExport").mockImplementation(() => undefined);
 
     render(<ExportButton circuit={circuit} />);
 
@@ -31,9 +31,9 @@ describe("ExportButton", () => {
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
 
-    fireEvent.click(screen.getByRole("menuitem", { name: /KiCad schematic/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /KiCad project/i }));
 
-    await waitFor(() => expect(exportSpy).toHaveBeenCalledWith(circuit, "kicad_sch"));
+    await waitFor(() => expect(exportSpy).toHaveBeenCalledWith(circuit, "kicad_project"));
     await waitFor(() => expect(downloadSpy).toHaveBeenCalledWith(file));
     // Menu closes after a successful export.
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
@@ -42,7 +42,7 @@ describe("ExportButton", () => {
   it("exposes both KiCad formats", () => {
     render(<ExportButton circuit={circuit} />);
     fireEvent.click(screen.getByRole("button", { name: /export/i }));
-    expect(screen.getByRole("menuitem", { name: /KiCad schematic/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /KiCad project/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Netlist/i })).toBeInTheDocument();
   });
 });
