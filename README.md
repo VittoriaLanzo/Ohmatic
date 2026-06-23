@@ -41,7 +41,7 @@ model can't get there, it returns a clarifying question and keeps the broken dra
 
 ## Benchmark
 
-A neutral, **third-party** test: someone else's prompts, our verifier. The 62 single-circuit tasks
+A neutral, **third-party** test: their prompts, our rules. The 62 single-circuit tasks
 of **PCBBench** — from [PCBSchemaGen v2](https://github.com/HZou9/PCBSchemaGen_v2) (MIT, © 2026
 Zou, Han, Nazerian, Zhang, Guo & Huang) — run end to end through the full pipeline and are scored
 by Ohmatic's own deterministic **ERC engine** (`eval/diagnostics.py` + `eval/rules/`, the same
