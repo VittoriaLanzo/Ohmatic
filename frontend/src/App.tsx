@@ -303,7 +303,7 @@ export default function App() {
         >
           <span aria-hidden="true">★</span> Star Ohmatic on GitHub
         </a>
-        <span className="board-footer-note">Source-available · Ohmatic-SAL-1.0</span>
+        <span className="board-footer-note">Source-available · Ohmatic-SAL-1.1</span>
       </footer>
     </main>
   );

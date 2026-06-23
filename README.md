@@ -173,7 +173,7 @@ than they add. The more lines a change adds, the less likely it is to be approve
 when you can.
 
 By contributing you agree your work is licensed under the
-[Ohmatic Source-Available License 1.0](LICENSE).
+[Ohmatic Source-Available License 1.1](LICENSE).
 
 <p align="center">
   <a href="https://github.com/VittoriaLanzo/Ohmatic/graphs/contributors">
@@ -235,7 +235,7 @@ internally consistent. It does not certify fitness for any particular purpose.
 
 ## License
 
-Ohmatic is source-available under the [Ohmatic Source-Available License 1.0](LICENSE), adapted from
+Ohmatic is source-available under the [Ohmatic Source-Available License 1.1](LICENSE), adapted from
 the Functional Source License 1.1: each release converts to Apache 2.0 ten years after it ships. You
 can use, modify, and redistribute it for any purpose that is not a Competing Use. Commercial,
 hosting, and competing-use rights, and acquisition, are available in

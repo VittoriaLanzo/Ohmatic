@@ -46,7 +46,7 @@ pull request.
 
 ## Licensing of contributions
 
-Ohmatic is source-available under the [Ohmatic Source-Available License 1.0](LICENSE) (adapted from
+Ohmatic is source-available under the [Ohmatic Source-Available License 1.1](LICENSE) (adapted from
 the Functional Source License 1.1). By submitting a contribution you agree that it is licensed under
 those same terms. Commercial, hosting, and competing-use rights, and acquisition, are described in
 [COMMERCIAL.md](COMMERCIAL.md).
