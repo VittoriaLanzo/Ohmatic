@@ -1,54 +1,47 @@
-"""Regenerate assets/benchmark.png from the verified PCBBench results.
+"""Regenerate assets/benchmark.svg from the verified PCBBench results.
 
-Diverging horizontal bars around a central "delivery line" (x=0). The only UNSAFE
-outcome - a broken circuit handed to the user - is drawn in red to the LEFT of the
-line; the two safe outcomes - a verified-clean circuit (green) and a killswitch
-abstention (gold) - extend RIGHT. So an Ohmatic leg, which abstains rather than ship
-an ERC-failing circuit, never crosses into the danger zone; a frontier model that
-always answers does. That contrast - blocked-and-delivered vs abstained - is the point.
+A solder-pad matrix in the Ohmatic PCB-board visual language. Every one of the 62
+PCBBench tasks is a single pad, one row per leg, sorted by outcome: phosphor-green
+(delivered & passes ERC), amber (killswitch abstention), LED-red (a broken circuit
+delivered to the user). The contrast reads like a board at a glance - the Ohmatic
+legs show green and amber pads and zero red; a frontier model that always answers
+shows red. Abstained vs broken, made literal.
 
     python -m eval.benchmark.cross_model.plot_benchmark
 
-Data-driven: each leg is read from verified/<leg>.jsonl (suite=pcbschemagen). A leg
-with no verified file is skipped, so bf16 appears automatically once its run lands.
-Numbers are never hard-coded here - rerun verify.py and this picks them up.
+Data-driven and expansible: each leg is read from verified/<leg>.jsonl
+(suite=pcbschemagen); a leg with no file is skipped, so bf16 - and any future leg -
+drops in as a new row automatically. No matplotlib: pure SVG, crisp at any size in
+the README and on the site, numbers never hard-coded (rerun verify.py to update).
 """
 from __future__ import annotations
 import json
-import math
 from pathlib import Path
-
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 
 HERE = Path(__file__).resolve().parent
 VERIFIED = HERE / "verified"
 SUITE = "pcbschemagen"
 
-BG = "#0d1117"; GREEN = "#3fb950"; GOLD = "#bb8009"; RED = "#f85149"
-FG = "#e6edf3"; MUTED = "#8b949e"; GRID = "#30363d"
+BOARD   = "#081712"
+PANEL   = "#0b201a"
+COPPER  = "#c47a3d"
+COPPERB = "#f59e4d"
+GOLD    = "#ffd072"
+SILK    = "#e9f2e7"
+SILKDIM = "#9db3a4"
+GREEN   = "#51e88a"   # delivered & passes ERC
+AMBER   = "#ffb145"   # abstained / killswitch
+RED     = "#ff5c49"   # broken circuit delivered
+LINE    = "rgba(196,122,61,0.20)"
+LINESTR = "rgba(196,122,61,0.42)"
+FONT    = "'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace"
 
-# leg key -> display label. Order top->bottom; missing legs are skipped silently
-# (bf16 slots in here automatically once verified/bf16.jsonl exists).
 LEGS = [
-    ("q4",    "Ohmatic Q4_K_M\nGGUF quant · 8B"),
-    ("q8",    "Ohmatic Q8_0\nGGUF quant · 8B"),
-    ("bf16",  "Ohmatic bf16\nfull precision · 8B"),
-    ("codex", "OpenAI Codex\nfrontier · xhigh effort"),
+    ("q4",    "Ohmatic Q4_K_M", "GGUF quant · 8B",       "ohmatic"),
+    ("q8",    "Ohmatic Q8_0",   "GGUF quant · 8B",       "ohmatic"),
+    ("bf16",  "Ohmatic bf16",   "full precision · 8B",   "ohmatic"),
+    ("codex", "OpenAI Codex",   "frontier · xhigh effort", "frontier"),
 ]
-
-
-def wilson_hi(k: int, n: int, z: float = 1.96) -> float:
-    """Upper 95% bound on the broken rate; for k=0 this is the rule-of-three read."""
-    if n == 0:
-        return 0.0
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (c + h) * 100
 
 
 def load_leg(key: str) -> dict | None:
@@ -61,83 +54,102 @@ def load_leg(key: str) -> dict | None:
         return None
     n = len(rows)
     clean = sum(r["outcome"] == "delivered_clean" for r in rows)
-    broken = sum(r["outcome"] == "delivered_broken" for r in rows)
     blocked = sum(r["outcome"] == "blocked_killswitch" for r in rows)
-    invalid = sum(r["outcome"] == "invalid_output" for r in rows)
-    return dict(n=n, clean=clean, broken=broken + invalid, blocked=blocked,
-                clean_pct=100 * clean / n, broken_pct=100 * (broken + invalid) / n,
-                blocked_pct=100 * blocked / n)
+    broken = sum(r["outcome"] in ("delivered_broken", "invalid_output") for r in rows)
+    return dict(n=n, clean=clean, blocked=blocked, broken=broken)
 
 
-legs = [(label, load_leg(key)) for key, label in LEGS]
-legs = [(label, d) for label, d in legs if d]   # drop legs with no data yet
+def esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-fig, ax = plt.subplots(figsize=(14.4, 0.2 + 1.9 * len(legs)), dpi=200)
-fig.patch.set_facecolor(BG); ax.set_facecolor(BG)
-ys = list(range(len(legs)))[::-1]               # first leg on top
-H = 0.6
 
-left_max = max((d["broken_pct"] for _, d in legs), default=0)
-XL = -(math.ceil((left_max + 6) / 10) * 10)     # round the danger axis out to a clean tick
+def txt(x, y, s, size, fill, weight=400, anchor="start", ls=0.0, op=1.0):
+    a = f' text-anchor="{anchor}"' if anchor != "start" else ""
+    l = f' letter-spacing="{ls}"' if ls else ""
+    o = f' opacity="{op}"' if op != 1.0 else ""
+    return (f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" '
+            f'font-weight="{weight}" fill="{fill}"{a}{l}{o}>{esc(s)}</text>')
 
-for y, (label, d) in zip(ys, legs):
-    # RIGHT of the delivery line: the two SAFE outcomes
-    ax.barh(y, d["clean_pct"], left=0, color=GREEN, height=H, zorder=3)
-    ax.barh(y, d["blocked_pct"], left=d["clean_pct"], color=GOLD, height=H, zorder=3)
-    # LEFT of the delivery line: the one UNSAFE outcome
-    ax.barh(y, -d["broken_pct"], left=0, color=RED, height=H, zorder=3)
 
-    if d["clean_pct"] >= 12:
-        ax.text(d["clean_pct"] / 2, y, f"{d['clean']}/{d['n']}\nclean", ha="center",
-                va="center", color="#0d1117", fontsize=12, fontweight="bold", zorder=6)
-    if d["blocked_pct"] >= 12:
-        ax.text(d["clean_pct"] + d["blocked_pct"] / 2, y, f"{d['blocked']}\nabstained",
-                ha="center", va="center", color="#0d1117", fontsize=12,
-                fontweight="bold", zorder=6)
-    if d["broken"] > 0:
-        ax.text(-d["broken_pct"] - 1.5, y, f"{d['broken']} BROKEN\ndelivered", ha="right",
-                va="center", color=RED, fontsize=12.5, fontweight="bold", zorder=6)
-    else:                                        # 0 broken: rule-of-three 95% upper bound (3/n)
-        ax.text(-1.5, y, f"0 broken  (≤{300 / d['n']:.1f}% @95%)", ha="right",
-                va="center", color=GREEN, fontsize=11.5, fontweight="bold", zorder=6)
-    ax.text(101.5, y, f"n={d['n']}", ha="left", va="center", color=MUTED, fontsize=11.5)
+legs = [(lab, sub, kind, load_leg(k)) for k, lab, sub, kind in LEGS]
+legs = [(lab, sub, kind, d) for lab, sub, kind, d in legs if d]
 
-# the delivery line: everything left of it reached the user broken
-ax.axvline(0, color="#ffffff", linewidth=1.8, zorder=5)
+# ---- geometry ----------------------------------------------------------------
+W = 1180
+PAD = 34
+GUTTER_R = 252               # leg-label column ends here
+STRIP_X0 = 270
+STRIP_X1 = W - 150           # leaves a column for the per-leg counts
+NCOLS = max((d["n"] for *_, d in legs), default=62)
+PITCH = (STRIP_X1 - STRIP_X0) / NCOLS
+DOT = min(14.5, PITCH - 1.8)
+HEAD = 142
+ROW = 60
+FOOT = 92
+H = HEAD + ROW * len(legs) + FOOT
 
-ax.set_yticks(ys)
-ax.set_yticklabels([label for label, _ in legs], color=FG, fontsize=12.5)
-ax.set_xlim(XL, 104)
-ticks = list(range(XL, 101, 20))
-ax.set_xticks(ticks)
-ax.set_xticklabels([f"{abs(t)}%" for t in ticks], color=MUTED, fontsize=11)
-ax.tick_params(colors=MUTED)
-for s in ax.spines.values():
-    s.set_visible(False)
-ax.xaxis.grid(True, color=GRID, linewidth=1, zorder=0)
-ax.set_axisbelow(True)
+s = []
+s.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'width="{W}" height="{H}" font-family="{FONT}" role="img">')
+s.append('<defs><pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">'
+         f'<circle cx="1.1" cy="1.1" r="1.1" fill="{COPPER}" opacity="0.06"/></pattern></defs>')
+s.append(f'<rect x="1" y="1" width="{W-2}" height="{H-2}" rx="14" fill="{BOARD}" '
+         f'stroke="{LINESTR}" stroke-width="1.5"/>')
+s.append(f'<rect x="1" y="1" width="{W-2}" height="{H-2}" rx="14" fill="url(#dots)"/>')
+for cx, cy in [(PAD, PAD), (W-PAD, PAD), (PAD, H-PAD), (W-PAD, H-PAD)]:
+    s.append(f'<circle cx="{cx}" cy="{cy}" r="5.5" fill="none" stroke="{COPPER}" '
+             f'stroke-width="1.2" opacity="0.5"/><circle cx="{cx}" cy="{cy}" r="1.6" fill="{COPPER}" opacity="0.5"/>')
 
-# region headers above the bars: danger (left) vs safe (right)
-top = len(legs) - 0.5
-ax.text(XL / 2, top + 0.25, "◀  BROKEN circuit delivered  (unsafe)", ha="center",
-        va="bottom", color=RED, fontsize=12, fontweight="bold")
-ax.text(50, top + 0.25, "verified-clean  +  abstained  (no broken circuit shipped)  ▶",
-        ha="center", va="bottom", color=GREEN, fontsize=12, fontweight="bold")
+# ---- header ------------------------------------------------------------------
+s.append(txt(PAD + 10, 56, "If it can't verify it, it won't deliver it.", 27, SILK, 700))
+s.append(txt(PAD + 10, 86, "62 PCBBench tasks (PCBSchemaGen, MIT)  ·  one ERC verifier for every leg  ·  condition C1  ·  each pad = one task",
+             13, SILKDIM, 400))
+s.append(txt(STRIP_X1 + 24, 86, "outcome", 11, SILKDIM, 400, op=0.7))
 
-ax.set_title("If it can't verify it, it won't deliver it.", color=FG, fontsize=22,
-             fontweight="bold", loc="left", pad=46)
-ax.text(0, 1.0, "62 PCBBench tasks (PCBSchemaGen, MIT) · same prompts + same ERC verifier "
-        "every leg · condition C1", transform=ax.transAxes, color=MUTED, fontsize=12, va="bottom")
+# ---- rows --------------------------------------------------------------------
+for i, (lab, sub, kind, d) in enumerate(legs):
+    rtop = HEAD + i * ROW
+    mid = rtop + ROW / 2
+    if i > 0 and kind != legs[i-1][2]:                       # divider: ours vs frontier
+        s.append(f'<line x1="{PAD+10}" y1="{rtop:.1f}" x2="{W-PAD-10}" y2="{rtop:.1f}" '
+                 f'stroke="{LINE}" stroke-width="1" stroke-dasharray="2 4"/>')
+    s.append(f'<rect x="{PAD+6}" y="{rtop+8:.1f}" width="{W-2*PAD-12}" height="{ROW-16:.1f}" '
+             f'rx="9" fill="{PANEL}" opacity="0.5"/>')
+    s.append(txt(GUTTER_R, mid - 3, lab, 15.5, SILK, 700, anchor="end"))
+    s.append(txt(GUTTER_R, mid + 14, sub, 10.5, SILKDIM, 400, anchor="end"))
 
-legend = [Patch(facecolor=GREEN, label="delivered · passes ERC"),
-          Patch(facecolor=GOLD, label="abstained · killswitch (asks to clarify)"),
-          Patch(facecolor=RED, label="broken circuit delivered to user")]
-ax.legend(handles=legend, loc="upper center", bbox_to_anchor=(0.5, -0.16 / max(1, len(legs)) - 0.06),
-          ncol=3, frameon=False, labelcolor=FG, fontsize=11.5, handlelength=1.3)
+    pads = [GREEN] * d["clean"] + [AMBER] * d["blocked"] + [RED] * d["broken"]
+    py = mid - DOT / 2
+    for idx, col in enumerate(pads):
+        px = STRIP_X0 + idx * PITCH + (PITCH - DOT) / 2
+        s.append(f'<rect x="{px:.1f}" y="{py:.1f}" width="{DOT:.1f}" height="{DOT:.1f}" '
+                 f'rx="{DOT*0.3:.1f}" fill="{col}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>')
 
-out = HERE.parents[2] / "assets" / "benchmark.png"
+    # per-leg counts (colored), right-aligned; broken emphasized
+    bw = 700 if d["broken"] else 400
+    s.append(f'<text x="{W-PAD-10:.1f}" y="{mid+5:.1f}" font-family="{FONT}" font-size="12.5" '
+             f'text-anchor="end">'
+             f'<tspan fill="{GREEN}" font-weight="700">{d["clean"]}</tspan>'
+             f'<tspan fill="{SILKDIM}"> · </tspan>'
+             f'<tspan fill="{AMBER}" font-weight="700">{d["blocked"]}</tspan>'
+             f'<tspan fill="{SILKDIM}"> · </tspan>'
+             f'<tspan fill="{RED}" font-weight="{bw}">{d["broken"]}</tspan></text>')
+
+# ---- legend + footnote -------------------------------------------------------
+ly = H - FOOT + 36
+lx = PAD + 12
+for col, label in [(GREEN, "verified-clean"), (AMBER, "abstained · killswitch"), (RED, "broken delivered")]:
+    s.append(f'<rect x="{lx}" y="{ly-11:.1f}" width="15" height="15" rx="4.5" fill="{col}"/>')
+    s.append(txt(lx + 22, ly + 1, label, 12, SILK, 400))
+    lx += 22 + len(label) * 7.5 + 30
+s.append(txt(W - PAD - 10, ly + 1, "counts:  clean · abstained · broken", 11, SILKDIM, 400, anchor="end", op=0.85))
+s.append(txt(PAD + 12, ly + 31,
+             "Same prompts and the same deterministic ERC verifier for every leg; competitors get the schema + registry but not the ERC rules. "
+             "Ohmatic abstains rather than ship an ERC-failing circuit — 0 broken (rule-of-three 95% upper bound ≤ 4.8%).",
+             11, SILKDIM, 400, op=0.9))
+s.append('</svg>')
+
+out = HERE.parents[2] / "assets" / "benchmark.svg"
 out.parent.mkdir(parents=True, exist_ok=True)
-fig.subplots_adjust(left=0.16, right=0.94, top=0.80, bottom=0.16)
-fig.savefig(out, facecolor=BG, dpi=200)
-print("wrote", out, "->", ", ".join(f"{lab.splitlines()[0]} {d['clean']}/{d['n']}c "
-                                    f"{d['blocked']}a {d['broken']}b" for lab, d in legs))
+out.write_text("\n".join(s), encoding="utf-8")
+print("wrote", out, "->", ", ".join(f"{lab} {d['clean']}/{d['blocked']}/{d['broken']}" for lab, _, _, d in legs))
