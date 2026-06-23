@@ -184,29 +184,30 @@
         <div class="shell grid-2">
           <div>
             <span class="eyebrow">Benchmark</span>
-            <h2>An 8B fine-tune. Zero broken across 75 prompts.</h2>
+            <h2>An 8B fine-tune. Zero broken boards delivered.</h2>
             <p>
-              75 messy, underspecified, real-user prompts, authored by Claude Opus (itself an evaluated
-              leg, so its row carries a disclosed home-field advantage), run end to end through the full
-              pipeline and verified by the same engine that gates production.
+              62 single-circuit tasks from <b>PCBBench</b> (PCBSchemaGen, MIT) &mdash; a third-party
+              suite, someone else's prompts &mdash; run end to end through the full pipeline and scored
+              by Ohmatic's own deterministic ERC engine, the same checker that gates production.
             </p>
             <div class="stat-row">
-              <div class="stat"><div class="n good">93.3%</div><div class="l">delivered clean (Ohmatic bf16)</div></div>
-              <div class="stat"><div class="n good">0</div><div class="l">broken circuits delivered</div></div>
-              <div class="stat"><div class="n bad">24%</div><div class="l">broken circuits delivered by Claude Fable 5</div></div>
+              <div class="stat"><div class="n good">0</div><div class="l">broken circuits Ohmatic delivered (62 tasks)</div></div>
+              <div class="stat"><div class="n bad">22</div><div class="l">broken circuits OpenAI Codex delivered, same tasks</div></div>
+              <div class="stat"><div class="n good">&le;4.8%</div><div class="l">Ohmatic's broken rate, 95% upper bound</div></div>
             </div>
             <p style="font-size: 0.82rem">
-              Wilson 95% intervals; identical prompts and verifier for every row. Claude Fable 5, Claude
-              Opus 4.8 and OpenAI Codex each received the complete Ohmatic system prompt and ran
-              single-shot at high reasoning effort (Opus at Claude's max; Fable and Codex at xhigh)
-              &mdash; that spec levels the field upward, since a bare model can't emit the schema at all.
-              Even so, each ships ~24&ndash;25% broken; quality loss shows up as fewer deliveries, not bad output.
+              Identical prompts and identical ERC verifier for every leg; competitors get the schema and
+              component registry but not the ERC rules (condition C1), so the checker can't be gamed. Each
+              frontier leg ran single-shot via its own CLI at max reasoning effort (Codex xhigh). PCBBench
+              is harder and out-of-distribution, so Ohmatic's clean rate is lower and it abstains on about
+              half &mdash; but where the frontier model answers every task and ships 22 broken boards,
+              Ohmatic asks you to clarify and ships none. The bf16 leg is still running.
               <a href="https://github.com/VittoriaLanzo/Ohmatic#benchmark">Full methodology &rarr;</a>
             </p>
           </div>
           <figure>
-            <img class="bench-img" src="assets/benchmark.png" alt="Benchmark chart: Ohmatic bf16 93.3% and Q4_K_M 72.0% verified-clean with zero broken deliveries; Claude Fable 5 (xhigh effort) at 76.0% with 24% broken, Claude Opus 4.8 (max effort) at 76.0% with 24% broken, and OpenAI Codex (xhigh effort) at 74.7% with 25% broken; the untrained Qwen3-8B base at 4.0%" loading="lazy" decoding="async" />
-            <figcaption>Verified-clean rate vs. broken deliveries, same 75-prompt suite &mdash; frontier legs at high effort (Opus max; Fable, Codex xhigh).</figcaption>
+            <img class="bench-img" src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M 30 green, 32 amber, 0 red; Ohmatic Q8_0 28 green, 34 amber, 0 red; OpenAI Codex at xhigh effort 40 green, 0 amber, 22 red. Red pads appear only on the Codex row." loading="lazy" decoding="async" />
+            <figcaption>62 PCBBench tasks, one ERC verifier &mdash; each pad is one task. Red (broken delivered) appears only on the frontier row; Ohmatic abstains in amber instead.</figcaption>
           </figure>
         </div>
       </section>

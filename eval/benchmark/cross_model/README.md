@@ -72,6 +72,7 @@ control that isolates the lift as training, not the 8B base.
 | `forward` | frozen held-out set (HF, private, `data/holdout_v1.jsonl`) | all legs |
 | `realuser` | `data/realuser_prompts.jsonl`, 75 novel messy prompts | all legs |
 | `correction` | held-out ERC-repair cases (HF, private) | **local legs only** (proprietary; enforced in `config.check_suite_allowed`) |
+| `pcbschemagen` | PCBBench (PCBSchemaGen v2, MIT), built from source by `make_pcbschemagen_suite.py`, never committed | all legs &mdash; the third-party headline suite; see [PCBSCHEMAGEN.md](PCBSCHEMAGEN.md) |
 
 ## Fairness contract (disclosed in any publication)
 

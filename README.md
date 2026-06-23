@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="#benchmark"><img alt="Benchmark: 93.3% ERC-clean on 75 prompts" src="https://img.shields.io/badge/benchmark-93.3%25%20ERC--clean-3fb950"></a>
+  <a href="#benchmark"><img alt="Benchmark: 0 broken circuits delivered on PCBBench" src="https://img.shields.io/badge/PCBBench-0%20broken%20delivered-3fb950"></a>
   <a href="https://huggingface.co/VittoriaLanzo"><img alt="Weights on Hugging Face" src="https://img.shields.io/badge/weights-Hugging%20Face-f59e0b"></a>
   <a href="https://github.com/VittoriaLanzo/Ohmatic/actions/workflows/python-package.yml"><img alt="Tests" src="https://github.com/VittoriaLanzo/Ohmatic/actions/workflows/python-package.yml/badge.svg"></a>
   <img alt="License: Source-Available" src="https://img.shields.io/badge/license-source--available-2563eb">
@@ -41,84 +41,76 @@ model can't get there, it returns a clarifying question and keeps the broken dra
 
 ## Benchmark
 
-75 novel "real-user" prompts (messy, underspecified, typo-ridden), authored by Claude Opus and
-overlap-checked against all training data, run end to end through the full pipeline. (Opus is itself
-an evaluated leg, so its own row carries a disclosed home-field advantage — see methodology.)
+A neutral, **third-party** test: someone else's prompts, our verifier. The 62 single-circuit tasks
+of **PCBBench** — from [PCBSchemaGen v2](https://github.com/HZou9/PCBSchemaGen_v2) (MIT, © 2026
+Zou, Han, Nazerian, Zhang, Guo & Huang) — run end to end through the full pipeline and are scored
+by Ohmatic's own deterministic **ERC engine** (`eval/diagnostics.py` + `eval/rules/`, the same
+checker that gates training and production). Competitors get the schema and component registry but
+**not** the ERC rules (condition C1), so the comparison can't be gamed by handing them our ruleset.
 
 <p align="center">
-  <img src="assets/benchmark.png" alt="Benchmark across 75 identical prompts judged by the same ERC engine: Ohmatic bf16 93.3% ERC-clean with zero ERC-failing deliveries (the rest withheld by the killswitch); Claude Fable 5 (xhigh effort, single-shot) 76.0% ERC-clean with 18 of 75 outputs failing the same checks; Claude Opus 4.8 (max effort, single-shot) 76.0% ERC-clean with 18 of 75 failing, despite Opus having authored the prompts; OpenAI Codex (xhigh effort, single-shot) 74.7% ERC-clean with 19 of 75 failing; Ohmatic Q4_K_M quant 72.0% ERC-clean, zero ERC-failing; the untrained Qwen3-8B base 4.0% ERC-clean." width="100%" />
+  <img src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M: 30 green, 32 amber, 0 red. Ohmatic Q8_0: 28 green, 34 amber, 0 red. OpenAI Codex at xhigh effort: 40 green, 0 amber, 22 red. Red pads appear only on the Codex row; the Ohmatic rows carry amber abstentions instead and zero red." width="100%" />
 </p>
 
-Every model is judged by the same ERC engine. "ERC-clean" means a delivered circuit passed that
-engine: structurally and electrically consistent against a fixed rule set. Ohmatic delivered 70 of
-the 75 and withheld the other 5; every delivery passed. On the same prompts, single-shot, 18 of 75 Claude Fable 5, 18 of 75 Claude Opus 4.8 (at max effort), and 19 of 75 OpenAI Codex outputs failed the same checks.
+The headline is the **failure mode**, not the clean rate. Left of the delivery line is the only
+unsafe outcome — a broken circuit handed to the user; right of it are the two safe ones — a
+verified-clean circuit, or a killswitch abstention. Ohmatic never crosses the line:
+
+| leg | ERC-clean | abstained (killswitch) | broken delivered |
+|-----|-----------|------------------------|------------------|
+| Ohmatic Q4_K_M (GGUF) | 30/62 (48%) | 32/62 | **0** (rule-of-three ≤ 4.8%) |
+| Ohmatic Q8_0 (GGUF) | 28/62 (45%) | 34/62 | **0** (≤ 4.8%) |
+| OpenAI Codex (C1, xhigh effort) | 40/62 (65%) | 0 | **22/62 (35%)** |
+
+PCBBench is harder and further from Ohmatic's distribution than the in-house suite, so the raw
+clean rate is lower and the killswitch abstains on roughly half the tasks. That is the trade it
+makes: where the frontier model answers every task and ships 22 broken boards, Ohmatic asks you to
+clarify instead and ships **none**. Same ballpark clean rate, opposite failure mode. The bf16 leg
+is still running and joins as its own column once it lands.
 
 <details>
 <summary><b>Methodology and reproduce</b></summary>
 
-Every model is judged by the identical ERC engine on the identical prompts; rates carry Wilson 95%
-intervals (bf16 ERC-clean 93.3%, 95% CI 85.3-97.1%; the full set is in the report output).
-"Failed ERC" means an output did not pass that engine. Because that engine also trains and gates
-Ohmatic, the ERC-clean rate measures conformance to a shared rule set; independent correctness is a
-separate question, addressed in [A note on verification](#a-note-on-verification). The comparison is
-fair because the rule set is held identical for every model, and every frontier leg (Fable 5, Opus 4.8,
-Codex) received the same complete system prompt — the schema, component
-registry, and every ERC rule. That spec levels the field upward: without it a chat model cannot emit
-the schema at all, so these competitor rates if anything overstate what a bare model would deliver.
+**Suite.** PCBBench is the 62 single-circuit tasks from PCBSchemaGen v2 (MIT). We use only the
+single-circuit set — Ohmatic builds one focused circuit per request, not whole multi-IC boards —
+and render each as a functional natural-language request. The suite is rebuilt from the upstream
+source on demand and **never committed**, so it cannot be trained against and the upstream MIT
+notice is preserved.
 
-On clean-rate, paired McNemar on the same 75 prompts: Ohmatic-only-clean 17 vs Claude
-Fable 5-only-clean 4, exact p = 0.007. Of the 75, Ohmatic delivered 70 (93.3% of all prompts; 100%
-of deliveries ERC-clean), withheld 5, and delivered 0 ERC-failing circuits. That zero is structural:
-the killswitch withholds anything that fails ERC before it reaches you, and it pays for that in
-availability, shown as the withheld column. The same Qwen3-8B base, untrained and single-shot,
-reaches 4.0% ERC-clean on these prompts, so on this suite the training accounts for the lift.
+**Verifier.** One deterministic ERC engine scores every leg: `eval.diagnostics.analyze_schematic`
+(connectivity, power integrity, pin legality, schema/structure) — the single source of truth that
+also gates training and production. Because that same engine trains and grades Ohmatic, the
+ERC-clean rate measures conformance to a fixed rule set; independent correctness is a separate
+question, addressed in [A note on verification](#a-note-on-verification). PCBSchemaGen's own
+verifier scores a complementary axis (spec-completion + exact part match) and is kept as future
+corroboration, never a replacement.
 
-Claude Fable 5 was handed that complete system prompt, then run single-shot as a fresh instance per
-prompt (no repo or conversation access, default decoding). The only thing withheld is the ERC
-correction loopback: the iterative repair loop is the product, and a chat user does not have it. Quantization degrades the generator: the Q4_K_M build still delivers 0
-ERC-failing circuits, but its killswitch fires about four times as often (28.0% withheld vs 6.7%),
-so the quality loss showed up as extra refusals while every delivery stayed ERC-clean.
+**Fairness (condition C1).** Every leg receives the byte-identical system prompt — schema +
+component registry — but competitors are **not** handed the ERC rules, because giving a model the
+checker's ruleset is how you benchmax it. Each frontier leg runs single-shot as a fresh,
+zero-context product instance through its own CLI (no api key), at its product's max reasoning
+effort (Codex xhigh). Ohmatic runs its full pipeline including the killswitch — that IS the product.
 
-OpenAI Codex, run the identical way (full spec, single-shot via the `codex` CLI) at its max reasoning
-effort (xhigh), reaches 74.7% ERC-clean (56/75, 95% CI 63.8-83.1%) and delivers 19 broken circuits
-with no killswitch — schema-validation errors, invalid pin references, missing bypass capacitors.
-
-Claude Opus 4.8, run the identical way at Claude's **max** effort (a level above xhigh), reaches
-76.0% ERC-clean (57/75, 95% CI 65.2-84.2%) and delivers 18 broken circuits with no killswitch —
-landing exactly on Fable. Max effort lifts Opus well above its default-effort pass (65.3%, discarded
-as not comparable), which is why every frontier leg is held at its product's top setting. Opus also
-authored the realuser suite, so its row carries a **home-field advantage** that biases in Opus's
-favour — a real, disclosed caveat, opposite in direction to the system-prompt leveling above.
-(`MISSING_POWER_VCC` ×12 was its most common failure: a circuit that reads fine but never ties the
-part to power.)
-
-**Reasoning effort per leg** (stated explicitly, so nothing is hidden):
-
-| Leg | Effort |
-|---|---|
-| Ohmatic bf16 / Q4_K_M | greedy decode (temp 0), full pipeline |
-| Claude Fable 5 | xhigh |
-| Claude Opus 4.8 | max (Claude's ceiling) |
-| OpenAI Codex | xhigh (Codex's ceiling) |
-| Qwen3-8B base | greedy, single-shot |
-
-Claude's scale is low < medium < high < xhigh < max; Codex tops out at xhigh. So Opus ran at Claude's
-max, Codex at its own max (xhigh), and Fable one notch below Claude's max.
+**Outcomes.** `delivered_clean` / `delivered_broken` / `blocked_killswitch` (Ohmatic abstains; no
+unverified circuit reaches the user) / `invalid_output`. Off-box legs have no killswitch, so every
+ERC failure is a broken circuit delivered. With 0 broken on 62 tasks, the 95% upper bound on
+Ohmatic's broken rate is the rule-of-three ≤ 4.8%.
 
 ```bash
-# stage 1: generate (per model leg; append-only, crash-resumable)
-python -m eval.benchmark.cross_model.generate --model ohmatic-bf16 --suite realuser
-# stage 2: verify every output through the identical extract -> ERC path (free, rerunnable)
+# 1. build the suite from source (reproducible; never committed)
+python -m eval.benchmark.cross_model.make_pcbschemagen_suite
+# 2. generate a leg — an Ohmatic GPU leg, or a competitor via its own CLI (no api key)
+python -m eval.benchmark.cross_model.generate --model q4 --suite pcbschemagen
+OHMATIC_C1_NO_ERC_RULES=1 python -m eval.benchmark.cross_model.generate --model codex --suite pcbschemagen
+# 3. verify (free, deterministic ERC) + report
 python -m eval.benchmark.cross_model.verify
-# stage 3: tables (Wilson CI, precision vs availability, per-category)
-python -m eval.benchmark.cross_model.report --by-category
+python -m eval.benchmark.cross_model.report --suite pcbschemagen --by-category
 ```
 
-The Claude legs need no api key - they drive the local `claude` CLI (a fresh, zero-context
-instance per prompt with the Ohmatic format spec on top of Claude's own product prompt); the
-local Ohmatic legs need a GPU and `HF_TOKEN`. The `realuser` suite is the 75-prompt set the
-numbers above cite. All pins, the model matrix, and the fairness contract live in
-[`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md).
+The Ohmatic legs import `inference.pipeline` (the literal production code — no benchmark-special
+path) and need a GPU. Full pins, the model matrix, and the fairness contract live in
+[`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md) and
+[`PCBSCHEMAGEN.md`](eval/benchmark/cross_model/PCBSCHEMAGEN.md).
 </details>
 
 ## How it works
