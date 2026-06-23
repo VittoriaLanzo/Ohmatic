@@ -33,6 +33,8 @@ from shared.t5_normalizer import (
     add_prefix as _t5_add_prefix,
     faithfulness as _t5_faithfulness,
     looks_non_english as _t5_non_english,
+    subject_recall as _t5_subject_recall,
+    REQUEST_RECALL_MIN as _T5_RECALL_MIN,
 )
 
 # Marker the parent looks for to distinguish "the worker ran and produced this
@@ -126,9 +128,9 @@ class SubprocessT5Normalizer:
     faithfulness gate in-process. Drop-in for HFT5Normalizer on the GGUF/edge tier.
 
     Each normalize() call: spawn worker -> generate once -> worker exits (torch
-    reclaimed by OS) -> parent applies the SAME repair/raise/warn gate as
-    HFT5Normalizer. This is deliberately NOT a persistent daemon: a daemon would
-    keep torch resident and defeat the RAM-reclaim goal.
+    reclaimed by OS) -> parent applies the SAME request-preservation guard + entity
+    gate as HFT5Normalizer. This is deliberately NOT a persistent daemon: a daemon
+    would keep torch resident and defeat the RAM-reclaim goal.
 
     On worker failure (nonzero exit, timeout, missing marker), normalize() raises
     so pipeline.run()'s existing except-clause falls back to the raw prompt. The
@@ -139,7 +141,7 @@ class SubprocessT5Normalizer:
         self,
         model_id: str,
         max_new_tokens: int = 256,
-        on_faithfulness_failure: str = "repair",
+        on_faithfulness_failure: str = "fallback",
         check_english: bool = True,  # accepted for HFT5Normalizer parity; the
         # worker always emits the warning (matching HFT5Normalizer's default).
         timeout_s: int = DEFAULT_TIMEOUT_S,
@@ -195,7 +197,16 @@ class SubprocessT5Normalizer:
         if not normalized:
             raise ValueError("T5 produced empty normalization")
 
-        # ── Hard faithfulness gate (identical to HFT5Normalizer) ─────────────
+        # ── Request-preservation guard (identical to HFT5Normalizer) ─────────
+        recall = _t5_subject_recall(prompt, normalized)
+        if recall < _T5_RECALL_MIN:
+            print(f"[t5] guard: subject drift (only {recall:.0%} of the request survived) "
+                  f"-> using the raw prompt", file=sys.stderr)
+            if self.on_faithfulness_failure == "raise":
+                raise ValueError(f"T5 replaced the request (subject recall {recall:.0%})")
+            return prompt.strip()
+
+        # ── Entity faithfulness gate (identical to HFT5Normalizer) ───────────
         ratio, missing = _t5_faithfulness(prompt, normalized)
         dropped = sorted(e for kind in missing.values() for e in kind)
         if dropped:
@@ -205,6 +216,8 @@ class SubprocessT5Normalizer:
             print(f"[t5] {msg}", file=sys.stderr)
             if self.on_faithfulness_failure == "repair":
                 normalized = f"{normalized.rstrip('.')} (must include: {', '.join(dropped)})."
+            elif self.on_faithfulness_failure != "warn":
+                return prompt.strip()   # "fallback" (default): the raw request is faithful
         return normalized
 
 

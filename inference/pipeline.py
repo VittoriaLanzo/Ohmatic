@@ -144,6 +144,8 @@ from shared.t5_normalizer import (
     add_prefix as _t5_add_prefix,
     faithfulness as _t5_faithfulness,
     looks_non_english as _t5_non_english,
+    subject_recall as _t5_subject_recall,
+    REQUEST_RECALL_MIN as _T5_RECALL_MIN,
 )
 
 
@@ -421,11 +423,14 @@ class HFT5Normalizer:
     """Wrap a HuggingFace Seq2SeqLM as the T5 normalizer. English only (non-English
     is logged as a warning).
 
-    HARD FAITHFULNESS GATE: T5's one legitimate failure is dropping a user-given
-    specific (e.g. "3.3V isolated RS-485" -> generic "RS-485"). After generating, it
-    compares entities (volts/parts/values) in input vs output. on_faithfulness_failure:
-    "repair" (default) re-attaches dropped specifics; "raise" fails loud; "warn" logs.
-    Clueless inputs carry no specifics, so the gate is a no-op for them.
+    REQUEST-PRESERVATION GUARD: T5 must ENRICH the request, never REPLACE it. After
+    generating, a subject-drift guard checks the circuit subject survived; if it did
+    not (an out-of-distribution rewrite swapped the circuit) the raw prompt is used
+    instead. Then an entity gate checks user-given specifics (volts/parts/values).
+    on_faithfulness_failure: "fallback" (default) returns the raw prompt when the
+    request was not preserved; "repair" re-attaches dropped specifics; "raise" fails
+    loud; "warn" keeps the T5 output but logs. Clueless inputs carry no specifics, so
+    the gates are a no-op for them.
     """
 
     TASK_PREFIX = _T5_PREFIX  # single-sourced (shared.t5_normalizer)
@@ -435,7 +440,7 @@ class HFT5Normalizer:
         model_id: str,
         max_new_tokens: int = 256,
         device_map: str = "auto",
-        on_faithfulness_failure: str = "repair",
+        on_faithfulness_failure: str = "fallback",
         check_english: bool = True,
     ) -> None:
         try:
@@ -469,7 +474,19 @@ class HFT5Normalizer:
         if not normalized:
             raise ValueError("T5 produced empty normalization")
 
-        # ── Hard faithfulness gate ──────────────────────────────────────────────────
+        # ── Request-preservation guard: T5 must ENRICH, never REPLACE ────────────────
+        # On out-of-distribution prompts T5 can swap the circuit for a memorized one.
+        # Re-attaching tokens cannot fix a wrong circuit, so on subject drift fall back
+        # to the raw prompt rather than corrupt what Qwen builds.
+        recall = _t5_subject_recall(prompt, normalized)
+        if recall < _T5_RECALL_MIN:
+            print(f"[t5] guard: subject drift (only {recall:.0%} of the request survived) "
+                  f"-> using the raw prompt", file=sys.stderr)
+            if self.on_faithfulness_failure == "raise":
+                raise ValueError(f"T5 replaced the request (subject recall {recall:.0%})")
+            return prompt.strip()
+
+        # ── Entity faithfulness gate (volts / parts / values) ───────────────────────
         ratio, missing = _t5_faithfulness(prompt, normalized)
         dropped = sorted(e for kind in missing.values() for e in kind)
         if dropped:
@@ -479,6 +496,8 @@ class HFT5Normalizer:
             print(f"[t5] {msg}", file=sys.stderr)
             if self.on_faithfulness_failure == "repair":
                 normalized = f"{normalized.rstrip('.')} (must include: {', '.join(dropped)})."
+            elif self.on_faithfulness_failure != "warn":
+                return prompt.strip()   # "fallback" (default): the raw request is faithful
         return normalized
 
 

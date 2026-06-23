@@ -80,3 +80,68 @@ def looks_non_english(text: str) -> bool:
         return False
     non_latin = sum(1 for c in letters if ord(c) > 0x024F)  # beyond Latin Extended-A
     return non_latin / len(letters) > 0.30
+
+
+# ── Request-preservation guard (subject drift) ────────────────────────────────
+# T5's ONLY job is to feed Qwen a cleaner version of the SAME request. On
+# out-of-distribution prompts it can silently swap the circuit for a memorized one.
+# subject_recall measures how much of the request's SUBJECT (its circuit-concept
+# words) survives; the caller falls back to the raw prompt when too little does.
+# Numeric specifics (volts/values/part numbers) are deliberately excluded here --
+# those are the faithfulness() gate's job.
+
+REQUEST_RECALL_MIN = 0.34  # >= ~1/3 of the request's subject words must survive
+
+_SALIENT_STOP = frozenset("""
+a an and or but the this that these those for to of in on at by with from into onto off
+i we you it its my our me your is are be am was were do does did will would can could should
+need needs want wants make makes made build builds design designs create creates please let
+circuit circuits board boards schematic schematics thing things stuff something anything
+some any use uses using used get gets got how many much more maybe idk lil little simple
+just about basically really actually kind sort
+""".split())
+
+# Light synonym/abbreviation folding so faithful rephrasings are not punished.
+_SYN = {"reg": "regul", "regulator": "regul", "regulate": "regul", "ldo": "regul",
+        "photoresistor": "ldr", "photocell": "ldr"}
+
+
+def _stem(tok: str) -> str:
+    for suf in ("ing", "ers", "er", "ed", "es", "s"):
+        if len(tok) > len(suf) + 2 and tok.endswith(suf):
+            return tok[: -len(suf)]
+    return tok
+
+
+def _subject_tokens(text: str) -> set[str]:
+    """Salient circuit-CONCEPT words: drop the task prefix, filler, short tokens, and
+    any token containing a digit (volts/values/part numbers are faithfulness()'s job).
+    Light-stem + fold a few synonyms so legitimate rephrasings are not penalised."""
+    out: set[str] = set()
+    for tok in re.findall(r"[a-z0-9]+", strip_prefix(text).lower()):
+        if len(tok) < 3 or tok in _SALIENT_STOP or any(c.isdigit() for c in tok):
+            continue
+        tok = _SYN.get(tok, tok)
+        tok = _stem(tok)
+        out.add(_SYN.get(tok, tok))
+    return out
+
+
+def _matches(tok: str, others: set[str]) -> bool:
+    """Token overlap tolerant of light stemming gaps (decoupl~decouple, regul~regulator):
+    exact, or a >=4-char shared prefix in either direction."""
+    if tok in others:
+        return True
+    if len(tok) >= 4:
+        return any(len(o) >= 4 and (o.startswith(tok) or tok.startswith(o)) for o in others)
+    return False
+
+
+def subject_recall(src: str, out: str) -> float:
+    """Fraction of the request's subject words that survive into `out`. Returns 1.0
+    when the request has no subject words to preserve (e.g. a pure-numeric prompt)."""
+    s = _subject_tokens(src)
+    if not s:
+        return 1.0
+    o = _subject_tokens(out)
+    return sum(1 for t in s if _matches(t, o)) / len(s)
