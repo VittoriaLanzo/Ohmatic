@@ -2,9 +2,8 @@
 
 Uniform item shape across all three suites:
     {"prompt_id": str, "suite": str, "user_prompt": str,
-     "category": str,        # partition / break-category / realuser category
-     "system_extra": str}    # correction suite only: broken circuit + ERC
-                             # feedback turn (NEVER leaves local legs)
+     "category": str,        # partition / category
+     "system_extra": str}    # correction suite only (NEVER leaves local legs)
 """
 
 from __future__ import annotations
@@ -73,11 +72,9 @@ def load_realuser() -> list[dict]:
 def load_correction(per_category: int = 0) -> list[dict]:
     """Held-out ERC-repair cases (LOCAL legs only, enforced in config).
 
-    holdout_loopback_v1 row schema: signature (row id), rule (break category),
-    input_messages (full trained conversation, passed to the generator VERBATIM),
-    reference_fixed (not scored; ERC is the judge). Correction is SINGLE-SHOT
-    (mirrors in-training correction_eval): the item carries `messages` and
-    generate.py routes it straight to chat() - no T5, no retry loop."""
+    Each item carries its conversation turns in `messages`; generate.py routes it
+    straight to chat() - single-shot, no T5, no retry loop - and the output is
+    verified in stage 2 like any other generation."""
     rows = _hf_jsonl(C.CORRECTION_HOLDOUT)
     if per_category:
         from collections import defaultdict
@@ -93,6 +90,21 @@ def load_correction(per_category: int = 0) -> list[dict]:
              "messages": r["input_messages"]} for r in rows]
 
 
+def load_pcbschemagen() -> list[dict]:
+    """PCBBench single-circuit tasks (MIT, github.com/HZou9/PCBSchemaGen_v2) rendered as
+    functional NL requests. Third-party generalization probe, scored with OUR ERC.
+    The suite is materialised from source (not committed, to avoid redistributing their
+    data without their notice) - run make_pcbschemagen_suite first."""
+    f = C.DATA_DIR / "pcbschemagen_prompts.jsonl"
+    if not f.exists():
+        raise SystemExit(f"{f} missing - build it first:\n"
+                         f"  python -m eval.benchmark.cross_model.make_pcbschemagen_suite")
+    rows = [json.loads(l) for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [{"prompt_id": r["id"], "suite": "pcbschemagen",
+             "user_prompt": r["prompt"], "category": r.get("category", "?"),
+             "system_extra": ""} for r in rows]
+
+
 def load_suite(suite: str, n: int = 0) -> list[dict]:
     if suite == "forward":
         return load_forward(n)
@@ -101,4 +113,7 @@ def load_suite(suite: str, n: int = 0) -> list[dict]:
         return items[:n] if n else items
     if suite == "correction":
         return load_correction(per_category=n or 0)
+    if suite == "pcbschemagen":
+        items = load_pcbschemagen()
+        return items[:n] if n else items
     raise SystemExit(f"Unknown suite '{suite}'")

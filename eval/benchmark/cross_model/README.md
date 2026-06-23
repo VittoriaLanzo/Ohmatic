@@ -29,9 +29,9 @@ IDs, artifact revisions, decoding, prompt sets) is pinned in `config.py`.
 | `fable-5` | any machine w/ the `claude` CLI logged in | `... generate --model fable-5 --suite realuser` |
 | `opus` | any machine w/ the `claude` CLI logged in | `... generate --model opus --suite realuser` |
 | `codex` | any machine w/ a PLAIN `codex` CLI logged in | `... generate --model codex --suite realuser` |
-| `star-r2-bf16` | GPU box | `... generate --model star-r2-bf16 --suite forward` |
-| `star-r2-q4` | GPU box (llama-cpp-python) | `... generate --model star-r2-q4 --suite forward` |
-| `star-r2-noT5` | GPU box (ablation) | `... generate --model star-r2-noT5 --suite realuser` |
+| `bf16` | GPU box | `... generate --model bf16 --suite forward` |
+| `q4` | GPU box (llama-cpp-python) | `... generate --model q4 --suite forward` |
+| `noT5` | GPU box (ablation) | `... generate --model noT5 --suite realuser` |
 | `qwen3-base` | GPU box (A40+) | `... generate --model qwen3-base --suite forward` |
 | `qwen3-base-1shot` | A40+ or 2x T4 | `... generate --model qwen3-base-1shot --suite realuser` |
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -71,6 +72,12 @@ def main() -> None:
     # System prompt: the SHARED single source - byte-identical for every leg.
     from shared.prompt_builder import build_system_prompt
     system_prompt = build_system_prompt()
+    # C1 "level-the-field" condition: competitors get schema + registry (so they CAN emit
+    # the format) but NOT the ERC rules (Ohmatic's moat). Ohmatic legs ignore this prompt
+    # and build their own internally, so this only affects the off-box competitor legs.
+    if os.environ.get("OHMATIC_C1_NO_ERC_RULES"):
+        system_prompt = system_prompt.split("=== ERC RULES")[0].rstrip()
+        print(f"[C1] ERC RULES stripped -> system prompt {len(system_prompt)} chars", flush=True)
 
     adapter = build_adapter(args.model, args.suite)
 

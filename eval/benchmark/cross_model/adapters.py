@@ -114,13 +114,21 @@ class ClaudeCliAdapter:
                 if proc.returncode == 0:
                     break
                 time.sleep(2 * (attempt + 1))
-        if proc.returncode != 0:
+        if proc.returncode != 0:                 # session/rate-limit text lands on stdout here
             raise RuntimeError(
-                f"claude CLI exit {proc.returncode} after retries: "
-                f"{(proc.stderr or '')[-400:]}")
-        d = json.loads(proc.stdout)
+                f"claude CLI exit {proc.returncode}: "
+                f"{(proc.stdout or '')[:200]} {(proc.stderr or '')[-300:]}")
+        try:
+            d = json.loads(proc.stdout)
+        except json.JSONDecodeError:             # e.g. "You've hit your session limit ..."
+            raise RuntimeError(
+                f"claude CLI non-JSON output (rate/session limit?): {(proc.stdout or '')[:200]}")
         if d.get("is_error"):
             raise RuntimeError(f"claude CLI error: {str(d.get('result', ''))[:300]}")
+        if not (d.get("result") or "").strip():  # empty 'success' = a limit cut-off, not a real answer
+            raise RuntimeError(
+                f"claude CLI empty result (rate/session limit?): "
+                f"subtype={d.get('subtype')} cost={d.get('total_cost_usd')}")
         u = d.get("usage", {}) or {}
         # Claude Code may bill a tiny auxiliary model (e.g. haiku, ~20 tok) for internal
         # orchestration; the circuit generator is the model with the real output volume.
@@ -176,6 +184,45 @@ class CodexCliAdapter:
                 "codex CLI not found - set OHMATIC_CODEX_BIN or put `codex` on PATH "
                 "(npm i -g @openai/codex) plus a logged-in session.")
 
+    @staticmethod
+    def _message_from_stdout(stdout: str) -> str:
+        """Recover the final assistant message from `codex exec` stdout when the
+        --output-last-message file is missing.
+
+        A customized codex (global plugins / a `stop` hook, e.g. a 'superpowers'-style
+        runtime) can swallow the -o file even on exit 0, while the message still prints
+        to stdout. codex renders the JSON both inline during the turn AND again after the
+        `tokens used` footer, so slicing on those text markers is brittle. Since every
+        leg in this benchmark emits a single JSON object, the robust recovery is: strip
+        ANSI, then return the LAST complete, balanced, parseable top-level {...} in the
+        stream (the final answer). If none parses, return the de-ANSI'd tail so the
+        shared extract_circuit can make its own attempt."""
+        import json as _json
+        import re
+        s = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", stdout or "")     # strip ANSI
+        last = None
+        i = s.find("{")
+        while i != -1:
+            depth, end = 0, -1
+            for j in range(i, len(s)):
+                if s[j] == "{":
+                    depth += 1
+                elif s[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = j
+                        break
+            if end == -1:
+                break                              # no balanced close from here on
+            cand = s[i:end + 1]
+            try:
+                _json.loads(cand)
+                last = cand                        # keep the last TOP-LEVEL object that parses
+            except _json.JSONDecodeError:
+                pass
+            i = s.find("{", end + 1)               # skip past this object - top-level only
+        return last if last is not None else s.strip()
+
     def run(self, system_prompt: str, user_prompt: str) -> dict:
         import json
         import os
@@ -200,6 +247,8 @@ class CodexCliAdapter:
                                   capture_output=True, text=True, encoding="utf-8",
                                   timeout=C.CLI_TIMEOUT_S, env=env)
             text = outf.read_text(encoding="utf-8") if outf.exists() else ""
+            if not text.strip():                  # hook ate the -o file: recover from stdout
+                text = self._message_from_stdout(proc.stdout)
         if not text and proc.returncode != 0:
             raise RuntimeError(
                 f"codex exec exit {proc.returncode}: {(proc.stderr or '')[-400:]}")
@@ -257,9 +306,8 @@ class OhmaticAdapter:
             retry_temperature=C.TEMPERATURE)
 
     def chat_messages(self, messages: list[dict]) -> dict:
-        """Correction suite: single-shot repair on the VERBATIM trained conversation.
-        No T5, no retry loop (mirrors in-training correction_eval); output verified
-        like any raw generation in stage 2."""
+        """Correction suite: single-shot repair from the provided message turns.
+        No T5, no retry loop; output verified like any raw generation in stage 2."""
         t0 = time.time()
         text = self.pipeline.generator.chat(messages, temperature=C.TEMPERATURE)  # greedy, deterministic
         return {"raw_output": text,

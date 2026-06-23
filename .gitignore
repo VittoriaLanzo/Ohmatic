@@ -17,6 +17,7 @@ eval/benchmark/holdout_manifest.json
 eval/benchmark/reports/
 eval/benchmark/cross_model/results/
 eval/benchmark/cross_model/verified/
+eval/benchmark/cross_model/data/pcbschemagen_prompts.jsonl
 tests/fixtures/erc_golden.jsonl
 
 # Node / frontend

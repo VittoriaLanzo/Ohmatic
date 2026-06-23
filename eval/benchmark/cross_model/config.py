@@ -11,7 +11,7 @@ appended on top. That spec is what lets a chat model emit the circuit schema at
 all, so it levels the field while still measuring product vs product - not a bare
 model behind an api key. The CLI uses the local Claude Code subscription auth, so
 NO api key is needed (the earlier hosted-API framing was a fallacy). The only
-secret is HF_TOKEN, read from env, for the private holdout suites - never here.
+secret is HF_TOKEN, read from env (gated weights / private data) - never here.
 """
 
 from __future__ import annotations
@@ -30,7 +30,8 @@ CORRECTION_HOLDOUT = "data/holdout_loopback_v1.jsonl" # LOCAL-ONLY suite (propri
 REALUSER_FILE     = DATA_DIR / "realuser_prompts.jsonl"
 
 OHMATIC_FINAL_REPO = "VittoriaLanzo/Ohmatic-Qwen3-8B"  # fully-merged bf16 + GGUF
-OHMATIC_GGUF_Q4    = "Ohmatic-Qwen3-8B-Q4_K_M.gguf"
+OHMATIC_GGUF_Q4    = "Ohmatic-Qwen3-8B-Q4_K_M.gguf"   # distribution quant, ~4.7 GB
+OHMATIC_GGUF_Q8    = "Ohmatic-Qwen3-8B-Q8_0.gguf"     # quality-ceiling quant, ~8.5 GB
 T5_NORMALIZER      = "VittoriaLanzo/ohmatic-t5-normalizer"
 QWEN_BASE          = "Qwen/Qwen3-8B"
 
@@ -68,7 +69,7 @@ CODEX_REASONING_EFFORT = "xhigh"
 #     normalized, so the pipeline runs with a pass-through normalizer there
 #     (same convention as eval/benchmark/prod_eval.py).
 MODELS: dict[str, dict] = {
-    # Claude products, subagent-driven (forward + realuser; correction is local-only IP).
+    # Claude products, subagent-driven (forward + realuser; correction is local-only).
     # adapter="claude_cli": a fresh zero-context `claude -p` instance per ask with the
     # Ohmatic spec appended on top of Claude's product prompt. `model` is the CLI's
     # pinned id (full id, not an alias, so the leg is reproducible).
@@ -78,21 +79,21 @@ MODELS: dict[str, dict] = {
     # published run actually used (a subagent run that preserved that setting).
     "fable-5": dict(
         adapter="claude_cli", model="claude-fable-5", effort="xhigh",
-        suites=["forward", "realuser"],
+        suites=["forward", "realuser", "pcbschemagen"],
     ),
     # NOTE: the `realuser` suite was AUTHORED by Claude Opus (see fairness contract).
     # Opus therefore evaluates realuser on home turf - a conservative bias FAVORING the
     # Claude leg; `forward` (held-out, not Opus-authored) is the contamination-free read.
     "opus": dict(
         adapter="claude_cli", model="claude-opus-4-8", effort="max",
-        suites=["forward", "realuser"],
+        suites=["forward", "realuser", "pcbschemagen"],
     ),
     # OpenAI Codex, the mirror of the Claude legs: `codex exec` on the local ChatGPT
     # subscription (no api key), Ohmatic spec in AGENTS.md on top of Codex's product
     # prompt. model="" -> the Codex CLI's configured default (recorded via cli_model).
     "codex": dict(
         adapter="codex_cli", model="",
-        suites=["forward", "realuser"],
+        suites=["forward", "realuser", "pcbschemagen"],
     ),
 
     # Ohmatic product legs - full end-to-end pipeline incl. killswitch
@@ -104,28 +105,34 @@ MODELS: dict[str, dict] = {
         adapter="local1shot", qwen_model=QWEN_BASE,   # same harness as the hosted
         suites=["realuser"],                # legs - isolates the base from training
     ),
-    "star-r2-bf16": dict(                    # the trained model, bf16
+    "bf16": dict(                    # the trained model, full-precision bf16
         adapter="ohmatic", qwen_model=OHMATIC_FINAL_REPO, backend="hf",
-        suites=["forward", "realuser", "correction"],
+        # ~16 GB weights: needs 2xT4 (tensor-parallel) or an A100 - won't fit one 15 GB T4.
+        suites=["forward", "realuser", "correction", "pcbschemagen"],
     ),
-    "star-r2-q4": dict(                      # the distribution quant
+    "q4": dict(                      # the distribution quant (Q4_K_M)
         adapter="ohmatic", gguf_repo=OHMATIC_FINAL_REPO, gguf_file=OHMATIC_GGUF_Q4,
         backend="llamacpp",
-        suites=["forward", "realuser", "correction"],
+        suites=["forward", "realuser", "correction", "pcbschemagen"],
+    ),
+    "q8": dict(                      # higher-fidelity quant (Q8_0) - the quality
+        adapter="ohmatic", gguf_repo=OHMATIC_FINAL_REPO, gguf_file=OHMATIC_GGUF_Q8,
+        backend="llamacpp",                  # ceiling for a single-GPU GGUF deploy
+        suites=["forward", "realuser", "correction", "pcbschemagen"],
     ),
 
     # Ablation: trained model WITHOUT the T5 front-end (realuser only) -
     # isolates exactly what T5 contributes on messy input.
-    "star-r2-noT5": dict(
+    "noT5": dict(
         adapter="ohmatic", qwen_model=OHMATIC_FINAL_REPO, backend="hf",
         no_t5=True,
         suites=["realuser"],
     ),
 }
 
-SUITES = ("forward", "realuser", "correction")
+SUITES = ("forward", "realuser", "correction", "pcbschemagen")
 
-# Off-box models never see the correction suite (proprietary ERC feedback corpus).
+# Off-box models never see the correction suite (local-only).
 LOCAL_ONLY_SUITES = ("correction",)
 
 
