@@ -203,13 +203,15 @@
               where the frontier model answers every task and ships 22 broken boards, Ohmatic asks you
               to clarify and ships none across all three precisions (q4, q8, bf16). Ohmatic is trained to
               &le;30-component circuits while PCBBench spans up to 50, so its largest tasks are out-of-scope
-              and it abstains on them.
+              and it abstains on them. The untrained Qwen3-8B base (the model Ohmatic is fine-tuned from),
+              run the same way with no pipeline, ships 61/62 broken: the floor the fine-tune and the
+              verifier-gated pipeline lift Ohmatic above.
               <a href="https://github.com/VittoriaLanzo/Ohmatic#benchmark">Full methodology &rarr;</a>
             </p>
           </div>
           <figure>
-            <img class="bench-img" src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M 30 green, 32 amber, 0 red; Ohmatic Q8_0 28 green, 34 amber, 0 red; Ohmatic bf16 27 green, 35 amber, 0 red; OpenAI Codex at xhigh effort 40 green, 0 amber, 22 red. Red pads appear only on the Codex row." loading="lazy" decoding="async" />
-            <figcaption>62 PCBBench tasks, one ERC verifier. Each pad is one task; red (broken delivered) appears only on the frontier row, while Ohmatic abstains in amber instead.</figcaption>
+            <img class="bench-img" src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M 30 green, 32 amber, 0 red; Ohmatic Q8_0 28 green, 34 amber, 0 red; Ohmatic bf16 27 green, 35 amber, 0 red; OpenAI Codex at xhigh effort 40 green, 0 amber, 22 red; the untrained Qwen3-8B base 1 green, 0 amber, 61 red. The Ohmatic rows carry amber abstentions and zero red; the untrained base is almost all red, and Codex shows 22 red." loading="lazy" decoding="async" />
+            <figcaption>62 PCBBench tasks, one ERC verifier. Each pad is one task; the Ohmatic rows carry amber abstentions and no red, while the untrained base ships almost all red and Codex 22.</figcaption>
           </figure>
         </div>
       </section>

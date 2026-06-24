@@ -124,7 +124,7 @@ export default function App() {
           <a href="#schematic-heading">Circuit</a>
           <a href="#inspector-heading">Output</a>
         </nav>
-        <span className="version-badge">v0.0.2</span>
+        <span className="version-badge">v0.0.3</span>
         <div className={`health-pill is-${health}`} role="status" aria-live="polite">
           <Server size={16} aria-hidden="true" />
           Gateway {health}

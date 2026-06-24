@@ -41,6 +41,7 @@ LEGS = [
     ("q8",    "Ohmatic Q8_0",   "GGUF quant · 8B",       "ohmatic"),
     ("bf16",  "Ohmatic bf16",   "full precision · 8B",   "ohmatic"),
     ("codex", "OpenAI Codex",   "frontier · xhigh effort", "frontier"),
+    ("qwen3-base-1shot", "Qwen3-8B base", "untrained · single-shot", "baseline"),
 ]
 
 

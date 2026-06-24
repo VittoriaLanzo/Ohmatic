@@ -52,10 +52,16 @@ class ClaudeCliAdapter:
         import shutil
         self.model = model
         self.effort = effort          # reasoning effort level, e.g. "max"/"xhigh"
-        self.exe = shutil.which("claude")
+        # The leg MUST run a claude CLI whose `-p ... --output-format json` returns a RAW
+        # single-shot completion (num_turns=1), not agent prose. Newer CLIs drifted to
+        # agent-style -p output ("Here is the LDO supply…", "Wrote it to file.md") - that
+        # is not a circuit. Pin a known-good CLI via OHMATIC_CLAUDE_BIN (the exact version
+        # that produced the clean JSON leg), else fall back to `claude` on PATH - the same
+        # escape hatch the codex leg has via OHMATIC_CODEX_BIN.
+        self.exe = os.environ.get("OHMATIC_CLAUDE_BIN") or shutil.which("claude")
         if not self.exe:
             raise SystemExit(
-                "`claude` CLI not on PATH - the Claude legs need it "
+                "`claude` CLI not found - set OHMATIC_CLAUDE_BIN or put `claude` on PATH "
                 "(npm i -g @anthropic-ai/claude-code) plus a logged-in session.")
 
     @staticmethod
@@ -120,9 +126,29 @@ class ClaudeCliAdapter:
                 f"{(proc.stdout or '')[:200]} {(proc.stderr or '')[-300:]}")
         try:
             d = json.loads(proc.stdout)
-        except json.JSONDecodeError:             # e.g. "You've hit your session limit ..."
-            raise RuntimeError(
-                f"claude CLI non-JSON output (rate/session limit?): {(proc.stdout or '')[:200]}")
+        except json.JSONDecodeError:
+            # No json envelope: the CLI printed the model's answer as RAW text. On a long
+            # technical task the Claude Code product narrates a design rationale and fences
+            # the circuit in ```json instead of returning a bare object (verified: rc=0, the
+            # circuit IS present and stage-2 extract_circuit recovers it). That is a real
+            # answer - store it verbatim and let stage-2 pull the JSON, the SAME extract +
+            # ERC path the codex leg's messy output already goes through (parity, NOT a
+            # prompt change). Only the auth/limit sentinels are not an answer, so those still
+            # raise and resume later (so a limited account never poisons a row).
+            raw = (proc.stdout or "").strip()
+            low = raw.lower()
+            if (not raw or "session limit" in low or "not logged in" in low
+                    or "please run /login" in low):
+                raise RuntimeError(
+                    f"claude CLI limit/auth (rate/session limit?): {raw[:200]}")
+            return {
+                "raw_output": raw,
+                "latency_s": round(time.time() - t0, 3),
+                "tokens_in": 0, "tokens_out": 0,
+                "cli_cost_usd": 0.0,          # no envelope -> the CLI reported no cost here
+                "cli_model": self.model,
+                "cli_num_turns": None,
+            }
         if d.get("is_error"):
             raise RuntimeError(f"claude CLI error: {str(d.get('result', ''))[:300]}")
         if not (d.get("result") or "").strip():  # empty 'success' = a limit cut-off, not a real answer
@@ -333,6 +359,32 @@ class OhmaticAdapter:
         }
 
 
+# ── Local: untrained-base single-shot control ─────────────────────────────────
+
+class LocalSingleShotAdapter:
+    """The untrained base model run SINGLE-SHOT (pass@1): ONE greedy generation on the
+    byte-identical C1 system + user prompt, verified in stage 2 - NO T5, NO ERC loop, NO
+    retries, NO killswitch. The pre-fine-tune control: same HF transformers backend the bf16
+    Ohmatic leg uses (bf16, enable_thinking=False, greedy), so the only things that change
+    between this and the trained bf16 leg are the WEIGHTS (base vs Ohmatic-trained) and the
+    PIPELINE (none vs full) - isolating exactly what the training + the verifier-gated pipeline
+    buy. Scored as a competitor (raw output -> our ERC), so with no killswitch it can DELIVER
+    broken circuits, unlike the Ohmatic legs."""
+
+    def __init__(self, cfg: dict):
+        from inference.pipeline import HFChatModel
+        self.gen = HFChatModel(cfg["qwen_model"], max_new_tokens=C.MAX_TOKENS)
+
+    def run(self, system_prompt: str, user_prompt: str) -> dict:
+        t0 = time.time()
+        text = self.gen.chat(
+            [{"role": "system", "content": system_prompt},
+             {"role": "user", "content": user_prompt}],
+            temperature=C.TEMPERATURE)            # 0.0 -> greedy + enable_thinking=False
+        return {"raw_output": text, "latency_s": round(time.time() - t0, 3),
+                "tokens_in": 0, "tokens_out": 0}
+
+
 def build_adapter(model_name: str, suite: str):
     cfg = C.model_cfg(model_name)
     kind = cfg["adapter"]
@@ -344,4 +396,6 @@ def build_adapter(model_name: str, suite: str):
         # The bench prompts are already normalized (forward holdout, correction, and the
         # pcbschemagen NL requests), so the pipeline runs a pass-through normalizer here.
         return OhmaticAdapter(cfg, use_t5=False)
+    if kind == "local1shot":
+        return LocalSingleShotAdapter(cfg)
     raise SystemExit(f"Unknown adapter kind: {kind}")

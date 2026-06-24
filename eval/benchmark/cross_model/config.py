@@ -15,10 +15,14 @@ only secret is HF_TOKEN, read from env (gated weights / private data) - never he
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 HERE        = Path(__file__).resolve().parent
-RESULTS_DIR = HERE / "results"          # stage-1 raw generations (append-only)
+# RESULTS_DIR is env-overridable (OHMATIC_RESULTS_DIR) so concurrent shards on one box can each
+# write to a PRIVATE results dir - two processes never append to one file, which avoids
+# interleaving when rows are multi-KB (the base 1-shot leg stores the raw circuit in raw_output).
+RESULTS_DIR = Path(os.environ.get("OHMATIC_RESULTS_DIR") or (HERE / "results"))  # stage-1 raw generations
 VERIFIED_DIR = HERE / "verified"        # stage-2 outcomes (recomputable forever)
 DATA_DIR    = HERE / "data"             # benchmark prompt sets / artifacts
 
@@ -31,6 +35,7 @@ OHMATIC_FINAL_REPO = "VittoriaLanzo/Ohmatic-Qwen3-8B"  # fully-merged bf16 + GGU
 OHMATIC_GGUF_Q4    = "Ohmatic-Qwen3-8B-Q4_K_M.gguf"   # distribution quant, ~4.7 GB
 OHMATIC_GGUF_Q8    = "Ohmatic-Qwen3-8B-Q8_0.gguf"     # quality-ceiling quant, ~8.5 GB
 T5_NORMALIZER      = "VittoriaLanzo/ohmatic-t5-normalizer"
+QWEN_BASE          = "Qwen/Qwen3-8B"                   # the untrained base Ohmatic fine-tunes from
 
 # Decoding - identical budget for every model. Local legs are GREEDY
 # (deterministic); the CLI competitor leg runs the shipped product's own default
@@ -60,6 +65,16 @@ CODEX_REASONING_EFFORT = "xhigh"
 #     pcbschemagen NL requests), so the pipeline runs with a pass-through normalizer
 #     here (same convention as eval/benchmark/prod_eval.py).
 MODELS: dict[str, dict] = {
+    # Claude Opus, the off-box competitor driven product-vs-product through the `claude -p`
+    # CLI (no api key) at MAX reasoning effort. `model` is the full pinned id so the leg is
+    # reproducible; the CLI BINARY is itself pinned via OHMATIC_CLAUDE_BIN to a version whose
+    # -p output is a raw single-shot JSON completion (newer CLIs emit agent prose) - see
+    # ClaudeCliAdapter. A fresh, sealed, zero-context instance per ask.
+    "opus": dict(
+        adapter="claude_cli", model="claude-opus-4-8", effort="max",
+        suites=["forward", "pcbschemagen"],
+    ),
+
     # OpenAI Codex, the off-box competitor: `codex exec` on the local ChatGPT
     # subscription (no api key), the Ohmatic spec in AGENTS.md on top of Codex's
     # product prompt, at MAX reasoning effort (xhigh). model="" -> the CLI's
@@ -84,6 +99,14 @@ MODELS: dict[str, dict] = {
         adapter="ohmatic", gguf_repo=OHMATIC_FINAL_REPO, gguf_file=OHMATIC_GGUF_Q8,
         backend="llamacpp",                  # ceiling for a single-GPU GGUF deploy
         suites=["forward", "correction", "pcbschemagen"],
+    ),
+
+    # Baseline: the UNTRAINED Qwen3-8B base (the model Ohmatic fine-tunes from) run SINGLE-SHOT
+    # (pass@1) on the same C1 competitor prompt - no T5, no ERC loop, no killswitch. The
+    # pre-fine-tune floor; isolates what the training + the pipeline add over the raw base model.
+    "qwen3-base-1shot": dict(
+        adapter="local1shot", qwen_model=QWEN_BASE, backend="hf",
+        suites=["pcbschemagen"],
     ),
 }
 

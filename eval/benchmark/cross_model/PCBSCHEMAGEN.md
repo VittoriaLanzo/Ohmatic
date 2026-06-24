@@ -45,6 +45,10 @@ they are unaffected). Ohmatic always runs its full pipeline incl. the killswitch
   retries → **killswitch** (abstains rather than ship an ERC-failing circuit).
 - **Competitor:** `codex` (OpenAI Codex, xhigh effort), a fresh, zero-context, single-shot
   product instance via its CLI, given the C1 system prompt.
+- **Baseline:** `qwen3-base-1shot`, the untrained **Qwen3-8B base** (the very model Ohmatic is
+  fine-tuned from), run single-shot (one greedy bf16 generation, same C1 prompt, no T5 / ERC /
+  killswitch). The pre-fine-tune floor: it isolates exactly what the training + the verifier-gated
+  pipeline add over the raw base model.
 
 ## Run it
 
@@ -59,10 +63,20 @@ python -m eval.benchmark.cross_model.generate --model q4 --suite pcbschemagen
 OHMATIC_C1_NO_ERC_RULES=1 \
   python -m eval.benchmark.cross_model.generate --model codex --suite pcbschemagen
 
+# 2c. the untrained-base floor: single-shot, C1, no pipeline. One process = 1 shard, the
+#     portable default - runs anywhere an 8B bf16 model fits (~16.4 GB).
+OHMATIC_C1_NO_ERC_RULES=1 \
+  python -m eval.benchmark.cross_model.generate --model qwen3-base-1shot --suite pcbschemagen
+
 # 3. verify (free, deterministic ERC) + report
 python -m eval.benchmark.cross_model.verify
 python -m eval.benchmark.cross_model.report --suite pcbschemagen --by-category
 ```
+
+Every leg runs as a **single process (1 shard) by default**, so it is portable to whatever machine the
+model fits on. Data-parallel sharding (`--shard I/N` across N processes) is an *optional* speedup only
+where the VRAM holds N copies of the model, e.g. the base bf16 leg is ~16.4 GB/shard, so 2 shards
+(~33 GB) fit a 48 GB A40, but a smaller GPU (or CPU) should stay at the 1-shard default.
 
 ### On Kaggle (the GPU legs)
 
@@ -97,18 +111,26 @@ the metric the killswitch minimises). Plus per-model ERC-code histograms and pai
 Identical prompts and identical ERC for every leg. The headline is the *failure mode*, not the
 clean rate:
 
-| leg | ERC-clean | abstained (killswitch) | broken delivered |
-|-----|-----------|------------------------|------------------|
-| Ohmatic q4 (Q4_K_M) | 30/62 (48%) | 32/62 | **0** (rule-of-three ≤ 4.8%) |
-| Ohmatic q8 (Q8_0)   | 28/62 (45%) | 34/62 | **0** (≤ 4.8%) |
-| Ohmatic bf16        | 27/62 (44%) | 35/62 | **0** (≤ 4.8%) |
-| Codex (C1)          | 40/62 (65%) | 0      | **22/62 (35%)** |
+| leg | ERC-clean | abstained (killswitch) | broken delivered | AUGRC |
+|-----|-----------|------------------------|------------------|-------|
+| Ohmatic q4 (Q4_K_M) | 30/62 (48%) | 32/62 | **0** (rule-of-three ≤ 4.8%) | 0.000 |
+| Ohmatic q8 (Q8_0)   | 28/62 (45%) | 34/62 | **0** (≤ 4.8%) | 0.000 |
+| Ohmatic bf16        | 27/62 (44%) | 35/62 | **0** (≤ 4.8%) | 0.000 |
+| Codex (C1)          | 40/62 (65%) | 0      | **22/62 (35%)** | 0.066 |
+| Qwen3-8B base, 1-shot (untrained) | 1/62 (1.6%) | 0 | **61/62 (98%)** | 0.492 |
 
-Same ballpark clean rate, opposite failure mode: every Ohmatic precision (q4 → q8 → bf16) abstains
-rather than ship an ERC-failing circuit (**0 broken delivered**, AUGRC 0.000), while the frontier
-competitor delivers 22 broken circuits (AUGRC 0.066). bf16 is marginally *more* conservative than
-the quantized legs (it abstains slightly more), so the killswitch guarantee is a property of the
-pipeline, not an artifact of quantization.
+Same ballpark clean rate among the trained systems, opposite failure mode: every Ohmatic precision
+(q4 → q8 → bf16) abstains rather than ship an ERC-failing circuit (**0 broken delivered**, AUGRC 0.000),
+while the frontier competitor delivers 22 broken circuits (AUGRC 0.066). bf16 is marginally *more*
+conservative than the quantized legs (it abstains slightly more), so the killswitch guarantee is a
+property of the pipeline, not an artifact of quantization.
+
+The **untrained Qwen3-8B base** (the model Ohmatic is fine-tuned from), run single-shot on the *same*
+C1 prompt with no pipeline is the floor: it emits schema-shaped JSON but only **1/62** is electrically
+sound and it **delivers 61/62 broken** (AUGRC **0.492**, near the no-skill ceiling). The distance from
+that floor to Ohmatic-bf16 (same starting weights, same hardware, **0 broken**) is precisely what the
+fine-tune + the verifier-gated pipeline buy: a near-zero-capability, ships-anything base becomes an
+ERC-clued system that never delivers a circuit it can't vouch for.
 
 **Scope caveat.** Ohmatic is trained to circuits of **≤30 components**; PCBBench spans circuits up
 to **50**. The largest tasks are therefore out-of-distribution for Ohmatic. It cannot build them
