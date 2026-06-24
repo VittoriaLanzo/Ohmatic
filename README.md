@@ -49,7 +49,7 @@ checker that gates training and production). Competitors get the schema and comp
 **not** the ERC rules (condition C1), so the comparison can't be gamed by handing them our ruleset.
 
 <p align="center">
-  <img src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M: 30 green, 32 amber, 0 red. Ohmatic Q8_0: 28 green, 34 amber, 0 red. OpenAI Codex at xhigh effort: 40 green, 0 amber, 22 red. Red pads appear only on the Codex row; the Ohmatic rows carry amber abstentions instead and zero red." width="100%" />
+  <img src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M: 30 green, 32 amber, 0 red. Ohmatic Q8_0: 28 green, 34 amber, 0 red. Ohmatic bf16: 27 green, 35 amber, 0 red. OpenAI Codex at xhigh effort: 40 green, 0 amber, 22 red. Red pads appear only on the Codex row; the Ohmatic rows carry amber abstentions instead and zero red." width="100%" />
 </p>
 
 The headline is the **failure mode**, not the clean rate. Left of the delivery line is the only
@@ -60,13 +60,19 @@ verified-clean circuit, or a killswitch abstention. Ohmatic never crosses the li
 |-----|-----------|------------------------|------------------|
 | Ohmatic Q4_K_M (GGUF) | 30/62 (48%) | 32/62 | **0** (rule-of-three ≤ 4.8%) |
 | Ohmatic Q8_0 (GGUF) | 28/62 (45%) | 34/62 | **0** (≤ 4.8%) |
+| Ohmatic bf16 (full precision) | 27/62 (44%) | 35/62 | **0** (≤ 4.8%) |
 | OpenAI Codex (C1, xhigh effort) | 40/62 (65%) | 0 | **22/62 (35%)** |
 
 PCBBench is harder and further from Ohmatic's distribution than the in-house suite, so the raw
 clean rate is lower and the killswitch abstains on roughly half the tasks. That is the trade it
 makes: where the frontier model answers every task and ships 22 broken boards, Ohmatic asks you to
-clarify instead and ships **none**. Same ballpark clean rate, opposite failure mode. The bf16 leg
-is still running and joins as its own column once it lands.
+clarify instead and ships **none** across all three precisions. Same ballpark clean rate, opposite
+failure mode.
+
+> **Scope caveat.** Ohmatic is trained to circuits of **≤30 components**; PCBBench spans up to
+> **50**, so its largest tasks are out-of-distribution — Ohmatic cannot build them and abstains
+> rather than guess. A non-trivial share of its abstentions is therefore a training-scope limit,
+> not just killswitch caution, which makes the clean rate above conservative.
 
 <details>
 <summary><b>Methodology and reproduce</b></summary>

@@ -47,3 +47,4 @@ models/
 # Local agent / editor state - never ship
 .claude/
 .vscode/
+eval/benchmark/cross_model/bench_status.html

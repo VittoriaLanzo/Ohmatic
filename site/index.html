@@ -191,22 +191,24 @@
               by Ohmatic's own deterministic ERC engine, the same checker that gates production.
             </p>
             <div class="stat-row">
-              <div class="stat"><div class="n good">0</div><div class="l">broken circuits Ohmatic delivered (62 tasks)</div></div>
+              <div class="stat"><div class="n good">0</div><div class="l">broken circuits Ohmatic delivered (q4 / q8 / bf16)</div></div>
               <div class="stat"><div class="n bad">22</div><div class="l">broken circuits OpenAI Codex delivered, same tasks</div></div>
               <div class="stat"><div class="n good">&le;4.8%</div><div class="l">Ohmatic's broken rate, 95% upper bound</div></div>
             </div>
             <p style="font-size: 0.82rem">
-              Identical prompts and identical ERC verifier for every leg; competitors get the schema and
-              component registry but not the ERC rules (condition C1), so the checker can't be gamed. Each
-              frontier leg ran single-shot via its own CLI at max reasoning effort (Codex xhigh). PCBBench
-              is harder and out-of-distribution, so Ohmatic's clean rate is lower and it abstains on about
-              half &mdash; but where the frontier model answers every task and ships 22 broken boards,
-              Ohmatic asks you to clarify and ships none. The bf16 leg is still running.
+              Identical prompts and identical ERC verifier for every leg; the competitor gets the schema
+              and component registry but not the ERC rules (condition C1), so the checker can't be gamed.
+              Codex ran single-shot via its CLI at xhigh reasoning effort. PCBBench is harder and
+              out-of-distribution, so Ohmatic's clean rate is lower and it abstains on about half &mdash;
+              but where the frontier model answers every task and ships 22 broken boards, Ohmatic asks you
+              to clarify and ships none across all three precisions (q4, q8, bf16). Ohmatic is trained to
+              &le;30-component circuits while PCBBench spans up to 50, so its largest tasks are out-of-scope
+              and count among its abstentions.
               <a href="https://github.com/VittoriaLanzo/Ohmatic#benchmark">Full methodology &rarr;</a>
             </p>
           </div>
           <figure>
-            <img class="bench-img" src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M 30 green, 32 amber, 0 red; Ohmatic Q8_0 28 green, 34 amber, 0 red; OpenAI Codex at xhigh effort 40 green, 0 amber, 22 red. Red pads appear only on the Codex row." loading="lazy" decoding="async" />
+            <img class="bench-img" src="assets/benchmark.svg" alt="Solder-pad matrix: each of 62 PCBBench tasks is one pad, one row per leg, colored by outcome under one ERC verifier. Green is verified-clean, amber is a killswitch abstention, red is a broken circuit delivered. Ohmatic Q4_K_M 30 green, 32 amber, 0 red; Ohmatic Q8_0 28 green, 34 amber, 0 red; Ohmatic bf16 27 green, 35 amber, 0 red; OpenAI Codex at xhigh effort 40 green, 0 amber, 22 red. Red pads appear only on the Codex row." loading="lazy" decoding="async" />
             <figcaption>62 PCBBench tasks, one ERC verifier &mdash; each pad is one task. Red (broken delivered) appears only on the frontier row; Ohmatic abstains in amber instead.</figcaption>
           </figure>
         </div>

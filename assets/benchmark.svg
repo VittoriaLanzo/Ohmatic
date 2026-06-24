@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 414" width="1180" height="414" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 500" width="1180" height="500" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" role="img">
 <defs><pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1.1" cy="1.1" r="1.1" fill="#c47a3d" opacity="0.06"/></pattern></defs>
-<rect x="1" y="1" width="1178" height="412" rx="14" fill="#081712" stroke="rgba(196,122,61,0.42)" stroke-width="1.5"/>
-<rect x="1" y="1" width="1178" height="412" rx="14" fill="url(#dots)"/>
+<rect x="1" y="1" width="1178" height="498" rx="14" fill="#081712" stroke="rgba(196,122,61,0.42)" stroke-width="1.5"/>
+<rect x="1" y="1" width="1178" height="498" rx="14" fill="url(#dots)"/>
 <circle cx="34" cy="34" r="5.5" fill="none" stroke="#c47a3d" stroke-width="1.2" opacity="0.5"/><circle cx="34" cy="34" r="1.6" fill="#c47a3d" opacity="0.5"/>
 <circle cx="1146" cy="34" r="5.5" fill="none" stroke="#c47a3d" stroke-width="1.2" opacity="0.5"/><circle cx="1146" cy="34" r="1.6" fill="#c47a3d" opacity="0.5"/>
-<circle cx="34" cy="380" r="5.5" fill="none" stroke="#c47a3d" stroke-width="1.2" opacity="0.5"/><circle cx="34" cy="380" r="1.6" fill="#c47a3d" opacity="0.5"/>
-<circle cx="1146" cy="380" r="5.5" fill="none" stroke="#c47a3d" stroke-width="1.2" opacity="0.5"/><circle cx="1146" cy="380" r="1.6" fill="#c47a3d" opacity="0.5"/>
+<circle cx="34" cy="466" r="5.5" fill="none" stroke="#c47a3d" stroke-width="1.2" opacity="0.5"/><circle cx="34" cy="466" r="1.6" fill="#c47a3d" opacity="0.5"/>
+<circle cx="1146" cy="466" r="5.5" fill="none" stroke="#c47a3d" stroke-width="1.2" opacity="0.5"/><circle cx="1146" cy="466" r="1.6" fill="#c47a3d" opacity="0.5"/>
 <text x="44.0" y="56.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="27" font-weight="700" fill="#e9f2e7">If it can't verify it, it won't deliver it.</text>
 <text x="44.0" y="86.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="13" font-weight="400" fill="#9db3a4">62 PCBBench tasks (PCBSchemaGen, MIT)  ·  one ERC verifier for every leg  ·  condition C1  ·  each pad = one task</text>
 <text x="1054.0" y="86.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="11" font-weight="400" fill="#9db3a4" opacity="0.7">outcome</text>
@@ -141,10 +141,9 @@
 <rect x="1006.4" y="226.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
 <rect x="1018.6" y="226.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
 <text x="1136.0" y="237.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12.5" text-anchor="end"><tspan fill="#51e88a" font-weight="700">28</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ffb145" font-weight="700">34</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ff5c49" font-weight="400">0</tspan></text>
-<line x1="44" y1="262.0" x2="1136" y2="262.0" stroke="rgba(196,122,61,0.20)" stroke-width="1" stroke-dasharray="2 4"/>
 <rect x="40" y="270.0" width="1100" height="44.0" rx="9" fill="#0b201a" opacity="0.5"/>
-<text x="252.0" y="289.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="15.5" font-weight="700" fill="#e9f2e7" text-anchor="end">OpenAI Codex</text>
-<text x="252.0" y="306.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="10.5" font-weight="400" fill="#9db3a4" text-anchor="end">frontier · xhigh effort</text>
+<text x="252.0" y="289.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="15.5" font-weight="700" fill="#e9f2e7" text-anchor="end">Ohmatic bf16</text>
+<text x="252.0" y="306.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="10.5" font-weight="400" fill="#9db3a4" text-anchor="end">full precision · 8B</text>
 <rect x="270.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
 <rect x="283.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
 <rect x="295.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
@@ -172,48 +171,116 @@
 <rect x="565.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
 <rect x="577.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
 <rect x="589.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="601.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="614.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="626.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="638.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="650.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="663.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="675.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="687.7" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="699.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="712.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="724.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="736.7" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="749.0" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="761.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="773.5" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="785.7" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="798.0" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="810.3" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="822.5" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="834.8" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="847.0" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="859.3" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="871.5" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="883.8" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="896.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="908.3" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="920.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="932.8" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="945.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="957.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="969.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="981.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="994.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="1006.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<rect x="1018.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
-<text x="1136.0" y="297.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12.5" text-anchor="end"><tspan fill="#51e88a" font-weight="700">40</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ffb145" font-weight="700">0</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ff5c49" font-weight="700">22</tspan></text>
-<rect x="46" y="347.0" width="15" height="15" rx="4.5" fill="#51e88a"/>
-<text x="68.0" y="359.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12" font-weight="400" fill="#e9f2e7">verified-clean</text>
-<rect x="203.0" y="347.0" width="15" height="15" rx="4.5" fill="#ffb145"/>
-<text x="225.0" y="359.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12" font-weight="400" fill="#e9f2e7">abstained · killswitch</text>
-<rect x="420.0" y="347.0" width="15" height="15" rx="4.5" fill="#ff5c49"/>
-<text x="442.0" y="359.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12" font-weight="400" fill="#e9f2e7">broken delivered</text>
-<text x="1136.0" y="359.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="11" font-weight="400" fill="#9db3a4" text-anchor="end" opacity="0.85">counts:  clean · abstained · broken</text>
-<text x="46.0" y="389.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="11" font-weight="400" fill="#9db3a4" opacity="0.9">Same prompts and the same deterministic ERC verifier for every leg; competitors get the schema + registry but not the ERC rules. Ohmatic abstains rather than ship an ERC-failing circuit — 0 broken (rule-of-three 95% upper bound ≤ 4.8%).</text>
+<rect x="601.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="614.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="626.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="638.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="650.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="663.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="675.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="687.7" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="699.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="712.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="724.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="736.7" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="749.0" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="761.2" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="773.5" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="785.7" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="798.0" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="810.3" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="822.5" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="834.8" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="847.0" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="859.3" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="871.5" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="883.8" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="896.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="908.3" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="920.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="932.8" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="945.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="957.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="969.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="981.9" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="994.1" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="1006.4" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="1018.6" y="286.8" width="10.5" height="10.5" rx="3.1" fill="#ffb145" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<text x="1136.0" y="297.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12.5" text-anchor="end"><tspan fill="#51e88a" font-weight="700">27</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ffb145" font-weight="700">35</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ff5c49" font-weight="400">0</tspan></text>
+<line x1="44" y1="322.0" x2="1136" y2="322.0" stroke="rgba(196,122,61,0.20)" stroke-width="1" stroke-dasharray="2 4"/>
+<rect x="40" y="330.0" width="1100" height="44.0" rx="9" fill="#0b201a" opacity="0.5"/>
+<text x="252.0" y="349.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="15.5" font-weight="700" fill="#e9f2e7" text-anchor="end">OpenAI Codex</text>
+<text x="252.0" y="366.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="10.5" font-weight="400" fill="#9db3a4" text-anchor="end">frontier · xhigh effort</text>
+<rect x="270.9" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="283.2" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="295.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="307.7" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="319.9" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="332.2" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="344.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="356.7" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="369.0" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="381.2" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="393.5" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="405.7" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="418.0" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="430.3" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="442.5" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="454.8" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="467.0" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="479.3" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="491.5" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="503.8" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="516.1" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="528.3" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="540.6" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="552.8" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="565.1" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="577.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="589.6" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="601.9" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="614.1" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="626.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="638.6" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="650.9" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="663.2" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="675.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="687.7" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="699.9" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="712.2" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="724.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="736.7" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="749.0" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#51e88a" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="761.2" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="773.5" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="785.7" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="798.0" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="810.3" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="822.5" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="834.8" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="847.0" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="859.3" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="871.5" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="883.8" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="896.1" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="908.3" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="920.6" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="932.8" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="945.1" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="957.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="969.6" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="981.9" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="994.1" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="1006.4" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<rect x="1018.6" y="346.8" width="10.5" height="10.5" rx="3.1" fill="#ff5c49" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>
+<text x="1136.0" y="357.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12.5" text-anchor="end"><tspan fill="#51e88a" font-weight="700">40</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ffb145" font-weight="700">0</tspan><tspan fill="#9db3a4"> · </tspan><tspan fill="#ff5c49" font-weight="700">22</tspan></text>
+<rect x="46" y="407.0" width="15" height="15" rx="4.5" fill="#51e88a"/>
+<text x="68.0" y="419.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12" font-weight="400" fill="#e9f2e7">verified-clean</text>
+<rect x="203.0" y="407.0" width="15" height="15" rx="4.5" fill="#ffb145"/>
+<text x="225.0" y="419.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12" font-weight="400" fill="#e9f2e7">abstained · killswitch</text>
+<rect x="420.0" y="407.0" width="15" height="15" rx="4.5" fill="#ff5c49"/>
+<text x="442.0" y="419.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="12" font-weight="400" fill="#e9f2e7">broken delivered</text>
+<text x="1136.0" y="419.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="11" font-weight="400" fill="#9db3a4" text-anchor="end" opacity="0.85">counts:  clean · abstained · broken</text>
+<text x="46.0" y="449.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="11" font-weight="400" fill="#9db3a4" opacity="0.9">Same prompts and the same deterministic ERC verifier for every leg; competitors get the schema + registry but not the ERC rules (condition C1).</text>
+<text x="46.0" y="467.0" font-family="'Fragment Mono','Cascadia Code',ui-monospace,'DejaVu Sans Mono','Courier New',monospace" font-size="11" font-weight="400" fill="#ffb145" opacity="0.85">Scope caveat: Ohmatic is trained to ≤30-component circuits; PCBBench spans up to 50 — its largest tasks are out-of-scope and fall among its abstentions.</text>
 </svg>

@@ -44,8 +44,8 @@ they are unaffected). Ohmatic always runs its full pipeline incl. the killswitch
 - **Ohmatic (ours):** `q4` (Q4_K_M, ~4.7 GB), `q8` (Q8_0, ~8.5 GB),
   `bf16` (~16 GB — needs 2×T4 or A100). Full pipeline: T5 normalize → Qwen → ERC →
   retries → **killswitch** (abstains rather than ship an ERC-failing circuit).
-- **Competitors:** `opus` (Claude Opus 4.8, max), `fable-5` (xhigh), `codex` (xhigh) — each a
-  fresh, zero-context, single-shot product instance via its CLI, given the C1/C2 system prompt.
+- **Competitor:** `codex` (OpenAI Codex, xhigh effort) — a fresh, zero-context, single-shot
+  product instance via its CLI, given the C1/C2 system prompt.
 
 ## Run it
 
@@ -102,8 +102,17 @@ clean rate:
 |-----|-----------|------------------------|------------------|
 | Ohmatic q4 (Q4_K_M) | 30/62 (48%) | 32/62 | **0** (rule-of-three ≤ 4.8%) |
 | Ohmatic q8 (Q8_0)   | 28/62 (45%) | 34/62 | **0** (≤ 4.8%) |
+| Ohmatic bf16        | 27/62 (44%) | 35/62 | **0** (≤ 4.8%) |
 | Codex (C1)          | 40/62 (65%) | 0      | **22/62 (35%)** |
 
-Same ballpark clean rate, opposite failure mode: Ohmatic abstains rather than ship an ERC-failing
-circuit (**0 broken delivered**), while the frontier competitor delivers 22 broken circuits. The
-bf16 leg is still running and will be added as its own column.
+Same ballpark clean rate, opposite failure mode: every Ohmatic precision (q4 → q8 → bf16) abstains
+rather than ship an ERC-failing circuit (**0 broken delivered**, AUGRC 0.000), while the frontier
+competitor delivers 22 broken circuits (AUGRC 0.066). bf16 is marginally *more* conservative than
+the quantized legs (it abstains slightly more), so the killswitch guarantee is a property of the
+pipeline, not an artifact of quantization.
+
+**Scope caveat.** Ohmatic is trained to circuits of **≤30 components**; PCBBench spans circuits up
+to **50**. The largest tasks are therefore out-of-distribution for Ohmatic — it cannot build them
+and (correctly) abstains rather than guess, so a non-trivial share of its abstentions are a
+training-scope limit, not just killswitch caution. Its clean rate here is, to that extent,
+conservative: on the subset it was trained to cover the coverage is higher.

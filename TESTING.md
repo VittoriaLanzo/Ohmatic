@@ -66,9 +66,10 @@ are fetched. To run a real generation, fetch a model first:
 The cross-model benchmark lives in `eval/benchmark/cross_model/`:
 
 ```
-python -m eval.benchmark.cross_model.generate --model q4 --suite realuser
+python -m eval.benchmark.cross_model.make_pcbschemagen_suite
+python -m eval.benchmark.cross_model.generate --model q4 --suite pcbschemagen
 python -m eval.benchmark.cross_model.verify
-python -m eval.benchmark.cross_model.report --suite realuser
+python -m eval.benchmark.cross_model.report --suite pcbschemagen
 ```
 
 `generate` is the only stage that costs GPU/money; `verify` and `report` are free and

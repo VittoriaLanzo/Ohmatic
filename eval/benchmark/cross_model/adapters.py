@@ -8,7 +8,7 @@ IP boundary: the Claude legs are SINGLE-SHOT (pass@1) on the byte-identical syst
 prompt + user turn, driven through the `claude -p` CLI (product vs product, NO api
 key); the ERC feedback loop is proprietary, never offered to an off-box model
 (disclosed in the report). Ohmatic legs run the full product pipeline:
-T5 (realuser only) -> Qwen -> ERC -> up to 3 corrections -> killswitch.
+T5 normalize -> Qwen -> ERC -> up to 3 corrections -> killswitch.
 """
 
 from __future__ import annotations
@@ -333,40 +333,6 @@ class OhmaticAdapter:
         }
 
 
-# ── Local: untrained-base control, single-shot via vLLM ───────────────────────
-
-class LocalSingleShotAdapter:
-    """A local HF model run SINGLE-SHOT (pass@1): one greedy generation on the
-    byte-identical system + user prompt, verified in stage 2 - NO T5, NO ERC loop,
-    NO killswitch. Same harness as the hosted legs, so the untrained-base-vs-trained
-    read is apples-to-apples (isolates the 8B base from our training + pipeline).
-
-    Backed by vLLM (paged attention): the ~6k-token system prompt + 8B in fp16 fits
-    on commodity 2x16GB where the HF sdpa path OOMs. Tensor-parallel auto-scales to
-    the visible GPUs (1 on an A40 box, 2 on a dual-T4)."""
-
-    def __init__(self, cfg: dict):
-        import torch
-        from inference.vllm_backend import VLLMChatModel
-        # fp16 not bf16: Turing-class GPUs (T4, sm_75) have no bf16, and fp16 is
-        # inference-lossless for this read. enforce_eager dodges CUDA-graph capture
-        # OOM on small VRAM. max_model_len covers the ~6.5k prompt + 4096 generation.
-        self.gen = VLLMChatModel(
-            cfg["qwen_model"], max_model_len=12288,
-            tensor_parallel=max(1, torch.cuda.device_count()),
-            dtype="float16", gpu_mem_util=0.90, enforce_eager=True)
-
-    def run(self, system_prompt: str, user_prompt: str) -> dict:
-        t0 = time.time()
-        out = self.gen.generate(
-            [[{"role": "system", "content": system_prompt},
-              {"role": "user", "content": user_prompt}]],
-            greedy=True, max_tokens=C.MAX_TOKENS)
-        text = out[0][0] if (out and out[0]) else ""
-        return {"raw_output": text, "latency_s": round(time.time() - t0, 3),
-                "tokens_in": 0, "tokens_out": 0}
-
-
 def build_adapter(model_name: str, suite: str):
     cfg = C.model_cfg(model_name)
     kind = cfg["adapter"]
@@ -375,9 +341,7 @@ def build_adapter(model_name: str, suite: str):
     if kind == "codex_cli":
         return CodexCliAdapter(cfg["model"])
     if kind == "ohmatic":
-        # T5 only for realuser (raw messy input). Holdout prompts are already
-        # normalized - pass-through there, same as prod_eval.
-        return OhmaticAdapter(cfg, use_t5=(suite == "realuser"))
-    if kind == "local1shot":
-        return LocalSingleShotAdapter(cfg)
+        # The bench prompts are already normalized (forward holdout, correction, and the
+        # pcbschemagen NL requests), so the pipeline runs a pass-through normalizer here.
+        return OhmaticAdapter(cfg, use_t5=False)
     raise SystemExit(f"Unknown adapter kind: {kind}")

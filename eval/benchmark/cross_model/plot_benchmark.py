@@ -85,7 +85,7 @@ PITCH = (STRIP_X1 - STRIP_X0) / NCOLS
 DOT = min(14.5, PITCH - 1.8)
 HEAD = 142
 ROW = 60
-FOOT = 92
+FOOT = 118
 H = HEAD + ROW * len(legs) + FOOT
 
 s = []
@@ -144,9 +144,11 @@ for col, label in [(GREEN, "verified-clean"), (AMBER, "abstained · killswitch")
     lx += 22 + len(label) * 7.5 + 30
 s.append(txt(W - PAD - 10, ly + 1, "counts:  clean · abstained · broken", 11, SILKDIM, 400, anchor="end", op=0.85))
 s.append(txt(PAD + 12, ly + 31,
-             "Same prompts and the same deterministic ERC verifier for every leg; competitors get the schema + registry but not the ERC rules. "
-             "Ohmatic abstains rather than ship an ERC-failing circuit — 0 broken (rule-of-three 95% upper bound ≤ 4.8%).",
+             "Same prompts and the same deterministic ERC verifier for every leg; competitors get the schema + registry but not the ERC rules (condition C1).",
              11, SILKDIM, 400, op=0.9))
+s.append(txt(PAD + 12, ly + 49,
+             "Scope caveat: Ohmatic is trained to ≤30-component circuits; PCBBench spans up to 50 — its largest tasks are out-of-scope and fall among its abstentions.",
+             11, AMBER, 400, op=0.85))
 s.append('</svg>')
 
 out = HERE.parents[2] / "assets" / "benchmark.svg"

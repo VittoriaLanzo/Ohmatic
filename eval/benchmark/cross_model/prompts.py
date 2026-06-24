@@ -54,21 +54,6 @@ def load_forward(n: int = 0) -> list[dict]:
              "system_extra": ""} for r in rows]
 
 
-def load_realuser() -> list[dict]:
-    """Novel messy 'real user' prompts authored by a NEUTRAL model (Opus, not in
-    the matrix), dedup-checked against the corpus, committed so the suite is frozen."""
-    if not C.REALUSER_FILE.exists():
-        raise SystemExit(f"{C.REALUSER_FILE} missing - run the Opus prompt-"
-                         f"authoring step first (see README).")
-    rows = [json.loads(l) for l in C.REALUSER_FILE.read_text(encoding="utf-8")
-            .splitlines() if l.strip()]
-    return [{"prompt_id": r.get("id") or _sha1(r["prompt"]),
-             "suite": "realuser",
-             "user_prompt": r["prompt"],
-             "category": r.get("category", "?"),
-             "system_extra": ""} for r in rows]
-
-
 def load_correction(per_category: int = 0) -> list[dict]:
     """Held-out ERC-repair cases (LOCAL legs only, enforced in config).
 
@@ -108,9 +93,6 @@ def load_pcbschemagen() -> list[dict]:
 def load_suite(suite: str, n: int = 0) -> list[dict]:
     if suite == "forward":
         return load_forward(n)
-    if suite == "realuser":
-        items = load_realuser()
-        return items[:n] if n else items
     if suite == "correction":
         return load_correction(per_category=n or 0)
     if suite == "pcbschemagen":

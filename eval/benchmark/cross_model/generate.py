@@ -45,7 +45,7 @@ def main() -> None:
     ap.add_argument("--model", required=True, choices=list(C.MODELS))
     ap.add_argument("--suite", required=True, choices=list(C.SUITES))
     ap.add_argument("--n", type=int, default=0,
-                    help="forward/realuser: cap items; correction: per-category cap")
+                    help="forward: cap items; correction: per-category cap")
     ap.add_argument("--dry-run", action="store_true",
                     help="list pending items, build nothing, spend nothing")
     ap.add_argument("--shard", default="",
