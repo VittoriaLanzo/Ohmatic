@@ -42,8 +42,8 @@ model can't get there, it returns a clarifying question and keeps the broken dra
 ## Benchmark
 
 A neutral, **third-party** test: their prompts, our rules. The 62 single-circuit tasks
-of **PCBBench** — from [PCBSchemaGen v2](https://github.com/HZou9/PCBSchemaGen_v2) (MIT, © 2026
-Zou, Han, Nazerian, Zhang, Guo & Huang) — run end to end through the full pipeline and are scored
+of **PCBBench**, from [PCBSchemaGen v2](https://github.com/HZou9/PCBSchemaGen_v2) (MIT, © 2026
+Zou, Han, Nazerian, Zhang, Guo & Huang), run end to end through the full pipeline and are scored
 by Ohmatic's own deterministic **ERC engine** (`eval/diagnostics.py` + `eval/rules/`, the same
 checker that gates training and production). Competitors get the schema and component registry but
 **not** the ERC rules (condition C1), so the comparison can't be gamed by handing them our ruleset.
@@ -53,7 +53,7 @@ checker that gates training and production). Competitors get the schema and comp
 </p>
 
 The headline is the **failure mode**, not the clean rate. Left of the delivery line is the only
-unsafe outcome — a broken circuit handed to the user; right of it are the two safe ones — a
+unsafe outcome: a broken circuit handed to the user; right of it are the two safe ones: a
 verified-clean circuit, or a killswitch abstention. Ohmatic never crosses the line:
 
 | leg | ERC-clean | abstained (killswitch) | broken delivered |
@@ -70,7 +70,7 @@ clarify instead and ships **none** across all three precisions. Same ballpark cl
 failure mode.
 
 > **Scope caveat.** Ohmatic is trained to circuits of **≤30 components**; PCBBench spans up to
-> **50**, so its largest tasks are out-of-distribution — Ohmatic cannot build them and abstains
+> **50**, so its largest tasks are out-of-distribution, and Ohmatic cannot build them; it abstains
 > rather than guess. A non-trivial share of its abstentions is therefore a training-scope limit,
 > not just killswitch caution, which makes the clean rate above conservative.
 
@@ -78,24 +78,24 @@ failure mode.
 <summary><b>Methodology and reproduce</b></summary>
 
 **Suite.** PCBBench is the 62 single-circuit tasks from PCBSchemaGen v2 (MIT). We use only the
-single-circuit set — Ohmatic builds one focused circuit per request, not whole multi-IC boards —
+single-circuit set (Ohmatic builds one focused circuit per request, not whole multi-IC boards)
 and render each as a functional natural-language request. The suite is rebuilt from the upstream
 source on demand and **never committed**, so it cannot be trained against and the upstream MIT
 notice is preserved.
 
 **Verifier.** One deterministic ERC engine scores every leg: `eval.diagnostics.analyze_schematic`
-(connectivity, power integrity, pin legality, schema/structure) — the single source of truth that
+(connectivity, power integrity, pin legality, schema/structure), the single source of truth that
 also gates training and production. Because that same engine trains and grades Ohmatic, the
 ERC-clean rate measures conformance to a fixed rule set; independent correctness is a separate
 question, addressed in [A note on verification](#a-note-on-verification). PCBSchemaGen's own
 verifier scores a complementary axis (spec-completion + exact part match) and is kept as future
 corroboration, never a replacement.
 
-**Fairness (condition C1).** Every leg receives the byte-identical system prompt — schema +
-component registry — but competitors are **not** handed the ERC rules, because giving a model the
+**Fairness (condition C1).** Every leg receives the byte-identical system prompt (schema +
+component registry), but competitors are **not** handed the ERC rules, because giving a model the
 checker's ruleset is how you benchmax it. Each frontier leg runs single-shot as a fresh,
 zero-context product instance through its own CLI (no api key), at its product's max reasoning
-effort (Codex xhigh). Ohmatic runs its full pipeline including the killswitch — that IS the product.
+effort (Codex xhigh). Ohmatic runs its full pipeline including the killswitch. That IS the product.
 
 **Outcomes.** `delivered_clean` / `delivered_broken` / `blocked_killswitch` (Ohmatic abstains; no
 unverified circuit reaches the user) / `invalid_output`. Off-box legs have no killswitch, so every
@@ -105,7 +105,7 @@ Ohmatic's broken rate is the rule-of-three ≤ 4.8%.
 ```bash
 # 1. build the suite from source (reproducible; never committed)
 python -m eval.benchmark.cross_model.make_pcbschemagen_suite
-# 2. generate a leg — an Ohmatic GPU leg, or a competitor via its own CLI (no api key)
+# 2. generate a leg: an Ohmatic GPU leg, or a competitor via its own CLI (no api key)
 python -m eval.benchmark.cross_model.generate --model q4 --suite pcbschemagen
 OHMATIC_C1_NO_ERC_RULES=1 python -m eval.benchmark.cross_model.generate --model codex --suite pcbschemagen
 # 3. verify (free, deterministic ERC) + report
@@ -113,7 +113,7 @@ python -m eval.benchmark.cross_model.verify
 python -m eval.benchmark.cross_model.report --suite pcbschemagen --by-category
 ```
 
-The Ohmatic legs import `inference.pipeline` (the literal production code — no benchmark-special
+The Ohmatic legs import `inference.pipeline` (the literal production code, no benchmark-special
 path) and need a GPU. Full pins, the model matrix, and the fairness contract live in
 [`eval/benchmark/cross_model/`](eval/benchmark/cross_model/README.md) and
 [`PCBSCHEMAGEN.md`](eval/benchmark/cross_model/PCBSCHEMAGEN.md).

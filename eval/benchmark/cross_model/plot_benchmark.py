@@ -147,7 +147,7 @@ s.append(txt(PAD + 12, ly + 31,
              "Same prompts and the same deterministic ERC verifier for every leg; competitors get the schema + registry but not the ERC rules (condition C1).",
              11, SILKDIM, 400, op=0.9))
 s.append(txt(PAD + 12, ly + 49,
-             "Scope caveat: Ohmatic is trained to ≤30-component circuits; PCBBench spans up to 50 — its largest tasks are out-of-scope and fall among its abstentions.",
+             "Scope caveat: Ohmatic is trained to ≤30-component circuits; PCBBench spans up to 50, so its largest tasks are out-of-scope and it abstains on them.",
              11, AMBER, 400, op=0.85))
 s.append('</svg>')
 
