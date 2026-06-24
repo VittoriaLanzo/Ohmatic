@@ -121,8 +121,7 @@ path) and need a GPU. Full pins, the model matrix, and the fairness contract liv
 
 ## How it works
 
-Five stages. One of them is allowed to say no.
-
+Five stages. 
 1. **Normalize** rewrites a messy or underspecified prompt onto the input distribution the model trained on, then re-attaches any specifics (voltages, parts) the rewrite dropped.
 2. **Generate** emits a two-stage circuit JSON: topology first, then layout.
 3. **Verify** runs a deterministic electrical rule checker: connectivity, power integrity, pin legality, structure. The same engine gates training, the benchmark, and production.
